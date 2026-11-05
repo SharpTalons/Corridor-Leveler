@@ -1,0 +1,947 @@
+<title>Corridor Leveler</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: the plugin window itself (as it will look inside OBS or a DAW) on top, a test bench that feeds it signal underneath, then a plain explanation. One deliberate dark look: it is a piece of audio hardware. */
+:root{
+  --ink:#0b0f14;
+  --panel:#141a21;
+  --panel2:#1a222b;
+  --well:#0e1318;
+  --line:#26313c;
+  --text:#e1e7ec;
+  --muted:#8b9aa7;
+  --faint:#81909c;
+  --band:#e2b04a;
+  --boost:#5db4d6;
+  --cut:#e27458;
+  --ok:#7cc48f;
+  --limit:#ef5454;
+  --f-display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--ink);color:var(--text);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;letter-spacing:.01em;text-wrap:balance;margin:0;line-height:1.1}
+.intro{display:flex;flex-direction:column;gap:8px;max-width:70ch}
+.sub{font-family:var(--f-mono);font-size:13px;color:var(--band)}
+.intro h1{font-size:clamp(34px,6vw,54px)}
+.intro p{margin:0;color:var(--muted)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* ---------- device ---------- */
+.device{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px;
+  box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 24px 60px -30px rgba(0,0,0,.8)}
+.dev-top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand b{font-family:var(--f-display);font-size:26px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.brand span{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--well)}
+.seg button{font:500 13px var(--f-body);color:var(--muted);background:transparent;border:0;padding:7px 12px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--panel2);color:var(--text);box-shadow:inset 0 -2px 0 var(--band)}
+.seg button:hover{color:var(--text)}
+button:focus-visible,.knob:focus-visible,input:focus-visible,select:focus-visible,label.btn:focus-within{outline:2px solid var(--band);outline-offset:2px}
+.lab{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.ctl{display:flex;align-items:center;gap:8px}
+.btn{font:600 13px var(--f-body);color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 13px;cursor:pointer}
+.btn:hover{border-color:var(--faint)}
+.btn.on{border-color:var(--band);color:var(--band)}
+.btn.primary{background:var(--band);color:#1b1508;border-color:var(--band)}
+.btn.primary.on{background:transparent;color:var(--band)}
+
+.status{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.chip{display:inline-flex;align-items:center;gap:8px;font:600 13px var(--f-body);padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--well);color:var(--muted);min-width:0}
+.chip i{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+.chip[data-s="holding"]{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
+.chip[data-s="boosting"]{color:var(--boost);border-color:color-mix(in srgb,var(--boost) 40%,var(--line))}
+.chip[data-s="cutting"],.chip[data-s="catching"]{color:var(--cut);border-color:color-mix(in srgb,var(--cut) 40%,var(--line))}
+.chip[data-s="maxed"]{color:var(--band);border-color:color-mix(in srgb,var(--band) 40%,var(--line))}
+.chip.lim{color:var(--limit);border-color:color-mix(in srgb,var(--limit) 45%,var(--line))}
+.now{color:var(--muted);font-size:13px}
+.now b{color:var(--text);font-weight:500}
+
+.readouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ro{background:var(--well);padding:9px 12px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.ro .v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:21px;font-weight:600;white-space:nowrap}
+.ro .v small{font-size:11px;color:var(--muted);font-weight:400;margin-left:4px}
+.ro.g .v{color:var(--boost)}
+.ro.g.neg .v{color:var(--cut)}
+.ro.l .v{color:var(--limit)}
+
+.scope{position:relative;height:380px;background:var(--well);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.scope canvas{width:100%;height:100%;display:block}
+.hint{font-size:12.5px;color:var(--muted);margin:-4px 2px 0}
+.hint b{color:var(--band);font-weight:600}
+
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.group{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 12px 10px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.group h3{font-size:15px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+.group .row{display:flex;flex-wrap:wrap;gap:6px 4px;align-items:flex-start}
+.group .note{font-size:12px;color:var(--faint);margin:0;line-height:1.4}
+.knob{width:76px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:ns-resize;user-select:none;touch-action:none;border-radius:8px;padding:2px 0}
+.knob svg{width:56px;height:56px;overflow:visible}
+.knob .trk{fill:none;stroke:var(--line);stroke-width:5;stroke-linecap:round}
+.knob .val{fill:none;stroke:var(--k,var(--band));stroke-width:5;stroke-linecap:round}
+.knob .cap{fill:var(--panel);stroke:var(--line)}
+.knob .ptr{stroke:var(--text);stroke-width:2.5;stroke-linecap:round}
+.knob .kv{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--text);white-space:nowrap}
+.knob .kl{font-size:11.5px;color:var(--muted);text-align:center;line-height:1.2;min-height:2.4em}
+.knob[aria-disabled="true"]{opacity:.35;cursor:default}
+
+/* ---------- bench ---------- */
+.bench{border:1px dashed var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.bench-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline}
+.bench-head h2{font-size:22px}
+.bench-head p{margin:0;color:var(--muted);font-size:13.5px;flex:1 1 320px}
+.bench-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 20px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field .top{display:flex;justify-content:space-between;gap:8px}
+.field .top span:last-child{font-family:var(--f-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--band)}
+.events{display:flex;flex-wrap:wrap;gap:8px}
+.file-name{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+label.btn input{position:absolute;opacity:0;width:1px;height:1px}
+label.btn{position:relative;display:inline-block}
+
+/* ---------- explainer ---------- */
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px 36px}
+.how h2{font-size:28px;grid-column:1/-1}
+.step{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:baseline}
+.step .n{font-family:var(--f-mono);font-size:12px;color:var(--band)}
+.step h3{font-size:19px}
+.step p{grid-column:2;margin:0;color:var(--muted);font-size:14px;max-width:62ch}
+.next{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);max-width:75ch;font-size:14px}
+.next b{color:var(--text)}
+
+@media (max-width:560px){
+  .scope{height:340px}
+  .knob{width:70px}
+  .brand b{font-size:22px}
+  .ro:last-child{grid-column:1/-1}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <h1>Corridor Leveler</h1>
+    <div class="sub">Working prototype of a Windows VST3 plugin for OBS and DAWs</div>
+    <p>Set a loudness corridor. When the sound leaves it, Corridor brings it back. While the sound stays inside, Corridor leaves it alone. Pauses and room noise are never boosted. Below is the plugin window running on simulated audio. Change the settings, drag the corridor edges on the graph, or play your own file.</p>
+  </header>
+
+  <!-- ================= PLUGIN WINDOW ================= -->
+  <section class="device" aria-label="Plugin window">
+    <div class="dev-top">
+      <div class="brand"><b>Corridor</b><span>auto-leveler + limiter</span></div>
+      <div class="ctl"><span class="lab">Material</span><div class="seg" id="segMode"></div></div>
+      <button class="btn" id="bypass" aria-pressed="false">Bypass</button>
+      <button class="btn primary" id="listen" aria-pressed="false">▶ Listen</button>
+    </div>
+
+    <div class="status">
+      <span class="chip" id="chip" data-s="waiting"><i></i><span id="chipText">Waiting for signal</span></span>
+      <span class="chip lim" id="limChip" hidden><i></i>Limiter working</span>
+      <span class="now">Now: <b id="now">Normal talking</b></span>
+    </div>
+
+    <div class="readouts">
+      <div class="ro"><span class="lab">Input · LUFS-S</span><span class="v" id="roIn">—</span></div>
+      <div class="ro"><span class="lab">Output · LUFS-S</span><span class="v" id="roOut">—</span></div>
+      <div class="ro g" id="roGainBox"><span class="lab">Leveler gain</span><span class="v" id="roGain">0.0<small>dB</small></span></div>
+      <div class="ro l"><span class="lab">Limiter</span><span class="v" id="roLim">0.0<small>dB</small></span></div>
+      <div class="ro"><span class="lab">Output peak</span><span class="v" id="roPk">—</span></div>
+    </div>
+
+    <div class="scope"><canvas id="cv" aria-label="Live meters and level history. The amber corridor marks the target range, the dashed line marks the don't-boost threshold."></canvas></div>
+    <p class="hint">Drag the <b>HI</b>, <b>LO</b> and <b>GATE</b> tabs (or the lines across the graph) to move them. The grey line is the input level and the white line is the output. The strip underneath shows the gain the plugin applies: blue for boost, coral for cut.</p>
+
+    <div class="controls">
+      <div class="group">
+        <h3>Target corridor</h3>
+        <div class="row" id="gRange"></div>
+        <p class="note">Inside the corridor nothing changes. Outside it, the sound is pulled back to the nearest edge.</p>
+      </div>
+      <div class="group">
+        <h3>How far it may go</h3>
+        <div class="row" id="gLimits"></div>
+        <p class="note">The most it will ever lift or lower the sound.</p>
+      </div>
+      <div class="group">
+        <h3>Speed</h3>
+        <div class="seg" id="segSpeed"></div>
+        <div class="row" id="gSpeed"></div>
+        <p class="note" id="speedNote">Auto: small drifts are corrected slowly, big jumps quickly, and sudden shouts within about 50 ms.</p>
+      </div>
+      <div class="group">
+        <h3>In pauses &amp; silence</h3>
+        <div class="seg" id="segBelow"></div>
+        <div class="row" id="gPause"></div>
+        <p class="note">When everything falls below the threshold, the plugin waits for this long before doing anything.</p>
+      </div>
+      <div class="group">
+        <h3>Measure by</h3>
+        <div class="seg" id="segDet" style="flex-wrap:wrap"></div>
+        <p class="note" id="detNote"></p>
+      </div>
+      <div class="group">
+        <h3>Limiter &amp; output</h3>
+        <div class="seg" id="segLim"></div>
+        <div class="row" id="gLim"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TEST BENCH ================= -->
+  <section class="bench" aria-label="Test bench">
+    <div class="bench-head">
+      <h2>Test bench</h2>
+      <p>This panel is not part of the plugin. It feeds the plugin a looping script of situations: normal talking, a quiet speaker, a shout, long silences with only room noise. You can also throw events at it yourself or load your own audio file.</p>
+    </div>
+    <div class="bench-grid">
+      <div class="field">
+        <span class="lab">Signal source</span>
+        <div class="seg" id="segSrc"></div>
+        <div class="ctl" style="flex-wrap:wrap">
+          <label class="btn" for="file">Choose audio file…<input type="file" id="file" accept="audio/*"></label>
+          <span class="file-name" id="fileName">No file loaded</span>
+        </div>
+      </div>
+      <div class="field">
+        <span class="lab">Throw an event</span>
+        <div class="events">
+          <button class="btn" id="evShout">Shout</button>
+          <button class="btn" id="evQuiet">Lean back (quiet)</button>
+          <button class="btn" id="evSilent">Stop talking</button>
+        </div>
+        <div class="ctl"><button class="btn on" id="scriptBtn" aria-pressed="true">Script running</button><span class="now" style="font-size:12.5px">Turn off for steady talking</span></div>
+      </div>
+      <div class="field">
+        <div class="top"><label class="lab" for="talk">Speaker / input level</label><span id="talkV">0 dB</span></div>
+        <input type="range" id="talk" min="-20" max="16" step="1" value="0">
+        <div class="top"><label class="lab" for="noise">Background noise</label><span id="noiseV">−58 LUFS</span></div>
+        <input type="range" id="noise" min="-75" max="-30" step="1" value="-58">
+      </div>
+      <div class="field">
+        <div class="top"><label class="lab" for="vol">Speaker volume (listening only)</label><span id="volV">40%</span></div>
+        <input type="range" id="vol" min="0" max="100" step="1" value="40">
+        <p class="note" style="margin:0;font-size:12.5px;color:var(--faint)">Press Listen to hear the result. Use Bypass to compare with and without the plugin.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= EXPLAINER ================= -->
+  <section class="how">
+    <h2>How it decides, 100 times a second</h2>
+    <div class="step"><span class="n">1</span><h3>Measure three ways</h3>
+      <p>It reads loudness in LUFS (how loud people perceive it), RMS (average energy) and peak (the loudest instant). In Auto, LUFS decides how loud the sound is, a sudden jump in loudness triggers a fast cut, and peak level drives the limiter.</p></div>
+    <div class="step"><span class="n">2</span><h3>Ignore pauses and noise</h3>
+      <p>Anything quieter than <em>Don't boost below</em> is left out of the measurement. Silence and room hum can't pull the level down, so they can't trigger a boost. After a pause it holds the current gain for the hold time. Then it either eases back to 0 dB or keeps holding, depending on your choice.</p></div>
+    <div class="step"><span class="n">3</span><h3>Compare with the corridor</h3>
+      <p>Between Lower and Upper it does nothing. Above Upper, it pulls the sound down to Upper. Below Lower, it lifts the sound up to Lower. It never goes beyond Max boost or Max cut.</p></div>
+    <div class="step"><span class="n">4</span><h3>Pick a speed</h3>
+      <p>In Auto, the further out of range the sound is, the faster it reacts. Boosting is always gentler than cutting, because a sudden boost sounds unnatural and a sudden shout needs to be caught quickly. In Manual, it uses your fixed dB-per-second rates.</p></div>
+    <div class="step"><span class="n">5</span><h3>Catch the peaks</h3>
+      <p>A limiter with 5 ms look-ahead sits at the end and keeps every peak under the ceiling, so the output never clips.</p></div>
+    <p class="next" style="grid-column:1/-1"><b>About this prototype.</b> The measuring and leveling logic on this page is the same logic the real plugin will use. Once you're happy with how it behaves, it gets built as an open-source Windows VST3 plugin with a matching window and a normal installer. The plugin will measure in stereo; this page measures one channel to keep it light.</p>
+  </section>
+</div>
+
+<script>
+"use strict";
+/* ================= helpers ================= */
+const $ = s => document.querySelector(s);
+const K20 = Math.LN10 / 20;
+const fromDB = d => Math.exp(d * K20);
+const toDB = x => x > 1e-10 ? 20 * Math.log10(x) : -200;
+const lufs = ms => ms > 1e-13 ? -0.691 + 10 * Math.log10(ms) : -120;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+function rng(seed){ let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const fmt = (v, dec = 1, signed = false) => (v < -0.0001 ? "−" : (signed && v > 0.0001 ? "+" : "")) + Math.abs(v).toFixed(dec);
+
+/* ================= parameters ================= */
+const PRESETS = {
+  mic: { upper:-16, lower:-22, threshold:-45, maxBoost:12, maxCut:12, hold:1.0, boostSpeed:3, cutSpeed:10 },
+  mix: { upper:-12, lower:-18, threshold:-50, maxBoost:9,  maxCut:12, hold:2.0, boostSpeed:2, cutSpeed:8 }
+};
+const P = Object.assign({
+  mode:"mic", speedMode:"auto", belowMode:"return", detector:"auto",
+  limiter:true, ceiling:-1, release:80, trim:0, bypass:false,
+  source:"sim", script:true, talk:0, noise:-58
+}, PRESETS.mic);
+
+const SPEC = {
+  upper:     { min:-40, max:-3,  step:0.5, label:"Upper",            unit:"", dec:1, color:"var(--band)" },
+  lower:     { min:-50, max:-6,  step:0.5, label:"Lower",            unit:"", dec:1, color:"var(--band)" },
+  threshold: { min:-70, max:-20, step:0.5, label:"Don't boost below", unit:"", dec:1, color:"var(--muted)" },
+  maxBoost:  { min:0,   max:24,  step:0.5, label:"Max boost",        unit:" dB", dec:1, color:"var(--boost)", signed:true },
+  maxCut:    { min:0,   max:24,  step:0.5, label:"Max cut",          unit:" dB", dec:1, color:"var(--cut)" },
+  boostSpeed:{ min:0.5, max:20,  step:0.5, label:"Boost speed",      unit:" dB/s", dec:1, color:"var(--boost)" },
+  cutSpeed:  { min:1,   max:60,  step:1,   label:"Cut speed",        unit:" dB/s", dec:0, color:"var(--cut)" },
+  hold:      { min:0,   max:5,   step:0.1, label:"Pause hold",       unit:" s", dec:1, color:"var(--muted)" },
+  ceiling:   { min:-12, max:0,   step:0.1, label:"Ceiling",          unit:" dBFS", dec:1, color:"var(--limit)" },
+  release:   { min:10,  max:500, step:5,   label:"Release",          unit:" ms", dec:0, color:"var(--limit)" },
+  trim:      { min:-12, max:12,  step:0.5, label:"Output trim",      unit:" dB", dec:1, color:"var(--text)", signed:true }
+};
+
+function enforce(k){
+  if (k === "upper"){ if (P.lower > P.upper - 1) P.lower = P.upper - 1; if (P.threshold > P.lower - 1) P.threshold = P.lower - 1; }
+  else if (k === "lower"){ if (P.upper < P.lower + 1) P.upper = P.lower + 1; if (P.threshold > P.lower - 1) P.threshold = P.lower - 1; }
+  else if (k === "threshold"){ if (P.lower < P.threshold + 1) P.lower = P.threshold + 1; if (P.upper < P.lower + 1) P.upper = P.lower + 1; }
+}
+function setParam(k, v){
+  const s = SPEC[k];
+  v = Math.round(clamp(v, s.min, s.max) / s.step) * s.step;
+  P[k] = +v.toFixed(3);
+  enforce(k);
+  refreshKnobs();
+}
+
+/* ================= DSP building blocks ================= */
+class Biquad{
+  constructor(c){ this.set(c); this.z1 = 0; this.z2 = 0; }
+  set(c){ this.b0 = c[0]; this.b1 = c[1]; this.b2 = c[2]; this.a1 = c[3]; this.a2 = c[4]; }
+  run(x){ const y = this.b0 * x + this.z1; this.z1 = this.b1 * x - this.a1 * y + this.z2; this.z2 = this.b2 * x - this.a2 * y; return y; }
+}
+// ITU-R BS.1770 K-weighting for any sample rate
+function kWeight(fs){
+  let f0 = 1681.974450955533, G = 3.999843853973347, Q = 0.7071752369554196;
+  let K = Math.tan(Math.PI * f0 / fs);
+  const Vh = Math.pow(10, G / 20), Vb = Math.pow(Vh, 0.4996667741545416);
+  let a0 = 1 + K / Q + K * K;
+  const s1 = new Biquad([(Vh + Vb * K / Q + K * K) / a0, 2 * (K * K - Vh) / a0, (Vh - Vb * K / Q + K * K) / a0, 2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0]);
+  f0 = 38.13547087602444; Q = 0.5003270373238773; K = Math.tan(Math.PI * f0 / fs);
+  a0 = 1 + K / Q + K * K;
+  const s2 = new Biquad([1, -2, 1, 2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0]);
+  return [s1, s2];
+}
+function bandpass(fs, f, Q){ const w = 2 * Math.PI * f / fs, al = Math.sin(w) / (2 * Q), a0 = 1 + al; return [al / a0, 0, -al / a0, -2 * Math.cos(w) / a0, (1 - al) / a0]; }
+function measureLUFS(gen, fs, sec){ const k = kWeight(fs); let s = 0; const N = Math.round(fs * sec); for (let i = 0; i < N; i++){ const y = k[1].run(k[0].run(gen())); s += y * y; } return lufs(s / N); }
+
+/* ---------- meter: LUFS-M (400 ms), LUFS-S (3 s), RMS (300 ms), peak ---------- */
+class Meter{
+  constructor(fs){
+    this.fs = fs; this.k = kWeight(fs); this.sub = Math.round(fs / 100);
+    this.n = 0; this.aK = 0; this.aR = 0; this.p = 0;
+    this.rK = new Float32Array(300); this.rR = new Float32Array(30); this.i = 0; this.j = 0;
+    this.M = -120; this.S = -120; this.R = -120; this.P = -120; this.H = -120; this.hT = 0;
+    this.bK = 0; this.bR = 0; this.bP = 0;
+  }
+  push(x){
+    const y = this.k[1].run(this.k[0].run(x));
+    this.aK += y * y; this.aR += x * x; const a = x < 0 ? -x : x; if (a > this.p) this.p = a;
+    if (++this.n >= this.sub){
+      const n = this.n; this.bK = this.aK / n; this.bR = this.aR / n; this.bP = this.p;
+      this.aK = 0; this.aR = 0; this.p = 0; this.n = 0; this.calc(); return true;
+    }
+    return false;
+  }
+  calc(){
+    this.rK[this.i] = this.bK; this.i = (this.i + 1) % 300;
+    this.rR[this.j] = this.bR; this.j = (this.j + 1) % 30;
+    let sM = 0, sS = 0, sR = 0;
+    for (let k = 0; k < 300; k++){ const v = this.rK[(this.i - 1 - k + 300) % 300]; sS += v; if (k < 40) sM += v; }
+    for (let k = 0; k < 30; k++) sR += this.rR[k];
+    this.M = lufs(sM / 40); this.S = lufs(sS / 300); this.R = sR > 1e-13 ? 10 * Math.log10(sR / 30) : -120;
+    const pd = toDB(this.bP);
+    this.P = pd > this.P ? pd : this.P - 0.25;
+    if (pd > this.H){ this.H = pd; this.hT = 150; } else if (--this.hT < 0) this.H -= 0.3;
+  }
+}
+
+/* ---------- the leveler: gated detector + corridor logic ---------- */
+class Leveler{
+  constructor(){
+    this.N = 300; this.ms = new Float32Array(300); this.msr = new Float32Array(300); this.pk = new Float32Array(300);
+    this.act = new Uint8Array(300); this.i = 0;
+    this.g = 0; this.state = "waiting"; this.activeT = 0; this.silentT = 10; this.L = null; this.M = -120;
+  }
+  // called every 10 ms with that block's K-weighted mean square, plain mean square, peak, and the ungated momentary loudness
+  block(msK, msR, pk, M){
+    const N = this.N, i = this.i;
+    this.ms[i] = msK; this.msr[i] = msR; this.pk[i] = pk;
+    const active = M >= P.threshold;
+    this.act[i] = active ? 1 : 0; this.M = M;
+
+    const det = P.detector === "auto" ? (P.mode === "mic" ? "g1" : "g3") : P.detector;
+    const win = det === "lufsM" ? 40 : det === "lufsS" || det === "g3" ? 300 : det === "g1" ? 100 : det === "rms" ? 30 : 20;
+    let sum = 0, cnt = 0, mx = 0;
+    for (let k = 0; k < win; k++){
+      const j = (i - k + N) % N;
+      if (this.act[j]){ cnt++; sum += det === "rms" ? this.msr[j] : this.ms[j]; if (this.pk[j] > mx) mx = this.pk[j]; }
+    }
+    this.i = (i + 1) % N;
+    let L = null;
+    if (cnt >= Math.min(win, 10)) L = det === "peak" ? toDB(mx) : det === "rms" ? (sum > 0 ? 10 * Math.log10(sum / cnt) : -120) : lufs(sum / cnt);
+    this.L = L;
+
+    const dt = 0.01, auto = P.speedMode === "auto", g = this.g;
+    let target = g, rate = 0, st;
+    if (!active){
+      this.silentT += dt; this.activeT = 0;
+      if (this.silentT > P.hold && P.belowMode === "return" && Math.abs(g) > 0.01){ target = 0; rate = auto ? 3 : Math.max(1, P.boostSpeed); st = "returning"; }
+      else st = "waiting";
+    } else {
+      this.activeT += dt; this.silentT = 0;
+      if (L === null || this.activeT < 0.15) st = "waiting";
+      else {
+        const out = L + g;
+        if (out > P.upper + 0.05){
+          target = P.upper - L; st = "cutting";
+          const d = out - P.upper; rate = auto ? clamp(3 + 2.5 * d, 3, 24) : P.cutSpeed;
+        } else if (out < P.lower - 0.05){
+          target = P.lower - L; st = "boosting";
+          const d = P.lower - out; rate = auto ? clamp(1 + 0.6 * d, 1, 6) * (P.mode === "mix" ? 0.6 : 1) : P.boostSpeed;
+        } else st = "holding";
+        // Auto: a sudden burst far above the corridor is caught fast, using the 400 ms reading
+        if (auto && M + g > P.upper + 6){
+          const t2 = P.upper + 3 - M;
+          if (t2 < target){ target = t2; rate = 45; st = "catching"; }
+        }
+      }
+    }
+    target = clamp(target, -P.maxCut, P.maxBoost);
+    const step = rate * dt;
+    this.g = target > g ? Math.min(target, g + step) : Math.max(target, g - step);
+    if (this.g > P.maxBoost) this.g = Math.max(P.maxBoost, g - 6 * dt);   // knob turned down mid-boost
+    if (this.g < -P.maxCut) this.g = Math.min(-P.maxCut, g + 6 * dt);
+    if (st === "boosting" && this.g >= P.maxBoost - 0.01) st = "maxed";
+    if ((st === "cutting" || st === "catching") && this.g <= -P.maxCut + 0.01) st = "maxed";
+    this.state = st;
+  }
+}
+
+/* ---------- look-ahead peak limiter (5 ms) ---------- */
+class Limiter{
+  constructor(fs){
+    this.fs = fs; const L = Math.max(1, Math.round(fs * 0.005)); this.L = L; this.cap = L + 4;
+    this.buf = new Float32Array(L + 1); this.w = 0;
+    this.qv = new Float32Array(this.cap); this.qi = new Float64Array(this.cap); this.h = 0; this.t = 0; this.sz = 0; this.n = 0;
+    this.env = 1; this.att = 1 - Math.exp(-1 / (L * 0.25)); this.rel = 0.001; this.c = fromDB(-1); this.minEnv = 1;
+  }
+  setup(){ this.rel = 1 - Math.exp(-1 / (P.release * 0.001 * this.fs)); this.c = fromDB(P.ceiling); }
+  process(x){
+    const c = this.c, a = x < 0 ? -x : x, req = (P.limiter && a > c) ? c / a : 1;
+    while (this.sz > 0){ const b = (this.t - 1 + this.cap) % this.cap; if (this.qv[b] >= req){ this.t = b; this.sz--; } else break; }
+    this.qv[this.t] = req; this.qi[this.t] = this.n; this.t = (this.t + 1) % this.cap; this.sz++;
+    while (this.qi[this.h] < this.n - (this.L + 1)){ this.h = (this.h + 1) % this.cap; this.sz--; }
+    this.n++;
+    const tg = this.qv[this.h];
+    this.env += (tg - this.env) * (tg < this.env ? this.att : this.rel);
+    const d = this.buf[this.w]; this.buf[this.w] = x; this.w = (this.w + 1) % (this.L + 1);
+    let y = d * this.env;
+    if (P.limiter){ if (y > c) y = c; else if (y < -c) y = -c; }
+    if (this.env < this.minEnv) this.minEnv = this.env;
+    return y;
+  }
+}
+
+/* ================= simulated sources ================= */
+const VOWELS = [[730,1090],[270,2290],[300,870],[530,1840],[660,1720],[440,1020],[400,1900],[600,1200]];
+class Voice{
+  constructor(fs, seed){
+    this.fs = fs; this.r = rng(seed); this.ph = 0; this.base = 118; this.f0 = 118; this.fT = 118; this.vib = 0;
+    this.b1 = new Biquad(bandpass(fs, 700, 5)); this.b2 = new Biquad(bandpass(fs, 1200, 7));
+    this.env = 0; this.tgt = 0; this.on = false; this.timer = 1;
+    this.aC = 1 - Math.exp(-1 / (0.012 * fs)); this.rC = 1 - Math.exp(-1 / (0.035 * fs)); this.gC = 1 - Math.exp(-1 / (0.08 * fs));
+  }
+  advance(){
+    const r = this.r, fs = this.fs;
+    if (this.on){ this.on = false; this.tgt = 0; const word = r() < 0.25; this.timer = fs * (word ? 0.12 + r() * 0.25 : 0.03 + r() * 0.07); }
+    else {
+      this.on = true; this.tgt = 0.55 + r() * 0.45; this.timer = fs * (0.09 + r() * 0.15);
+      const v = VOWELS[Math.floor(r() * VOWELS.length)];
+      this.b1.set(bandpass(fs, v[0], 5)); this.b2.set(bandpass(fs, v[1], 7)); this.fT = this.base * (0.85 + r() * 0.35);
+    }
+  }
+  next(){
+    if (--this.timer <= 0) this.advance();
+    this.env += (this.tgt - this.env) * (this.tgt > this.env ? this.aC : this.rC);
+    this.f0 += (this.fT - this.f0) * this.gC;
+    this.vib += 2 * Math.PI * 5 / this.fs;
+    this.ph += this.f0 * (1 + 0.012 * Math.sin(this.vib)) / this.fs; if (this.ph >= 1) this.ph -= 1;
+    const saw = 2 * this.ph - 1;
+    return (this.b1.run(saw) + 0.6 * this.b2.run(saw) + (this.r() * 2 - 1) * 0.03) * this.env;
+  }
+}
+class Pink{
+  constructor(seed){ this.r = rng(seed); this.b = [0,0,0,0,0,0,0]; }
+  next(){ const w = this.r() * 2 - 1, b = this.b;
+    b[0] = 0.99886 * b[0] + w * 0.0555179; b[1] = 0.99332 * b[1] + w * 0.0750759; b[2] = 0.969 * b[2] + w * 0.153852;
+    b[3] = 0.8665 * b[3] + w * 0.3104856; b[4] = 0.55 * b[4] + w * 0.5329522; b[5] = -0.7616 * b[5] - w * 0.016898;
+    const p = b[0] + b[1] + b[2] + b[3] + b[4] + b[5] + b[6] + w * 0.5362; b[6] = w * 0.115926; return p * 0.11; }
+}
+class Bed{ // stands in for game audio / music
+  constructor(fs, seed){
+    this.fs = fs; this.r = rng(seed); this.ch = [[220,277.2,329.6],[196,246.9,293.7],[174.6,220,261.6],[196,246.9,329.6]];
+    this.ci = 0; this.t = 0; this.len = Math.round(fs * 2); this.ph = [0,0,0]; this.bt = 0; this.beat = Math.round(fs * 0.5);
+    this.kp = 0; this.ke = 0; this.kd = Math.exp(-1 / (0.12 * fs)); this.hat = 0; this.hd = Math.exp(-1 / (0.03 * fs));
+  }
+  next(){
+    if (++this.t >= this.len){ this.t = 0; this.ci = (this.ci + 1) % 4; }
+    const c = this.ch[this.ci]; let s = 0;
+    for (let k = 0; k < 3; k++){ this.ph[k] += c[k] / this.fs; if (this.ph[k] >= 1) this.ph[k] -= 1; const p = 2 * Math.PI * this.ph[k]; s += Math.sin(p) + 0.25 * Math.sin(2 * p); }
+    s *= 0.28;
+    if (++this.bt >= this.beat){ this.bt = 0; this.ke = 1; this.kp = 0; }
+    if (this.bt === (this.beat >> 1)) this.hat = 1;
+    this.ke *= this.kd; this.hat *= this.hd;
+    this.kp += (50 + 90 * this.ke) / this.fs;
+    s += Math.sin(2 * Math.PI * this.kp) * this.ke * 0.9 + (this.r() * 2 - 1) * this.hat * 0.25;
+    return s;
+  }
+}
+const SCRIPTS = {
+  mic: [
+    { d:6,   v:-21, label:"Normal talking" },
+    { d:2.5, v:null, label:"Pause: room noise only" },
+    { d:6,   v:-32, label:"Quiet speaker, leaning back" },
+    { d:1.6, v:-11, label:"Shout" },
+    { d:5,   v:-22, label:"Normal talking" },
+    { d:6,   v:null, label:"Long silence: room noise only" },
+    { d:6,   v:-13, label:"Close to the mic, loud" }
+  ],
+  mix: [
+    { d:6,   v:-22, b:-30, label:"Talking over game audio" },
+    { d:5,   v:null, b:-20, label:"Loud game scene, nobody talking" },
+    { d:6,   v:-24, b:-36, label:"Talking, game quiet" },
+    { d:6,   v:null, b:null, label:"Menu / AFK: only background noise" },
+    { d:5,   v:-30, b:-42, label:"Everything quiet" },
+    { d:1.6, v:-12, b:-26, label:"Shout over the game" },
+    { d:5,   v:-20, b:-28, label:"Normal talking over game" }
+  ]
+};
+const calCache = {};
+function calibrate(fs){
+  if (calCache[fs]) return calCache[fs];
+  const v = new Voice(fs, 7), b = new Bed(fs, 11), p = new Pink(3);
+  return calCache[fs] = { v: measureLUFS(() => v.next(), fs, 8), b: measureLUFS(() => b.next(), fs, 8), n: measureLUFS(() => p.next(), fs, 4) };
+}
+class Sim{
+  constructor(fs){
+    this.fs = fs; this.cal = calibrate(fs);
+    this.voice = new Voice(fs, 7); this.bed = new Bed(fs, 11); this.pink = new Pink(3);
+    this.segIdx = 0; this.segT = 0; this.ev = null; this.cnt = 0;
+    this.cV = -100; this.cB = -100; this.gV = 0; this.gB = 0; this.gN = 0; this.k = 1 - Math.exp(-32 / (0.05 * fs));
+    this.label = "";
+  }
+  update(){
+    const step = 32 / this.fs, sc = SCRIPTS[P.mode];
+    if (this.segIdx >= sc.length) this.segIdx = 0;
+    if (P.script){ this.segT += step; if (this.segT >= sc[this.segIdx].d){ this.segT = 0; this.segIdx = (this.segIdx + 1) % sc.length; } }
+    if (this.ev){ this.ev.t -= step; if (this.ev.t <= 0) this.ev = null; }
+    const s = sc[this.segIdx];
+    let v, b, label;
+    const baseB = P.script ? s.b : -32;
+    if (this.ev){ v = this.ev.v; b = this.ev.keepBed ? baseB : null; label = this.ev.label; }
+    else if (P.script){ v = s.v; b = s.b; label = s.label; }
+    else { v = -22; b = -32; label = P.mode === "mix" ? "Steady talking over game audio" : "Steady talking"; }
+    if (P.mode === "mic") b = null;
+    this.label = label;
+    const tV = v == null ? -100 : v + P.talk, tB = b == null ? -100 : b;
+    this.cV += (tV - this.cV) * this.k; this.cB += (tB - this.cB) * this.k;
+    this.gV = this.cV < -95 ? 0 : fromDB(this.cV - this.cal.v);
+    this.gB = this.cB < -95 ? 0 : fromDB(this.cB - this.cal.b);
+    this.gN = fromDB(P.noise - this.cal.n);
+  }
+  next(){
+    if ((this.cnt++ & 31) === 0) this.update();
+    return this.voice.next() * this.gV + this.bed.next() * this.gB + this.pink.next() * this.gN;
+  }
+  event(type){
+    if (type === "shout") this.ev = { t:1.5, v:-11, keepBed:true, label:"Shout (your event)" };
+    if (type === "quiet") this.ev = { t:5, v:-34, keepBed:true, label:"Leaning back (your event)" };
+    if (type === "silent") this.ev = { t:6, v:null, keepBed:false, label:"Nobody talking, only noise (your event)" };
+  }
+}
+class FileSrc{
+  constructor(data, rate, name){ this.d = data; this.rate = rate; this.pos = 0; this.name = name; }
+  next(fs){ const d = this.d, n = d.length, i = this.pos | 0, f = this.pos - i; const v = d[i] * (1 - f) + d[(i + 1) % n] * f; this.pos += this.rate / fs; if (this.pos >= n) this.pos -= n; return v; }
+}
+
+/* ================= engine ================= */
+const HMAX = 300; const hist = [];
+class Engine{
+  constructor(fs){
+    this.fs = fs; this.sim = new Sim(fs); this.inM = new Meter(fs); this.outM = new Meter(fs);
+    this.lev = new Leveler(); this.lim = new Limiter(fs); this.lim.setup();
+    this.gCur = 0; this.gInc = 0; this.blocks = 0; this.inG = 1; this.outG = 1;
+  }
+  render(out, n){
+    const file = P.source === "file" ? fileSrc : null;
+    for (let s = 0; s < n; s++){
+      const x = file ? file.next(this.fs) * this.inG : this.sim.next();
+      if (this.inM.push(x)){
+        this.lev.block(this.inM.bK, this.inM.bR, this.inM.bP, this.inM.M);
+        this.gInc = (this.lev.g - this.gCur) / this.inM.sub;
+        this.lim.setup(); this.inG = fromDB(P.talk); this.outG = fromDB(P.trim);
+        if (++this.blocks % 5 === 0) this.snap();
+      }
+      this.gCur += this.gInc;
+      let y = this.lim.process(x * fromDB(this.gCur) * this.outG);
+      if (P.bypass) y = x;
+      this.outM.push(y);
+      if (out) out[s] = y;
+    }
+  }
+  snap(){
+    hist.push({ i:this.inM.M, o:this.outM.M, g:P.bypass ? 0 : this.lev.g, r:P.bypass ? 0 : toDB(this.lim.minEnv) });
+    this.lim.minEnv = 1;
+    if (hist.length > HMAX) hist.shift();
+  }
+}
+let fileSrc = null;
+let engine = new Engine(24000);
+let actx = null, node = null, vol = null, running = false;
+
+async function startAudio(){
+  try{
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    await actx.resume();
+  } catch(e){ actx = null; return; }
+  engine = new Engine(actx.sampleRate);
+  node = actx.createScriptProcessor(2048, 1, 2);
+  vol = actx.createGain(); vol.gain.value = volume();
+  node.onaudioprocess = e => { const L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1); engine.render(L, L.length); R.set(L); };
+  node.connect(vol); vol.connect(actx.destination);
+  running = true; setListen(true);
+}
+function stopAudio(){
+  running = false;
+  try{ node && node.disconnect(); actx && actx.close(); } catch(e){}
+  node = null; actx = null; engine = new Engine(24000); setListen(false);
+}
+function volume(){ const v = +$("#vol").value / 100; return v * v; }
+function setListen(on){ const b = $("#listen"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); b.textContent = on ? "■ Stop" : "▶ Listen"; }
+
+/* ================= UI: knobs & segments ================= */
+const knobs = {};
+function arcPath(a1, a2, r){
+  const p = a => [30 + r * Math.sin(a * Math.PI / 180), 30 - r * Math.cos(a * Math.PI / 180)];
+  const [x1, y1] = p(a1), [x2, y2] = p(a2);
+  return `M${x1.toFixed(2)} ${y1.toFixed(2)}A${r} ${r} 0 ${a2 - a1 > 180 ? 1 : 0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+}
+function makeKnob(parent, key){
+  const s = SPEC[key];
+  const el = document.createElement("div");
+  el.className = "knob"; el.tabIndex = 0; el.id = "k-" + key;
+  el.setAttribute("role", "slider"); el.setAttribute("aria-label", s.label);
+  el.setAttribute("aria-valuemin", s.min); el.setAttribute("aria-valuemax", s.max);
+  el.style.setProperty("--k", s.color);
+  el.innerHTML = `<svg viewBox="0 0 60 60" aria-hidden="true"><path class="trk" d="${arcPath(-135, 135, 24)}"/><path class="val"/><circle class="cap" cx="30" cy="30" r="16"/><line class="ptr" x1="30" y1="30" x2="30" y2="17"/></svg><span class="kv"></span><span class="kl">${s.label}</span>`;
+  parent.appendChild(el);
+  const val = el.querySelector(".val"), ptr = el.querySelector(".ptr"), kv = el.querySelector(".kv");
+  const disabled = () => el.getAttribute("aria-disabled") === "true";
+  knobs[key] = () => {
+    const t = (P[key] - s.min) / (s.max - s.min), a = -135 + t * 270;
+    const z = (s.signed && s.min < 0) ? 0 : -135;
+    const a0 = s.signed && s.min < 0 ? -135 + (0 - s.min) / (s.max - s.min) * 270 : -135;
+    val.setAttribute("d", Math.abs(a - a0) < 0.5 ? "" : arcPath(Math.min(a0, a), Math.max(a0, a), 24));
+    ptr.setAttribute("transform", `rotate(${a.toFixed(1)} 30 30)`);
+    kv.textContent = fmt(P[key], s.dec, s.signed) + s.unit;
+    el.setAttribute("aria-valuenow", P[key]); el.setAttribute("aria-valuetext", kv.textContent);
+    void z;
+  };
+  let y0 = 0, v0 = 0, dragging = false;
+  el.addEventListener("pointerdown", e => { if (disabled()) return; dragging = true; y0 = e.clientY; v0 = P[key]; el.setPointerCapture(e.pointerId); el.focus(); e.preventDefault(); });
+  el.addEventListener("pointermove", e => { if (!dragging) return; const range = s.max - s.min; setParam(key, v0 + (y0 - e.clientY) / 160 * range * (e.shiftKey ? 0.2 : 1)); });
+  const end = () => { dragging = false; };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+  el.addEventListener("wheel", e => { if (disabled()) return; e.preventDefault(); setParam(key, P[key] + (e.deltaY < 0 ? 1 : -1) * s.step * (e.shiftKey ? 1 : 2)); }, { passive:false });
+  el.addEventListener("dblclick", () => { if (disabled()) return; const d = (PRESETS[P.mode][key] ?? DEFAULTS[key]); setParam(key, d); });
+  el.addEventListener("keydown", e => {
+    if (disabled()) return;
+    const big = e.shiftKey ? 5 : 1;
+    if (e.key === "ArrowUp" || e.key === "ArrowRight"){ setParam(key, P[key] + s.step * big); e.preventDefault(); }
+    if (e.key === "ArrowDown" || e.key === "ArrowLeft"){ setParam(key, P[key] - s.step * big); e.preventDefault(); }
+  });
+}
+const DEFAULTS = { ceiling:-1, release:80, trim:0 };
+function refreshKnobs(){ for (const k in knobs) knobs[k](); }
+
+function makeSeg(id, key, opts, after){
+  const box = document.getElementById(id);
+  const btns = opts.map(([v, label]) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.id = id + "-" + v;
+    b.addEventListener("click", () => { P[key] = v; sync(); after && after(v); });
+    box.appendChild(b); return [v, b];
+  });
+  const sync = () => btns.forEach(([v, b]) => b.setAttribute("aria-pressed", String(P[key] === v)));
+  sync(); segSync.push(sync);
+}
+const segSync = [];
+
+["upper", "lower", "threshold"].forEach(k => makeKnob($("#gRange"), k));
+["maxBoost", "maxCut"].forEach(k => makeKnob($("#gLimits"), k));
+["boostSpeed", "cutSpeed"].forEach(k => makeKnob($("#gSpeed"), k));
+["hold"].forEach(k => makeKnob($("#gPause"), k));
+["ceiling", "release", "trim"].forEach(k => makeKnob($("#gLim"), k));
+
+makeSeg("segMode", "mode", [["mic", "Mic"], ["mix", "Mix"]], v => { Object.assign(P, PRESETS[v]); engine.sim.segIdx = 0; engine.sim.segT = 0; refreshKnobs(); detNote(); });
+makeSeg("segSpeed", "speedMode", [["auto", "Auto"], ["manual", "Manual"]], speedUI);
+makeSeg("segBelow", "belowMode", [["return", "Ease back to 0 dB"], ["hold", "Keep gain"]]);
+makeSeg("segDet", "detector", [["auto", "Auto"], ["lufsM", "LUFS-M"], ["lufsS", "LUFS-S"], ["rms", "RMS"], ["peak", "Peak"]], detNote);
+makeSeg("segLim", "limiter", [[true, "Limiter on"], [false, "Off"]]);
+makeSeg("segSrc", "source", [["sim", "Simulation"], ["file", "My audio file"]], v => { if (v === "file" && !fileSrc){ $("#fileName").textContent = "Choose a file first. Until then you'll hear silence."; } });
+
+function speedUI(){
+  const man = P.speedMode === "manual";
+  ["boostSpeed", "cutSpeed"].forEach(k => $("#k-" + k).setAttribute("aria-disabled", String(!man)));
+  $("#speedNote").textContent = man
+    ? "Manual: boosts and cuts move at exactly these rates."
+    : "Auto: small drifts are corrected slowly, big jumps quickly, and sudden shouts within about 50 ms.";
+}
+function detNote(){
+  const m = {
+    auto: P.mode === "mic"
+      ? "Auto (Mic): LUFS over the last 1 s of speech for the main decision, plus a 400 ms LUFS reading to catch shouts quickly."
+      : "Auto (Mix): LUFS over the last 3 s of active sound, so music and game audio aren't pumped. Shouts are still caught by the 400 ms reading.",
+    lufsM: "LUFS momentary (400 ms). Reacts quickly and follows how loud people hear it.",
+    lufsS: "LUFS short-term (3 s). Steady and smooth, but slow to notice changes.",
+    rms: "RMS over 300 ms. Average energy, with no correction for how the ear hears different frequencies.",
+    peak: "Peak level over 200 ms. Use a much higher corridor, around −12 to −3."
+  };
+  $("#detNote").textContent = m[P.detector] + " Sound below the threshold is ignored, whichever you choose.";
+}
+speedUI(); detNote(); refreshKnobs();
+
+$("#bypass").addEventListener("click", e => { P.bypass = !P.bypass; e.currentTarget.classList.toggle("on", P.bypass); e.currentTarget.setAttribute("aria-pressed", P.bypass); });
+$("#listen").addEventListener("click", () => running ? stopAudio() : startAudio());
+$("#evShout").addEventListener("click", () => engine.sim.event("shout"));
+$("#evQuiet").addEventListener("click", () => engine.sim.event("quiet"));
+$("#evSilent").addEventListener("click", () => engine.sim.event("silent"));
+$("#scriptBtn").addEventListener("click", e => { P.script = !P.script; const b = e.currentTarget; b.classList.toggle("on", P.script); b.setAttribute("aria-pressed", P.script); b.textContent = P.script ? "Script running" : "Script paused"; });
+$("#talk").addEventListener("input", e => { P.talk = +e.target.value; $("#talkV").textContent = fmt(P.talk, 0, true) + " dB"; });
+$("#noise").addEventListener("input", e => { P.noise = +e.target.value; $("#noiseV").textContent = fmt(P.noise, 0) + " LUFS"; });
+$("#vol").addEventListener("input", e => { $("#volV").textContent = e.target.value + "%"; if (vol) vol.gain.value = volume(); });
+$("#file").addEventListener("change", async e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  $("#fileName").textContent = "Loading " + f.name + "…";
+  try{
+    const buf = await f.arrayBuffer();
+    const oc = new OfflineAudioContext(1, 1, 44100);
+    const ab = await oc.decodeAudioData(buf);
+    const n = ab.length, mono = new Float32Array(n);
+    for (let c = 0; c < ab.numberOfChannels; c++){ const d = ab.getChannelData(c); for (let i = 0; i < n; i++) mono[i] += d[i] / ab.numberOfChannels; }
+    fileSrc = new FileSrc(mono, ab.sampleRate, f.name);
+    P.source = "file"; segSync.forEach(s => s());
+    $("#fileName").textContent = f.name + " · " + (n / ab.sampleRate).toFixed(1) + " s, looping";
+  } catch(err){
+    $("#fileName").textContent = "That file couldn't be read. Try a WAV or MP3.";
+  }
+});
+
+/* ================= drawing ================= */
+const cv = $("#cv"), cx = cv.getContext("2d");
+const css = getComputedStyle(document.documentElement);
+const C = {}; ["well","panel","panel2","line","text","muted","faint","band","boost","cut","ok","limit"].forEach(k => C[k] = css.getPropertyValue("--" + k).trim());
+const MONO = '"JetBrains Mono", ui-monospace, Consolas, monospace';
+let LAY = null, hover = null, drag = null;
+
+function rgba(hex, a){ const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+function zoneColor(v){ if (v > P.upper + 0.5) return C.cut; if (v >= P.lower - 0.5) return C.band; if (v >= P.threshold) return C.muted; return C.faint; }
+
+function draw(){
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const W = r.width, H = r.height;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.clearRect(0, 0, W, H);
+  const narrow = W < 600;
+  const scaleW = 28, mW = narrow ? 40 : 54, rulerW = narrow ? 46 : 78, gainW = narrow ? 30 : 40, gap = narrow ? 6 : 10;
+  const top = 26, h1b = H - 96, stripTop = h1b + 16, stripB = H - 12;
+  const scaleX = 2, inX = scaleX + scaleW, gX = inX + mW + gap;
+  const gainX = W - 6 - gainW, outX = gainX - gap - mW, rulerX = outX - gap - rulerW, gW = Math.max(20, rulerX - gX);
+  const yL = v => top + clamp(-v, 0, 60) / 60 * (h1b - top);
+  LAY = { gX, rulerX, rulerW, top, h1b, yL };
+
+  cx.font = `10px ${MONO}`; cx.textBaseline = "middle";
+
+  // dB scale + grid
+  cx.textAlign = "right";
+  for (let v = 0; v >= -60; v -= 6){
+    const y = yL(v);
+    cx.fillStyle = v % 12 === 0 ? C.muted : C.faint;
+    if (v % 12 === 0) cx.fillText(v === 0 ? "0" : "−" + (-v), scaleX + scaleW - 4, y);
+    cx.fillStyle = rgba(C.line, v % 12 === 0 ? 0.9 : 0.45);
+    cx.fillRect(gX, Math.round(y) + 0.5, gW, 1);
+  }
+
+  // below-threshold zone, corridor band (across graph + ruler + meters)
+  const yU = yL(P.upper), yLo = yL(P.lower), yT = yL(P.threshold);
+  cx.fillStyle = rgba(C.panel, 0.65); cx.fillRect(gX, yT, gW, h1b - yT);
+  cx.fillStyle = rgba(C.band, 0.11);
+  cx.fillRect(gX, yU, gW + gap + rulerW, yLo - yU);
+  cx.fillRect(inX - 2, yU, mW + 4, yLo - yU); cx.fillRect(outX - 2, yU, mW + 4, yLo - yU);
+  const hl = k => (hover === k || drag === k);
+  cx.fillStyle = C.band;
+  cx.fillRect(gX, Math.round(yU) - (hl("upper") ? 1 : 0), gW + gap + rulerW, hl("upper") ? 3 : 1.5);
+  cx.fillRect(gX, Math.round(yLo) - (hl("lower") ? 1 : 0), gW + gap + rulerW, hl("lower") ? 3 : 1.5);
+  cx.strokeStyle = hl("threshold") ? C.text : C.muted; cx.lineWidth = hl("threshold") ? 2 : 1.2; cx.setLineDash([5, 4]);
+  cx.beginPath(); cx.moveTo(gX, Math.round(yT) + 0.5); cx.lineTo(rulerX + rulerW, Math.round(yT) + 0.5); cx.stroke(); cx.setLineDash([]);
+
+  // history lines
+  const n = hist.length, stepX = gW / (HMAX - 1);
+  const line = (key, color, w) => {
+    cx.beginPath(); let started = false;
+    for (let k = 0; k < n; k++){ const x = gX + gW - (n - 1 - k) * stepX, y = yL(Math.max(hist[k][key], -60)); if (!started){ cx.moveTo(x, y); started = true; } else cx.lineTo(x, y); }
+    cx.strokeStyle = color; cx.lineWidth = w; cx.lineJoin = "round"; cx.stroke();
+  };
+  if (n > 1){
+    // soft fill under output
+    cx.beginPath(); cx.moveTo(gX + gW - (n - 1) * stepX, h1b);
+    for (let k = 0; k < n; k++) cx.lineTo(gX + gW - (n - 1 - k) * stepX, yL(Math.max(hist[k].o, -60)));
+    cx.lineTo(gX + gW, h1b); cx.closePath(); cx.fillStyle = rgba(C.text, 0.05); cx.fill();
+    line("i", rgba(C.muted, 0.75), 1.3);
+    line("o", C.text, 2);
+  }
+  if (!narrow){
+  cx.textAlign = "left"; cx.fillStyle = C.faint;
+  cx.fillText("15 s", gX + 4, top - 12); cx.textAlign = "right"; cx.fillText("now", gX + gW - 2, top - 12);
+  cx.textAlign = "left";
+  cx.fillStyle = rgba(C.muted, 0.9); cx.fillRect(gX + 46, top - 13, 12, 2); cx.fillStyle = C.faint; cx.fillText("in", gX + 62, top - 12);
+  cx.fillStyle = C.text; cx.fillRect(gX + 84, top - 13, 12, 2.5); cx.fillStyle = C.faint; cx.fillText("out", gX + 100, top - 12);
+  }
+
+  // gain strip
+  const R = Math.max(12, P.maxBoost, P.maxCut), mid = (stripTop + stripB) / 2, half = (stripB - stripTop) / 2 - 2;
+  const yG = v => mid - clamp(v, -R, R) / R * half;
+  cx.fillStyle = C.panel; cx.fillRect(gX, stripTop, gW, stripB - stripTop);
+  cx.fillStyle = C.line; cx.fillRect(gX, Math.round(mid), gW, 1);
+  cx.fillStyle = rgba(C.line, 0.6); cx.fillRect(gX, Math.round(yG(P.maxBoost)), gW, 1); cx.fillRect(gX, Math.round(yG(-P.maxCut)), gW, 1);
+  if (n > 1){
+    const area = (sign, color) => {
+      cx.beginPath(); cx.moveTo(gX + gW - (n - 1) * stepX, mid);
+      for (let k = 0; k < n; k++){ const g = hist[k].g; cx.lineTo(gX + gW - (n - 1 - k) * stepX, yG(sign > 0 ? Math.max(g, 0) : Math.min(g, 0))); }
+      cx.lineTo(gX + gW, mid); cx.closePath(); cx.fillStyle = rgba(color, 0.55); cx.fill();
+    };
+    area(1, C.boost); area(-1, C.cut);
+    for (let k = 0; k < n; k++){ const gr = hist[k].r; if (gr < -0.2){ const x = gX + gW - (n - 1 - k) * stepX; const hgt = clamp(-gr, 0, 12) / 12 * half; cx.fillStyle = C.limit; cx.fillRect(x - stepX / 2, stripB - hgt, Math.max(1.5, stepX), hgt); } }
+  }
+  cx.textAlign = "right"; cx.fillStyle = C.faint;
+  cx.fillText("+" + R, scaleX + scaleW - 4, stripTop + 6); cx.fillText("0", scaleX + scaleW - 4, mid); cx.fillText("−" + R, scaleX + scaleW - 4, stripB - 6);
+  cx.textAlign = "left"; cx.fillStyle = C.muted; cx.fillText("GAIN", gX + 4, stripTop + 8);
+  cx.fillStyle = C.limit; cx.fillText("limiter", gX + 40, stripTop + 8);
+
+  // meters
+  const meter = (x, m, title) => {
+    cx.textAlign = "center"; cx.fillStyle = C.muted; cx.font = `600 10.5px ${MONO}`; cx.fillText(title, x + mW / 2, top - 12); cx.font = `10px ${MONO}`;
+    const bw = (mW - 6) / 3, vals = [[m.P, "PK"], [m.R, "RMS"], [m.M, "LU"]];
+    vals.forEach(([v, lab], idx) => {
+      const bx = x + idx * (bw + 3);
+      cx.fillStyle = C.panel; cx.fillRect(bx, top, bw, h1b - top);
+      const y = yL(Math.min(v, 0));
+      if (v > -60){ cx.fillStyle = idx === 0 ? rgba(C.text, 0.55) : zoneColor(v); cx.fillRect(bx, y, bw, h1b - y); }
+      if (idx === 0 && m.H > -60){ cx.fillStyle = m.H > P.ceiling + 0.05 ? C.limit : C.text; cx.fillRect(bx, yL(Math.min(m.H, 0)) - 1, bw, 2); }
+      cx.fillStyle = C.faint; cx.fillText(lab, bx + bw / 2, h1b + 8);
+    });
+    cx.fillStyle = zoneColor(m.S); cx.font = `600 ${narrow ? 12 : 14}px ${MONO}`;
+    cx.fillText(m.S > -70 ? fmt(m.S, 1) : "—", x + mW / 2, stripTop + 26);
+    cx.font = `10px ${MONO}`; cx.fillStyle = C.faint; cx.fillText("LUFS-S", x + mW / 2, stripTop + 44);
+  };
+  meter(inX, engine.inM, "IN");
+  meter(outX, engine.outM, "OUT");
+
+  // ruler with draggable tabs + live markers
+  cx.fillStyle = C.panel; cx.fillRect(rulerX, top, rulerW, h1b - top);
+  const lev = engine.lev;
+  if (lev.L !== null && !P.bypass){
+    const yi = yL(Math.max(lev.L, -60)), yo = yL(Math.max(lev.L + lev.g, -60));
+    cx.strokeStyle = rgba(C.text, 0.35); cx.lineWidth = 1; cx.beginPath(); cx.moveTo(rulerX + 7, yi); cx.lineTo(rulerX + 7, yo); cx.stroke();
+    cx.fillStyle = C.muted; cx.beginPath(); cx.arc(rulerX + 7, yi, 3, 0, 7); cx.fill();
+    cx.fillStyle = C.text; cx.beginPath(); cx.moveTo(rulerX + 2, yo - 5); cx.lineTo(rulerX + 12, yo); cx.lineTo(rulerX + 2, yo + 5); cx.closePath(); cx.fill();
+  }
+  const tab = (k, label, color, dark) => {
+    const y = yL(P[k]), tx = rulerX + 15, tw = rulerW - 17, th = 17;
+    cx.fillStyle = color; cx.globalAlpha = hl(k) ? 1 : 0.92;
+    cx.beginPath(); cx.roundRect ? cx.roundRect(tx, y - th / 2, tw, th, 4) : cx.rect(tx, y - th / 2, tw, th); cx.fill(); cx.globalAlpha = 1;
+    cx.fillStyle = dark; cx.textAlign = "center"; cx.font = `600 ${narrow ? 9.5 : 10.5}px ${MONO}`;
+    cx.fillText(narrow ? fmt(P[k], 0) : label + " " + fmt(P[k], 0), tx + tw / 2, y + 0.5); cx.font = `10px ${MONO}`;
+  };
+  tab("threshold", "GATE", C.muted, C.well);
+  tab("lower", "LO", C.band, C.well);
+  tab("upper", "HI", C.band, C.well);
+  cx.textAlign = "center"; cx.fillStyle = C.muted; cx.font = `600 10.5px ${MONO}`; cx.fillText("RANGE", rulerX + rulerW / 2, top - 12); cx.font = `10px ${MONO}`;
+  if (narrow){ cx.fillStyle = C.faint; cx.fillText("HI/LO", rulerX + rulerW / 2, h1b + 8); }
+
+  // gain meter
+  const gyTop = top, gyB = h1b, gm = (gyTop + gyB) / 2, gh = (gyB - gyTop) / 2;
+  const yGM = v => gm - clamp(v, -24, 24) / 24 * gh;
+  cx.fillStyle = C.panel; cx.fillRect(gainX, gyTop, gainW, gyB - gyTop);
+  cx.fillStyle = C.line; cx.fillRect(gainX, Math.round(gm), gainW, 1);
+  const gNow = P.bypass ? 0 : lev.g;
+  cx.fillStyle = gNow >= 0 ? C.boost : C.cut;
+  const ya = yGM(gNow); cx.fillRect(gainX + 5, Math.min(ya, gm), gainW - 10, Math.abs(ya - gm));
+  cx.fillStyle = C.faint; cx.fillRect(gainX, Math.round(yGM(P.maxBoost)), gainW, 1); cx.fillRect(gainX, Math.round(yGM(-P.maxCut)), gainW, 1);
+  cx.textAlign = "center"; cx.fillStyle = C.muted; cx.font = `600 10.5px ${MONO}`; cx.fillText("GAIN", gainX + gainW / 2, top - 12);
+  cx.font = `600 ${narrow ? 11 : 13}px ${MONO}`; cx.fillStyle = gNow >= 0 ? C.boost : C.cut;
+  cx.fillText(fmt(gNow, 1, true), gainX + gainW / 2, stripTop + 26);
+  cx.font = `10px ${MONO}`; cx.fillStyle = C.faint; cx.fillText("dB", gainX + gainW / 2, stripTop + 44);
+  cx.fillText("+24", gainX + gainW / 2, gyTop + 8); cx.fillText("−24", gainX + gainW / 2, gyB - 8);
+}
+
+/* canvas dragging of corridor edges */
+function cpos(e){ const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+function hitTest(x, y, tol){
+  if (!LAY || x < LAY.gX || x > LAY.rulerX + LAY.rulerW || y < LAY.top - 8 || y > LAY.h1b + 8) return null;
+  let best = null, bd = tol;
+  ["upper", "lower", "threshold"].forEach(k => { const d = Math.abs(LAY.yL(P[k]) - y); if (d < bd){ bd = d; best = k; } });
+  return best;
+}
+function yToVal(y){ return -clamp((y - LAY.top) / (LAY.h1b - LAY.top), 0, 1) * 60; }
+cv.addEventListener("touchstart", e => { const t = e.touches[0]; const r = cv.getBoundingClientRect(); if (hitTest(t.clientX - r.left, t.clientY - r.top, 20)) e.preventDefault(); }, { passive:false });
+cv.addEventListener("pointerdown", e => { const p = cpos(e); const h = hitTest(p.x, p.y, e.pointerType === "touch" ? 20 : 10); if (h){ drag = h; cv.setPointerCapture(e.pointerId); e.preventDefault(); } });
+cv.addEventListener("pointermove", e => {
+  const p = cpos(e);
+  if (drag){ setParam(drag, yToVal(p.y)); return; }
+  hover = hitTest(p.x, p.y, 10); cv.style.cursor = hover ? "ns-resize" : "default";
+});
+const endDrag = () => { drag = null; };
+cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
+cv.addEventListener("pointerleave", () => { if (!drag) hover = null; });
+
+/* ================= status readouts ================= */
+const STATUS = {
+  waiting:   "Waiting for signal: nothing is boosted",
+  returning: "Silence: easing back to 0 dB",
+  holding:   "In range: leaving it alone",
+  boosting:  "Too quiet: boosting",
+  cutting:   "Too loud: cutting",
+  catching:  "Sudden burst: cutting fast",
+  maxed:     "At the max boost / max cut limit"
+};
+let uiT = 0;
+function updateUI(t){
+  if (t - uiT < 90) return; uiT = t;
+  const lev = engine.lev, st = P.bypass ? "bypass" : lev.state;
+  const chip = $("#chip"); chip.dataset.s = st;
+  $("#chipText").textContent = P.bypass ? "Bypassed: you're hearing the raw input" : STATUS[st];
+  const lastR = hist.length ? Math.min(...hist.slice(-6).map(h => h.r)) : 0;
+  $("#limChip").hidden = P.bypass || !P.limiter || lastR > -0.3;
+  $("#now").textContent = P.source === "file" ? (fileSrc ? fileSrc.name : "No file loaded") : engine.sim.label;
+  const v = (x, u) => (x > -70 ? fmt(x, 1) : "—") + `<small>${u}</small>`;
+  $("#roIn").innerHTML = v(engine.inM.S, "LUFS");
+  $("#roOut").innerHTML = v(engine.outM.S, "LUFS");
+  const g = P.bypass ? 0 : lev.g;
+  $("#roGain").innerHTML = fmt(g, 1, true) + "<small>dB</small>";
+  $("#roGainBox").classList.toggle("neg", g < -0.05);
+  $("#roLim").innerHTML = fmt(Math.min(0, lastR), 1) + "<small>dB</small>";
+  $("#roPk").innerHTML = v(engine.outM.H, "dBFS");
+}
+
+/* ================= main loop ================= */
+let last = performance.now();
+function frame(t){
+  const dt = Math.min(0.1, Math.max(0, (t - last) / 1000)); last = t;
+  if (!running) engine.render(null, Math.round(dt * engine.fs));
+  draw(); updateUI(t);
+  requestAnimationFrame(frame);
+}
+// pre-roll a few seconds so the first frame already shows history
+engine.render(null, engine.fs * 9);
+requestAnimationFrame(frame);
+</script>
