@@ -25,6 +25,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--ink);color:var(--text);font-family:var(--f-body);font-size:15px;line-height:1.5;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
 .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
@@ -80,20 +81,44 @@ button:focus-visible,.knob:focus-visible,input:focus-visible,select:focus-visibl
 .hint{font-size:12.5px;color:var(--muted);margin:-4px 2px 0}
 .hint b{color:var(--band);font-weight:600}
 
-.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
-.group{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 12px 10px;display:flex;flex-direction:column;gap:10px;min-width:0}
-.group h3{font-size:15px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
-.group .row{display:flex;flex-wrap:wrap;gap:6px 4px;align-items:flex-start}
-.group .note{font-size:12px;color:var(--faint);margin:0;line-height:1.4}
-.knob{width:76px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:ns-resize;user-select:none;touch-action:none;border-radius:8px;padding:2px 0}
-.knob svg{width:56px;height:56px;overflow:visible}
+.setup{display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none}
+.tabs button{font:600 14px var(--f-body);color:var(--muted);background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;cursor:pointer;white-space:nowrap}
+.tabs button:hover{color:var(--text)}
+.tabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--band)}
+.panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0}
+.card h3{font-size:19px}
+.card .num{font-family:var(--f-mono);font-size:12px;color:var(--band);margin-bottom:-6px}
+.card p{margin:0;font-size:13px;color:var(--muted);line-height:1.45}
+.card .row{display:flex;flex-wrap:wrap;gap:6px 4px;align-items:flex-start}
+.card .ok{color:var(--ok)}
+.btn.ghost{background:transparent;color:var(--muted);margin-top:auto}
+.btn:disabled{opacity:.6;cursor:default}
+.wrapseg{flex-wrap:wrap}
+.defs{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0;font-size:13px}
+.defs dt{font-family:var(--f-mono);color:var(--band)}
+.defs dd{margin:0;color:var(--muted)}
+.say{margin:0;font-size:15px;flex:1 1 300px;min-width:0}
+.timeline{display:flex;flex-wrap:wrap;gap:6px}
+.timeline button{font:500 13px var(--f-body);color:var(--muted);background:var(--well);border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer;display:inline-flex;gap:6px;align-items:baseline}
+.timeline button small{font-family:var(--f-mono);font-size:11px;color:var(--faint)}
+.timeline button:hover{color:var(--text)}
+.timeline button[aria-current="true"]{color:var(--text);border-color:var(--band);background:var(--panel2)}
+.knob{width:84px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.dial{cursor:ns-resize;user-select:none;touch-action:none;border-radius:50%;line-height:0}
+.dial svg{width:56px;height:56px;overflow:visible}
 .knob .trk{fill:none;stroke:var(--line);stroke-width:5;stroke-linecap:round}
 .knob .val{fill:none;stroke:var(--k,var(--band));stroke-width:5;stroke-linecap:round}
 .knob .cap{fill:var(--panel);stroke:var(--line)}
 .knob .ptr{stroke:var(--text);stroke-width:2.5;stroke-linecap:round}
-.knob .kv{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--text);white-space:nowrap}
-.knob .kl{font-size:11.5px;color:var(--muted);text-align:center;line-height:1.2;min-height:2.4em}
-.knob[aria-disabled="true"]{opacity:.35;cursor:default}
+.kin{display:flex;align-items:baseline;gap:3px;background:var(--well);border:1px solid var(--line);border-radius:6px;padding:2px 6px;cursor:text}
+.kin:focus-within{border-color:var(--band)}
+.kin input{width:42px;background:transparent;border:0;outline:0;color:var(--text);font:600 13px var(--f-mono);text-align:right;padding:0}
+.kin span{font:11px var(--f-mono);color:var(--muted)}
+.knob .kl{font-size:12px;color:var(--muted);text-align:center;line-height:1.25}
+.knob[aria-disabled="true"]{opacity:.4}
+.knob[aria-disabled="true"] .dial{cursor:default}
 
 /* ---------- bench ---------- */
 .bench{border:1px dashed var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
@@ -139,16 +164,15 @@ label.btn{position:relative;display:inline-block}
   <!-- ================= PLUGIN WINDOW ================= -->
   <section class="device" aria-label="Plugin window">
     <div class="dev-top">
-      <div class="brand"><b>Corridor</b><span>auto-leveler + limiter</span></div>
-      <div class="ctl"><span class="lab">Material</span><div class="seg" id="segMode"></div></div>
-      <button class="btn" id="bypass" aria-pressed="false">Bypass</button>
+      <div class="brand"><b>Corridor</b><span id="presetName">Mic voice</span></div>
+      <button class="btn" id="bypass" aria-pressed="false" title="Hear the input without the plugin">Bypass</button>
       <button class="btn primary" id="listen" aria-pressed="false">▶ Listen</button>
     </div>
 
-    <div class="status">
-      <span class="chip" id="chip" data-s="waiting"><i></i><span id="chipText">Waiting for signal</span></span>
-      <span class="chip lim" id="limChip" hidden><i></i>Limiter working</span>
-      <span class="now">Now: <b id="now">Normal talking</b></span>
+    <div class="status" aria-live="polite">
+      <span class="chip" id="chip" data-s="waiting"><i></i><span id="chipText">Waiting</span></span>
+      <span class="chip lim" id="limChip" hidden><i></i>Limiter</span>
+      <p class="say" id="say">Starting…</p>
     </div>
 
     <div class="readouts">
@@ -162,38 +186,73 @@ label.btn{position:relative;display:inline-block}
     <div class="scope"><canvas id="cv" aria-label="Live meters and level history. The amber corridor marks the target range, the dashed line marks the don't-boost threshold."></canvas></div>
     <p class="hint">Drag the <b>HI</b>, <b>LO</b> and <b>GATE</b> tabs (or the lines across the graph) to move them. The grey line is the input level and the white line is the output. The strip underneath shows the gain the plugin applies: blue for boost, coral for cut.</p>
 
-    <div class="controls">
-      <div class="group">
-        <h3>Target corridor</h3>
-        <div class="row" id="gRange"></div>
-        <p class="note">Inside the corridor nothing changes. Outside it, the sound is pulled back to the nearest edge.</p>
+    <div class="setup">
+      <div class="tabs" role="tablist" aria-label="Settings">
+        <button role="tab" id="tab-basics" aria-controls="tp-basics">Basics</button>
+        <button role="tab" id="tab-speed" aria-controls="tp-speed">Speed &amp; limits</button>
+        <button role="tab" id="tab-silence" aria-controls="tp-silence">Pauses &amp; noise</button>
+        <button role="tab" id="tab-measure" aria-controls="tp-measure">Measuring</button>
+        <button role="tab" id="tab-limiter" aria-controls="tp-limiter">Limiter &amp; output</button>
       </div>
-      <div class="group">
-        <h3>How far it may go</h3>
-        <div class="row" id="gLimits"></div>
-        <p class="note">The most it will ever lift or lower the sound.</p>
+
+      <div class="panel" role="tabpanel" id="tp-basics" aria-labelledby="tab-basics">
+        <div class="card"><span class="num">Step 1</span><h3>What are you leveling?</h3>
+          <div class="seg" id="segMode"></div>
+          <p>Mic is tuned for one voice. Mix reacts more gently, for game audio or music with talking on top. Switching loads starting values that suit it.</p></div>
+        <div class="card"><span class="num">Step 2</span><h3>Set the target range</h3>
+          <div class="row" id="bRange"></div>
+          <button class="btn" id="learnVoice">Use my normal level</button>
+          <p id="learnVoiceMsg">Talk normally for 3 seconds, and the range is set 3 dB either side of your level. You can also drag HI and LO on the graph.</p></div>
+        <div class="card"><span class="num">Step 3</span><h3>Ignore background noise</h3>
+          <div class="row" id="bGate"></div>
+          <button class="btn" id="learnNoise">Measure my background noise</button>
+          <p id="learnNoiseMsg">Stay quiet for 3 seconds. The threshold is set just above your noise, so pauses are never boosted.</p></div>
+        <div class="card"><span class="num">Step 4</span><h3>How quickly it reacts</h3>
+          <div class="seg" id="segReact"></div>
+          <p class="reactNote"></p>
+          <button class="btn ghost" id="reset">Reset to Mic defaults</button></div>
       </div>
-      <div class="group">
-        <h3>Speed</h3>
-        <div class="seg" id="segSpeed"></div>
-        <div class="row" id="gSpeed"></div>
-        <p class="note" id="speedNote">Auto: small drifts are corrected slowly, big jumps quickly, and sudden shouts within about 50 ms.</p>
+
+      <div class="panel" role="tabpanel" id="tp-speed" aria-labelledby="tab-speed" hidden>
+        <div class="card"><h3>Reaction speed</h3>
+          <div class="seg" id="segReact2"></div>
+          <div class="row" id="sSpeed"></div>
+          <p class="reactNote"></p></div>
+        <div class="card"><h3>How far it may go</h3>
+          <div class="row" id="sLimits"></div>
+          <p>The most it will ever lift or lower the sound, whatever happens.</p></div>
       </div>
-      <div class="group">
-        <h3>In pauses &amp; silence</h3>
-        <div class="seg" id="segBelow"></div>
-        <div class="row" id="gPause"></div>
-        <p class="note">When everything falls below the threshold, the plugin waits for this long before doing anything.</p>
+
+      <div class="panel" role="tabpanel" id="tp-silence" aria-labelledby="tab-silence" hidden>
+        <div class="card"><h3>Threshold</h3>
+          <div class="row" id="nGate"></div>
+          <p>Anything quieter than this counts as a pause or background noise. It's ignored when measuring, so it can never trigger a boost.</p></div>
+        <div class="card"><h3>During a pause</h3>
+          <div class="seg" id="segBelow"></div>
+          <div class="row" id="nHold"></div>
+          <p>The plugin first waits for the hold time, so short gaps between sentences change nothing. After that it either eases the gain back to 0 dB or keeps it where it was.</p></div>
       </div>
-      <div class="group">
-        <h3>Measure by</h3>
-        <div class="seg" id="segDet" style="flex-wrap:wrap"></div>
-        <p class="note" id="detNote"></p>
+
+      <div class="panel" role="tabpanel" id="tp-measure" aria-labelledby="tab-measure" hidden>
+        <div class="card"><h3>Measure loudness by</h3>
+          <div class="seg wrapseg" id="segDet"></div>
+          <p id="detNote"></p></div>
+        <div class="card"><h3>What the three meters mean</h3>
+          <dl class="defs">
+            <dt>LUFS</dt><dd>How loud people actually hear it. Streaming platforms use it. Best for leveling.</dd>
+            <dt>RMS</dt><dd>Average energy. Similar to LUFS but ignores how the ear hears different pitches.</dd>
+            <dt>Peak</dt><dd>The loudest single moment. Used by the limiter to stop clipping.</dd>
+          </dl></div>
       </div>
-      <div class="group">
-        <h3>Limiter &amp; output</h3>
-        <div class="seg" id="segLim"></div>
-        <div class="row" id="gLim"></div>
+
+      <div class="panel" role="tabpanel" id="tp-limiter" aria-labelledby="tab-limiter" hidden>
+        <div class="card"><h3>Limiter</h3>
+          <div class="seg" id="segLim"></div>
+          <div class="row" id="lLim"></div>
+          <p>A safety net at the very end. No peak gets louder than the ceiling, so the output never clips.</p></div>
+        <div class="card"><h3>Output</h3>
+          <div class="row" id="lTrim"></div>
+          <p>A final volume adjustment after leveling. Leave it at 0 unless the result is too quiet or too loud overall.</p></div>
       </div>
     </div>
   </section>
@@ -201,12 +260,31 @@ label.btn{position:relative;display:inline-block}
   <!-- ================= TEST BENCH ================= -->
   <section class="bench" aria-label="Test bench">
     <div class="bench-head">
-      <h2>Test bench</h2>
-      <p>This panel is not part of the plugin. It feeds the plugin a looping script of situations: normal talking, a quiet speaker, a shout, long silences with only room noise. You can also throw events at it yourself or load your own audio file.</p>
+      <h2>Try it out</h2>
+      <p>This panel isn't part of the plugin. It feeds the plugin test audio so you can see and hear how it reacts. The plugin above works on whatever plays here.</p>
+    </div>
+    <div class="field">
+      <div class="top"><span class="lab">Situations · click one to jump to it</span><span class="now" id="evNow">Now: Normal talking</span></div>
+      <div class="timeline" id="timeline"></div>
+      <div class="ctl" style="flex-wrap:wrap"><button class="btn" id="scriptBtn" aria-pressed="true">⏸ Pause the script</button><span class="now">While paused, the speaker keeps talking at a steady level.</span></div>
     </div>
     <div class="bench-grid">
       <div class="field">
-        <span class="lab">Signal source</span>
+        <span class="lab">Make something happen</span>
+        <div class="events">
+          <button class="btn" id="evShout">Shout</button>
+          <button class="btn" id="evQuiet">Lean back (quiet)</button>
+          <button class="btn" id="evSilent">Stop talking</button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="top"><label class="lab" for="talk">Speaker level</label><span id="talkV">0 dB</span></div>
+        <input type="range" id="talk" min="-20" max="16" step="1" value="0">
+        <div class="top"><label class="lab" for="noise">Background noise</label><span id="noiseV">−58 LUFS</span></div>
+        <input type="range" id="noise" min="-75" max="-30" step="1" value="-58">
+      </div>
+      <div class="field">
+        <span class="lab">Play instead</span>
         <div class="seg" id="segSrc"></div>
         <div class="ctl" style="flex-wrap:wrap">
           <label class="btn" for="file">Choose audio file…<input type="file" id="file" accept="audio/*"></label>
@@ -214,24 +292,9 @@ label.btn{position:relative;display:inline-block}
         </div>
       </div>
       <div class="field">
-        <span class="lab">Throw an event</span>
-        <div class="events">
-          <button class="btn" id="evShout">Shout</button>
-          <button class="btn" id="evQuiet">Lean back (quiet)</button>
-          <button class="btn" id="evSilent">Stop talking</button>
-        </div>
-        <div class="ctl"><button class="btn on" id="scriptBtn" aria-pressed="true">Script running</button><span class="now" style="font-size:12.5px">Turn off for steady talking</span></div>
-      </div>
-      <div class="field">
-        <div class="top"><label class="lab" for="talk">Speaker / input level</label><span id="talkV">0 dB</span></div>
-        <input type="range" id="talk" min="-20" max="16" step="1" value="0">
-        <div class="top"><label class="lab" for="noise">Background noise</label><span id="noiseV">−58 LUFS</span></div>
-        <input type="range" id="noise" min="-75" max="-30" step="1" value="-58">
-      </div>
-      <div class="field">
         <div class="top"><label class="lab" for="vol">Speaker volume (listening only)</label><span id="volV">40%</span></div>
         <input type="range" id="vol" min="0" max="100" step="1" value="40">
-        <p class="note" style="margin:0;font-size:12.5px;color:var(--faint)">Press Listen to hear the result. Use Bypass to compare with and without the plugin.</p>
+        <p class="hint" style="margin:0">Press Listen at the top to hear it. Press Bypass to hear the difference.</p>
       </div>
     </div>
   </section>
@@ -266,12 +329,13 @@ function rng(seed){ let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F
 const fmt = (v, dec = 1, signed = false) => (v < -0.0001 ? "−" : (signed && v > 0.0001 ? "+" : "")) + Math.abs(v).toFixed(dec);
 
 /* ================= parameters ================= */
+const REACT = { gentle:0.55, natural:1, fast:1.8 };
 const PRESETS = {
   mic: { upper:-16, lower:-22, threshold:-45, maxBoost:12, maxCut:12, hold:1.0, boostSpeed:3, cutSpeed:10 },
   mix: { upper:-12, lower:-18, threshold:-50, maxBoost:9,  maxCut:12, hold:2.0, boostSpeed:2, cutSpeed:8 }
 };
 const P = Object.assign({
-  mode:"mic", speedMode:"auto", belowMode:"return", detector:"auto",
+  mode:"mic", react:"natural", belowMode:"return", detector:"auto",
   limiter:true, ceiling:-1, release:80, trim:0, bypass:false,
   source:"sim", script:true, talk:0, noise:-58
 }, PRESETS.mic);
@@ -381,7 +445,7 @@ class Leveler{
     if (cnt >= Math.min(win, 10)) L = det === "peak" ? toDB(mx) : det === "rms" ? (sum > 0 ? 10 * Math.log10(sum / cnt) : -120) : lufs(sum / cnt);
     this.L = L;
 
-    const dt = 0.01, auto = P.speedMode === "auto", g = this.g;
+    const dt = 0.01, auto = P.react !== "manual", sc = REACT[P.react] || 1, g = this.g;
     let target = g, rate = 0, st;
     if (!active){
       this.silentT += dt; this.activeT = 0;
@@ -394,15 +458,15 @@ class Leveler{
         const out = L + g;
         if (out > P.upper + 0.05){
           target = P.upper - L; st = "cutting";
-          const d = out - P.upper; rate = auto ? clamp(3 + 2.5 * d, 3, 24) : P.cutSpeed;
+          const d = out - P.upper; rate = auto ? clamp(3 + 2.5 * d, 3, 24) * sc : P.cutSpeed;
         } else if (out < P.lower - 0.05){
           target = P.lower - L; st = "boosting";
-          const d = P.lower - out; rate = auto ? clamp(1 + 0.6 * d, 1, 6) * (P.mode === "mix" ? 0.6 : 1) : P.boostSpeed;
+          const d = P.lower - out; rate = auto ? clamp(1 + 0.6 * d, 1, 6) * (P.mode === "mix" ? 0.6 : 1) * sc : P.boostSpeed;
         } else st = "holding";
         // Auto: a sudden burst far above the corridor is caught fast, using the 400 ms reading
         if (auto && M + g > P.upper + 6){
           const t2 = P.upper + 3 - M;
-          if (t2 < target){ target = t2; rate = 45; st = "catching"; }
+          if (t2 < target){ target = t2; rate = 45 * Math.max(0.7, sc); st = "catching"; }
         }
       }
     }
@@ -557,6 +621,7 @@ class Sim{
     if (type === "shout") this.ev = { t:1.5, v:-11, keepBed:true, label:"Shout (your event)" };
     if (type === "quiet") this.ev = { t:5, v:-34, keepBed:true, label:"Leaning back (your event)" };
     if (type === "silent") this.ev = { t:6, v:null, keepBed:false, label:"Nobody talking, only noise (your event)" };
+    if (type === "talk") this.ev = { t:4, v:-21, keepBed:true, label:"Talking normally (for measuring)" };
   }
 }
 class FileSrc{
@@ -581,6 +646,7 @@ class Engine{
         this.gInc = (this.lev.g - this.gCur) / this.inM.sub;
         this.lim.setup(); this.inG = fromDB(P.talk); this.outG = fromDB(P.trim);
         if (++this.blocks % 5 === 0) this.snap();
+        if (learn) learnTick(this.inM);
       }
       this.gCur += this.gInc;
       let y = this.lim.process(x * fromDB(this.gCur) * this.outG);
@@ -626,35 +692,38 @@ function arcPath(a1, a2, r){
   const [x1, y1] = p(a1), [x2, y2] = p(a2);
   return `M${x1.toFixed(2)} ${y1.toFixed(2)}A${r} ${r} 0 ${a2 - a1 > 180 ? 1 : 0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
 }
+let knobCount = 0;
 function makeKnob(parent, key){
-  const s = SPEC[key];
+  const s = SPEC[key], uid = key + "-" + (++knobCount);
   const el = document.createElement("div");
-  el.className = "knob"; el.tabIndex = 0; el.id = "k-" + key;
-  el.setAttribute("role", "slider"); el.setAttribute("aria-label", s.label);
-  el.setAttribute("aria-valuemin", s.min); el.setAttribute("aria-valuemax", s.max);
+  el.className = "knob"; el.dataset.key = key; el.title = s.help || "";
   el.style.setProperty("--k", s.color);
-  el.innerHTML = `<svg viewBox="0 0 60 60" aria-hidden="true"><path class="trk" d="${arcPath(-135, 135, 24)}"/><path class="val"/><circle class="cap" cx="30" cy="30" r="16"/><line class="ptr" x1="30" y1="30" x2="30" y2="17"/></svg><span class="kv"></span><span class="kl">${s.label}</span>`;
+  el.innerHTML = `<div class="dial" tabindex="0" role="slider" id="dial-${uid}" aria-label="${s.label}" aria-valuemin="${s.min}" aria-valuemax="${s.max}"><svg viewBox="0 0 60 60" aria-hidden="true"><path class="trk" d="${arcPath(-135, 135, 24)}"/><path class="val"/><circle class="cap" cx="30" cy="30" r="16"/><line class="ptr" x1="30" y1="30" x2="30" y2="17"/></svg></div><label class="kin"><input id="in-${uid}" inputmode="decimal" autocomplete="off" aria-label="${s.label} value"><span>${s.unit.trim()}</span></label><span class="kl">${s.label}</span>`;
   parent.appendChild(el);
-  const val = el.querySelector(".val"), ptr = el.querySelector(".ptr"), kv = el.querySelector(".kv");
+  const dial = el.querySelector(".dial"), val = el.querySelector(".val"), ptr = el.querySelector(".ptr"), inp = el.querySelector("input");
   const disabled = () => el.getAttribute("aria-disabled") === "true";
-  knobs[key] = () => {
+  const a0 = s.signed && s.min < 0 ? -135 + (0 - s.min) / (s.max - s.min) * 270 : -135;
+  (knobs[key] = knobs[key] || []).push(() => {
     const t = (P[key] - s.min) / (s.max - s.min), a = -135 + t * 270;
-    const z = (s.signed && s.min < 0) ? 0 : -135;
-    const a0 = s.signed && s.min < 0 ? -135 + (0 - s.min) / (s.max - s.min) * 270 : -135;
     val.setAttribute("d", Math.abs(a - a0) < 0.5 ? "" : arcPath(Math.min(a0, a), Math.max(a0, a), 24));
     ptr.setAttribute("transform", `rotate(${a.toFixed(1)} 30 30)`);
-    kv.textContent = fmt(P[key], s.dec, s.signed) + s.unit;
-    el.setAttribute("aria-valuenow", P[key]); el.setAttribute("aria-valuetext", kv.textContent);
-    void z;
-  };
+    const txt = fmt(P[key], s.dec, s.signed);
+    if (document.activeElement !== inp) inp.value = txt;
+    dial.setAttribute("aria-valuenow", P[key]); dial.setAttribute("aria-valuetext", txt + s.unit);
+    inp.disabled = disabled();
+  });
+  const commit = () => { const v = parseFloat(inp.value.replace("−", "-").replace(",", ".")); if (isFinite(v)) setParam(key, v); else refreshKnobs(); };
+  inp.addEventListener("change", commit);
+  inp.addEventListener("keydown", e => { if (e.key === "Enter"){ commit(); inp.blur(); } if (e.key === "Escape"){ inp.blur(); refreshKnobs(); } });
+  inp.addEventListener("blur", () => refreshKnobs());
   let y0 = 0, v0 = 0, dragging = false;
-  el.addEventListener("pointerdown", e => { if (disabled()) return; dragging = true; y0 = e.clientY; v0 = P[key]; el.setPointerCapture(e.pointerId); el.focus(); e.preventDefault(); });
-  el.addEventListener("pointermove", e => { if (!dragging) return; const range = s.max - s.min; setParam(key, v0 + (y0 - e.clientY) / 160 * range * (e.shiftKey ? 0.2 : 1)); });
+  dial.addEventListener("pointerdown", e => { if (disabled()) return; dragging = true; y0 = e.clientY; v0 = P[key]; dial.setPointerCapture(e.pointerId); dial.focus(); e.preventDefault(); });
+  dial.addEventListener("pointermove", e => { if (!dragging) return; setParam(key, v0 + (y0 - e.clientY) / 160 * (s.max - s.min) * (e.shiftKey ? 0.2 : 1)); });
   const end = () => { dragging = false; };
-  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
-  el.addEventListener("wheel", e => { if (disabled()) return; e.preventDefault(); setParam(key, P[key] + (e.deltaY < 0 ? 1 : -1) * s.step * (e.shiftKey ? 1 : 2)); }, { passive:false });
-  el.addEventListener("dblclick", () => { if (disabled()) return; const d = (PRESETS[P.mode][key] ?? DEFAULTS[key]); setParam(key, d); });
-  el.addEventListener("keydown", e => {
+  dial.addEventListener("pointerup", end); dial.addEventListener("pointercancel", end);
+  dial.addEventListener("wheel", e => { if (disabled()) return; e.preventDefault(); setParam(key, P[key] + (e.deltaY < 0 ? 1 : -1) * s.step * (e.shiftKey ? 1 : 2)); }, { passive:false });
+  dial.addEventListener("dblclick", () => { if (disabled()) return; setParam(key, PRESETS[P.mode][key] ?? DEFAULTS[key]); });
+  dial.addEventListener("keydown", e => {
     if (disabled()) return;
     const big = e.shiftKey ? 5 : 1;
     if (e.key === "ArrowUp" || e.key === "ArrowRight"){ setParam(key, P[key] + s.step * big); e.preventDefault(); }
@@ -662,7 +731,7 @@ function makeKnob(parent, key){
   });
 }
 const DEFAULTS = { ceiling:-1, release:80, trim:0 };
-function refreshKnobs(){ for (const k in knobs) knobs[k](); }
+function refreshKnobs(){ for (const k in knobs) knobs[k].forEach(f => f()); }
 
 function makeSeg(id, key, opts, after){
   const box = document.getElementById(id);
@@ -676,46 +745,125 @@ function makeSeg(id, key, opts, after){
 }
 const segSync = [];
 
-["upper", "lower", "threshold"].forEach(k => makeKnob($("#gRange"), k));
-["maxBoost", "maxCut"].forEach(k => makeKnob($("#gLimits"), k));
-["boostSpeed", "cutSpeed"].forEach(k => makeKnob($("#gSpeed"), k));
-["hold"].forEach(k => makeKnob($("#gPause"), k));
-["ceiling", "release", "trim"].forEach(k => makeKnob($("#gLim"), k));
+["upper", "lower"].forEach(k => makeKnob($("#bRange"), k));
+makeKnob($("#bGate"), "threshold");
+["boostSpeed", "cutSpeed"].forEach(k => makeKnob($("#sSpeed"), k));
+["maxBoost", "maxCut"].forEach(k => makeKnob($("#sLimits"), k));
+makeKnob($("#nGate"), "threshold");
+makeKnob($("#nHold"), "hold");
+["ceiling", "release"].forEach(k => makeKnob($("#lLim"), k));
+makeKnob($("#lTrim"), "trim");
 
-makeSeg("segMode", "mode", [["mic", "Mic"], ["mix", "Mix"]], v => { Object.assign(P, PRESETS[v]); engine.sim.segIdx = 0; engine.sim.segT = 0; refreshKnobs(); detNote(); });
-makeSeg("segSpeed", "speedMode", [["auto", "Auto"], ["manual", "Manual"]], speedUI);
+const NAMES = { mic:"Mic voice", mix:"Stream mix" };
+function applyMode(){
+  $("#presetName").textContent = NAMES[P.mode];
+  $("#reset").textContent = `Reset to ${P.mode === "mic" ? "Mic" : "Mix"} defaults`;
+  buildTimeline(); detNote(); refreshKnobs();
+}
+makeSeg("segMode", "mode", [["mic", "Mic voice"], ["mix", "Whole mix"]], v => { Object.assign(P, PRESETS[v]); engine.sim.segIdx = 0; engine.sim.segT = 0; engine.sim.ev = null; applyMode(); });
+const REACT_OPTS = [["gentle", "Gentle"], ["natural", "Natural"], ["fast", "Fast"], ["manual", "Manual"]];
+makeSeg("segReact", "react", REACT_OPTS, speedUI);
+makeSeg("segReact2", "react", REACT_OPTS, speedUI);
 makeSeg("segBelow", "belowMode", [["return", "Ease back to 0 dB"], ["hold", "Keep gain"]]);
 makeSeg("segDet", "detector", [["auto", "Auto"], ["lufsM", "LUFS-M"], ["lufsS", "LUFS-S"], ["rms", "RMS"], ["peak", "Peak"]], detNote);
-makeSeg("segLim", "limiter", [[true, "Limiter on"], [false, "Off"]]);
-makeSeg("segSrc", "source", [["sim", "Simulation"], ["file", "My audio file"]], v => { if (v === "file" && !fileSrc){ $("#fileName").textContent = "Choose a file first. Until then you'll hear silence."; } });
+makeSeg("segLim", "limiter", [[true, "On"], [false, "Off"]]);
+makeSeg("segSrc", "source", [["sim", "Test script"], ["file", "My audio file"]], v => { if (v === "file" && !fileSrc){ $("#fileName").textContent = "Choose a file first. Until then you'll hear silence."; } });
 
 function speedUI(){
-  const man = P.speedMode === "manual";
-  ["boostSpeed", "cutSpeed"].forEach(k => $("#k-" + k).setAttribute("aria-disabled", String(!man)));
-  $("#speedNote").textContent = man
-    ? "Manual: boosts and cuts move at exactly these rates."
-    : "Auto: small drifts are corrected slowly, big jumps quickly, and sudden shouts within about 50 ms.";
+  const man = P.react === "manual";
+  document.querySelectorAll('.knob[data-key="boostSpeed"], .knob[data-key="cutSpeed"]').forEach(k => k.setAttribute("aria-disabled", String(!man)));
+  const t = {
+    gentle:  "Gentle: slow, smooth corrections. Shouts are still caught.",
+    natural: "Natural: small drifts are corrected slowly and big jumps quickly. Shouts are caught within about 50 ms.",
+    fast:    "Fast: corrects quickly. Tighter control, but you may hear it working.",
+    manual:  "Manual: boosts and cuts move at exactly the rates you set under Speed & limits."
+  }[P.react];
+  document.querySelectorAll(".reactNote").forEach(p => p.textContent = t);
+  refreshKnobs();
 }
+
 function detNote(){
   const m = {
     auto: P.mode === "mic"
-      ? "Auto (Mic): LUFS over the last 1 s of speech for the main decision, plus a 400 ms LUFS reading to catch shouts quickly."
-      : "Auto (Mix): LUFS over the last 3 s of active sound, so music and game audio aren't pumped. Shouts are still caught by the 400 ms reading.",
+      ? "Auto (Mic voice): LUFS over the last second of talking makes the main decision. A 400 ms reading catches shouts quickly."
+      : "Auto (Whole mix): LUFS over the last 3 seconds of sound, so music and game audio don't pump. Shouts are still caught by the 400 ms reading.",
     lufsM: "LUFS momentary (400 ms). Reacts quickly and follows how loud people hear it.",
     lufsS: "LUFS short-term (3 s). Steady and smooth, but slow to notice changes.",
-    rms: "RMS over 300 ms. Average energy, with no correction for how the ear hears different frequencies.",
-    peak: "Peak level over 200 ms. Use a much higher corridor, around −12 to −3."
+    rms: "RMS over 300 ms. Average energy, without the ear's frequency weighting.",
+    peak: "Peak level over 200 ms. Needs a much higher range, around −12 to −3."
   };
-  $("#detNote").textContent = m[P.detector] + " Sound below the threshold is ignored, whichever you choose.";
+  $("#detNote").textContent = m[P.detector] + " Whichever you pick, sound below the threshold is ignored.";
 }
-speedUI(); detNote(); refreshKnobs();
+/* tabs */
+const TABS = ["basics", "speed", "silence", "measure", "limiter"];
+function showTab(name, focus){
+  TABS.forEach(t => { const on = t === name; $("#tab-" + t).setAttribute("aria-selected", String(on)); $("#tab-" + t).tabIndex = on ? 0 : -1; $("#tp-" + t).hidden = !on; });
+  if (focus) $("#tab-" + name).focus();
+  try{ localStorage.setItem("corridor-tab", name); } catch(e){}
+}
+TABS.forEach((t, i) => {
+  const b = $("#tab-" + t);
+  b.addEventListener("click", () => showTab(t));
+  b.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") showTab(TABS[(i + 1) % TABS.length], true);
+    if (e.key === "ArrowLeft") showTab(TABS[(i - 1 + TABS.length) % TABS.length], true);
+  });
+});
+let startTab = "basics"; try{ startTab = localStorage.getItem("corridor-tab") || "basics"; } catch(e){}
+showTab(TABS.includes(startTab) ? startTab : "basics");
+
+/* test situations */
+function buildTimeline(){
+  const box = $("#timeline"); box.textContent = "";
+  SCRIPTS[P.mode].forEach((s, i) => {
+    const b = document.createElement("button"); b.type = "button"; b.id = "sit-" + i;
+    b.innerHTML = `${s.label}<small>${s.d}s</small>`;
+    b.addEventListener("click", () => { const sim = engine.sim; sim.segIdx = i; sim.segT = 0; sim.ev = null; P.source = "sim"; segSync.forEach(f => f()); if (!P.script) toggleScript(); });
+    box.appendChild(b);
+  });
+}
+
+/* learn: measure 3 s of voice or noise */
+let learn = null;
+function startLearn(type){
+  learn = { type, t:0, vals:[] };
+  if (P.source === "sim") engine.sim.event(type === "noise" ? "silent" : "talk");
+  $(type === "noise" ? "#learnNoiseMsg" : "#learnVoiceMsg").classList.remove("ok");
+}
+function learnTick(m){
+  learn.t += 0.01; learn.vals.push([m.M, m.bK]);
+  if (learn.t < 3) return;
+  const type = learn.type, vals = learn.vals.slice(60); learn = null;
+  if (type === "noise"){
+    const Ms = vals.map(v => v[0]).sort((a, b) => a - b), p95 = Ms[Math.floor(Ms.length * 0.95)] ?? -70;
+    const gate = Math.round((p95 + 6) * 2) / 2;
+    setParam("threshold", gate);
+    const msg = $("#learnNoiseMsg"); msg.classList.add("ok");
+    msg.textContent = `Measured background noise at about ${fmt(p95, 0)} LUFS. Threshold set to ${fmt(P.threshold, 1)}, 6 dB above it.`;
+  } else {
+    const act = vals.filter(v => v[0] >= P.threshold), msg = $("#learnVoiceMsg");
+    if (act.length < 60){ msg.classList.remove("ok"); msg.textContent = "Couldn't hear enough talking above the threshold. Try again while speaking normally."; return; }
+    const lv = lufs(act.reduce((s, v) => s + v[1], 0) / act.length);
+    setParam("upper", Math.round((lv + 3) * 2) / 2); setParam("lower", Math.round((lv - 3) * 2) / 2);
+    msg.classList.add("ok");
+    msg.textContent = `Your normal level is about ${fmt(lv, 1)} LUFS. Range set to ${fmt(P.lower, 1)} to ${fmt(P.upper, 1)}.`;
+  }
+}
+$("#learnVoice").addEventListener("click", () => startLearn("voice"));
+$("#learnNoise").addEventListener("click", () => startLearn("noise"));
+$("#reset").addEventListener("click", () => {
+  Object.assign(P, PRESETS[P.mode], { react:"natural", belowMode:"return", detector:"auto", limiter:true, ceiling:-1, release:80, trim:0 });
+  segSync.forEach(f => f()); speedUI(); applyMode();
+});
+function toggleScript(){ P.script = !P.script; const b = $("#scriptBtn"); b.setAttribute("aria-pressed", P.script); b.textContent = P.script ? "⏸ Pause the script" : "▶ Resume the script"; }
+speedUI(); applyMode();
 
 $("#bypass").addEventListener("click", e => { P.bypass = !P.bypass; e.currentTarget.classList.toggle("on", P.bypass); e.currentTarget.setAttribute("aria-pressed", P.bypass); });
 $("#listen").addEventListener("click", () => running ? stopAudio() : startAudio());
 $("#evShout").addEventListener("click", () => engine.sim.event("shout"));
 $("#evQuiet").addEventListener("click", () => engine.sim.event("quiet"));
 $("#evSilent").addEventListener("click", () => engine.sim.event("silent"));
-$("#scriptBtn").addEventListener("click", e => { P.script = !P.script; const b = e.currentTarget; b.classList.toggle("on", P.script); b.setAttribute("aria-pressed", P.script); b.textContent = P.script ? "Script running" : "Script paused"; });
+$("#scriptBtn").addEventListener("click", toggleScript);
 $("#talk").addEventListener("input", e => { P.talk = +e.target.value; $("#talkV").textContent = fmt(P.talk, 0, true) + " dB"; });
 $("#noise").addEventListener("input", e => { P.noise = +e.target.value; $("#noiseV").textContent = fmt(P.noise, 0) + " LUFS"; });
 $("#vol").addEventListener("input", e => { $("#volV").textContent = e.target.value + "%"; if (vol) vol.gain.value = volume(); });
@@ -807,6 +955,12 @@ function draw(){
   cx.fillStyle = C.text; cx.fillRect(gX + 84, top - 13, 12, 2.5); cx.fillStyle = C.faint; cx.fillText("out", gX + 100, top - 12);
   }
 
+  // zone labels
+  cx.textAlign = "left"; cx.font = `600 10.5px ${MONO}`;
+  if (!narrow && yLo - yU > 15){ cx.fillStyle = rgba(C.band, 0.95); cx.fillText("TARGET RANGE", gX + 6, yU + 9); }
+  if (h1b - yT > 18){ cx.fillStyle = C.muted; cx.fillText(narrow ? "IGNORED" : "BELOW HERE: IGNORED, NEVER BOOSTED", gX + 6, yT + 11); }
+  cx.font = `10px ${MONO}`;
+
   // gain strip
   const R = Math.max(12, P.maxBoost, P.maxCut), mid = (stripTop + stripB) / 2, half = (stripB - stripTop) / 2 - 2;
   const yG = v => mid - clamp(v, -R, R) / R * half;
@@ -837,7 +991,7 @@ function draw(){
       const y = yL(Math.min(v, 0));
       if (v > -60){ cx.fillStyle = idx === 0 ? rgba(C.text, 0.55) : zoneColor(v); cx.fillRect(bx, y, bw, h1b - y); }
       if (idx === 0 && m.H > -60){ cx.fillStyle = m.H > P.ceiling + 0.05 ? C.limit : C.text; cx.fillRect(bx, yL(Math.min(m.H, 0)) - 1, bw, 2); }
-      cx.fillStyle = C.faint; cx.fillText(lab, bx + bw / 2, h1b + 8);
+      if (!narrow){ cx.fillStyle = C.faint; cx.fillText(lab, bx + bw / 2, h1b + 8); }
     });
     cx.fillStyle = zoneColor(m.S); cx.font = `600 ${narrow ? 12 : 14}px ${MONO}`;
     cx.fillText(m.S > -70 ? fmt(m.S, 1) : "—", x + mW / 2, stripTop + 26);
@@ -866,7 +1020,7 @@ function draw(){
   tab("lower", "LO", C.band, C.well);
   tab("upper", "HI", C.band, C.well);
   cx.textAlign = "center"; cx.fillStyle = C.muted; cx.font = `600 10.5px ${MONO}`; cx.fillText("RANGE", rulerX + rulerW / 2, top - 12); cx.font = `10px ${MONO}`;
-  if (narrow){ cx.fillStyle = C.faint; cx.fillText("HI/LO", rulerX + rulerW / 2, h1b + 8); }
+  
 
   // gain meter
   const gyTop = top, gyB = h1b, gm = (gyTop + gyB) / 2, gh = (gyB - gyTop) / 2;
@@ -905,24 +1059,28 @@ cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", 
 cv.addEventListener("pointerleave", () => { if (!drag) hover = null; });
 
 /* ================= status readouts ================= */
-const STATUS = {
-  waiting:   "Waiting for signal: nothing is boosted",
-  returning: "Silence: easing back to 0 dB",
-  holding:   "In range: leaving it alone",
-  boosting:  "Too quiet: boosting",
-  cutting:   "Too loud: cutting",
-  catching:  "Sudden burst: cutting fast",
-  maxed:     "At the max boost / max cut limit"
-};
+const CHIP = { waiting:"Waiting", returning:"Easing back", holding:"In range", boosting:"Boosting", cutting:"Cutting", catching:"Fast cut", maxed:"At limit", bypass:"Bypassed" };
+function sentence(){
+  const lev = engine.lev, L = lev.L, g = lev.g, r = n => fmt(n, Math.abs(n % 1) > 0.01 && Math.abs(n % 1) < 0.99 && n === Math.round(n * 2) / 2 ? 1 : 0), d = n => fmt(n, 1, true);
+  if (P.bypass) return "Bypassed. You're hearing the input exactly as it comes in.";
+  switch (lev.state){
+    case "holding":   return `After leveling it sits at ${fmt(L + g, 0)}, inside the ${r(P.lower)} to ${r(P.upper)} range. It's left alone` + (Math.abs(g) > 0.2 ? `, keeping the ${d(g)} dB it already applied.` : ".");
+    case "boosting":  return `Coming in at ${fmt(L, 0)}, below the range. Lifting it toward ${r(P.lower)} (now ${d(g)} dB).`;
+    case "cutting":   return `Coming in at ${fmt(L, 0)}, above the range. Lowering it toward ${r(P.upper)} (now ${d(g)} dB).`;
+    case "catching":  return `Sudden loud burst. Cutting fast (now ${d(g)} dB).`;
+    case "returning": return `Only background noise for over ${fmt(P.hold, 1)} s. Easing the gain back to 0 dB (now ${d(g)} dB).`;
+    case "maxed":     return g > 0 ? `Still too quiet, but it has reached the max boost of ${fmt(P.maxBoost, 0)} dB and won't lift further.` : `Still too loud, but it has reached the max cut of ${fmt(P.maxCut, 0)} dB.`;
+    default:          return lev.M < P.threshold ? `Only background noise, below ${r(P.threshold)}. Nothing is boosted.` : "Sound just started. Measuring it before acting.";
+  }
+}
 let uiT = 0;
 function updateUI(t){
-  if (t - uiT < 90) return; uiT = t;
+  if (t - uiT < 120) return; uiT = t;
   const lev = engine.lev, st = P.bypass ? "bypass" : lev.state;
-  const chip = $("#chip"); chip.dataset.s = st;
-  $("#chipText").textContent = P.bypass ? "Bypassed: you're hearing the raw input" : STATUS[st];
+  $("#chip").dataset.s = st; $("#chipText").textContent = CHIP[st];
+  $("#say").textContent = sentence();
   const lastR = hist.length ? Math.min(...hist.slice(-6).map(h => h.r)) : 0;
   $("#limChip").hidden = P.bypass || !P.limiter || lastR > -0.3;
-  $("#now").textContent = P.source === "file" ? (fileSrc ? fileSrc.name : "No file loaded") : engine.sim.label;
   const v = (x, u) => (x > -70 ? fmt(x, 1) : "—") + `<small>${u}</small>`;
   $("#roIn").innerHTML = v(engine.inM.S, "LUFS");
   $("#roOut").innerHTML = v(engine.outM.S, "LUFS");
@@ -931,6 +1089,16 @@ function updateUI(t){
   $("#roGainBox").classList.toggle("neg", g < -0.05);
   $("#roLim").innerHTML = fmt(Math.min(0, lastR), 1) + "<small>dB</small>";
   $("#roPk").innerHTML = v(engine.outM.H, "dBFS");
+  // timeline highlight
+  const sim = engine.sim, onFile = P.source === "file";
+  document.querySelectorAll("#timeline button").forEach((b, i) => b.setAttribute("aria-current", String(!onFile && !sim.ev && P.script && i === sim.segIdx)));
+  $("#evNow").textContent = onFile ? "Playing your file: " + (fileSrc ? fileSrc.name : "none loaded") : "Now: " + sim.label;
+  // learning progress
+  for (const [type, id] of [["voice", "#learnVoice"], ["noise", "#learnNoise"]]){
+    const b = $(id);
+    b.textContent = learn && learn.type === type ? `Listening… ${Math.max(0, 3 - learn.t).toFixed(1)} s` : (type === "voice" ? "Use my normal level" : "Measure my background noise");
+    b.disabled = !!learn;
+  }
 }
 
 /* ================= main loop ================= */
