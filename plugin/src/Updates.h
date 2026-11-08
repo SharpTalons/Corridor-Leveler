@@ -20,8 +20,8 @@
 
 namespace updates {
 
-inline constexpr const char* kLatestUrl = "https://api.github.com/repos/fubulatu-lang/obs-dynamic-range/releases/latest";
-inline constexpr const char* kReleasesPage = "https://github.com/fubulatu-lang/obs-dynamic-range/releases";
+inline constexpr const char* kLatestUrl = "https://api.github.com/repos/fubulatu-lang/Corridor-Leveler/releases/latest";
+inline constexpr const char* kReleasesPage = "https://github.com/fubulatu-lang/Corridor-Leveler/releases";
 inline constexpr juce::int64 kMaxBytes = 200LL * 1024 * 1024;
 
 struct Release {

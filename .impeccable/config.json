@@ -20,6 +20,15 @@
         ],
         "createdAt": "2026-11-08T03:51:16.600Z",
         "reason": "Claude: the only bordered, shadowed box inside the plugin window is the help popover (#help), a hidden-by-default overlay positioned over the window, not a nested layout card"
+      },
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          "prototype/corridor-look.html"
+        ],
+        "createdAt": "2026-11-08T15:40:00.760Z",
+        "reason": "Claude: static scan assumes a white background; the page ground is #121214 and the grey text measures 5.2:1 or better on it"
       }
     ]
   }

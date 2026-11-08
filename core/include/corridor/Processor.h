@@ -48,6 +48,8 @@ struct Snapshot {
     float outRms;     // dB RMS (300 ms)
     float gain;       // dB applied by the leveler
     float limiterDb;  // most gain reduction by the limiter in this slot (<= 0)
+    float inPeak;     // dBFS, highest input sample in this slot (for the waveform view)
+    bool analyzing;   // Hold mode was measuring during this slot
 };
 
 // Everything the UI shows. Written by the audio thread, read by any thread.
@@ -140,7 +142,7 @@ private:
     std::vector<int64_t> qi_;
     int qh_ = 0, qt_ = 0, qsz_ = 0, qcap_ = 0;
     int64_t qn_ = 0;
-    float env_ = 1.f, att_ = 0.f, rel_ = 0.f, minEnv_ = 1.f;
+    float env_ = 1.f, att_ = 0.f, rel_ = 0.f, minEnv_ = 1.f, slotPeak_ = 0.f;
 
     // bypass crossfade
     float bypassMix_ = 0.f, bypassStep_ = 0.f;
