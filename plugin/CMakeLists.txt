@@ -17,11 +17,10 @@ endif()
 set(_formats VST3 Standalone)
 if(CORRIDOR_BUILD_VST2)
   if(NOT CORRIDOR_FST_DIR)
-    FetchContent_Declare(fst GIT_REPOSITORY https://git.iem.at/zmoelnig/FST.git GIT_TAG 647af068765b75867e3a28b4dd8991ab9ed47f7c)
-    FetchContent_GetProperties(fst)
-    if(NOT fst_POPULATED)
-      FetchContent_Populate(fst)
-    endif()
+    # download only: SOURCE_SUBDIR has no CMakeLists.txt, so FST's own project is not added
+    FetchContent_Declare(fst GIT_REPOSITORY https://git.iem.at/zmoelnig/FST.git GIT_TAG 647af068765b75867e3a28b4dd8991ab9ed47f7c
+      SOURCE_SUBDIR download-only)
+    FetchContent_MakeAvailable(fst)
     set(CORRIDOR_FST_DIR "${fst_SOURCE_DIR}")
   endif()
   # JUCE looks for <pluginterfaces/vst2.x/aeffect.h>; point those names at FST.

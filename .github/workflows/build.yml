@@ -14,7 +14,7 @@ jobs:
     name: Linux checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install build libraries
         run: |
           sudo apt-get update
@@ -31,7 +31,7 @@ jobs:
           A="build/plugin/CorridorLeveler_artefacts/Release"
           xvfb-run -a build/plugin/corridor_plugin_check_artefacts/Release/corridor_plugin_check \
             --vst3 "$A/VST3/Corridor Leveler.vst3" --vst2 "$A/VST/libCorridor Leveler.so" --snapshots screenshots
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: window-screenshots
           path: screenshots/*.png
@@ -42,7 +42,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Work out the version
@@ -80,11 +80,11 @@ jobs:
         shell: pwsh
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DSrcDir=$pwd\stage" "/DAppVersion=$env:VERSION" installer\corridor.iss
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: CorridorLeveler-Windows-Setup
           path: dist/*.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: CorridorLeveler-Windows-files
           path: stage/

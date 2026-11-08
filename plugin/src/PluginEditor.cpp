@@ -1137,6 +1137,7 @@ private:
     TextButton ease{"Ease in silence"}, bypass{"Bypass"}, themeBtn{"Dark theme"};
     TextButton versionBtn{"v0"}, updateBtn{"Update"};
     TagLayer tags;
+    TooltipWindow tooltips{this, 600};  // shows the tooltips set on Ease, the theme switch and others
     SharedResourcePointer<updates::Checker> checker;  // declared before the panels that use it
     AboutPanel about;
     UpdatePrompt prompt;

@@ -8,11 +8,9 @@ set(CORRIDOR_LIBOBS_INCLUDE_DIR "" CACHE PATH "Use an existing libobs source fol
 if(NOT CORRIDOR_LIBOBS_INCLUDE_DIR)
   FetchContent_Declare(obs_src
     URL "https://github.com/obsproject/obs-studio/archive/refs/tags/${CORRIDOR_OBS_VERSION}.tar.gz"
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-  FetchContent_GetProperties(obs_src)
-  if(NOT obs_src_POPULATED)
-    FetchContent_Populate(obs_src)
-  endif()
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_SUBDIR download-only)  # headers only: OBS's own project is not added
+  FetchContent_MakeAvailable(obs_src)
   set(CORRIDOR_LIBOBS_INCLUDE_DIR "${obs_src_SOURCE_DIR}/libobs")
 endif()
 
