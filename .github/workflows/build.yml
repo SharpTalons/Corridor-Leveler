@@ -24,7 +24,7 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build --parallel
-      - name: DSP core and OBS filter tests
+      - name: DSP core tests
         run: ctest --test-dir build --output-on-failure
       - name: Load the plugins like a host, render the window
         run: |
@@ -68,12 +68,9 @@ jobs:
         shell: bash
         run: |
           A="build/plugin/CorridorLeveler_artefacts/Release"
-          mkdir -p stage/obs/data stage/vst3 stage/vst2 stage/app
-          cp build/obs/Release/corridor-leveler.dll stage/obs/
-          cp -r obs/data/. stage/obs/data/
+          mkdir -p stage/vst3 stage/vst2
           cp -r "$A/VST3/Corridor Leveler.vst3" stage/vst3/
           cp "$A/VST/Corridor Leveler.dll" stage/vst2/
-          cp "$A/Standalone/Corridor Leveler.exe" stage/app/
           cp LICENSE stage/LICENSE.txt
           cp installer/README.txt stage/README.txt
       - name: Build installer
@@ -99,5 +96,5 @@ jobs:
           generate_release_notes: true
           make_latest: true
           body: |
-            Windows installer for Corridor Leveler ${{ env.VERSION }}: the OBS filter, VST3, 2.x plugin and Standalone app.
+            Windows installer for Corridor Leveler ${{ env.VERSION }}: the VST3 and 2.x plugins (OBS loads the 2.x plugin).
             Download **CorridorLeveler-${{ env.VERSION }}-Windows-Setup.exe** below, run it, then restart OBS.

@@ -1,8 +1,7 @@
 // Corridor Leveler - shared DSP core.
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Framework-free so the same engine runs in the VST3/VST2/Standalone builds (JUCE)
-// and in the native OBS filter (libobs). Works at whatever sample rate the host runs,
+// Framework-free: the engine behind the VST3 and VST2 builds (JUCE). Works at whatever sample rate the host runs,
 // with mono or stereo (any channel count; detection is linked across channels).
 #pragma once
 

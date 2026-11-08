@@ -1,11 +1,11 @@
-# VST3, legacy VST 2.x and Standalone builds, made with JUCE (AGPLv3 open-source licence).
+# VST3 and VST 2.x builds, made with JUCE (AGPLv3 open-source licence).
 # The 2.x format is built against FST (GPLv3), an open reimplementation of the 2.x headers,
 # because Steinberg no longer distributes that SDK.
 include(FetchContent)
 
 set(CORRIDOR_JUCE_DIR "" CACHE PATH "Use an existing JUCE checkout instead of downloading")
 set(CORRIDOR_FST_DIR "" CACHE PATH "Use an existing FST checkout instead of downloading")
-option(CORRIDOR_BUILD_VST2 "Build the legacy 2.x plugin (needed by OBS's built-in VST filter)" ON)
+option(CORRIDOR_BUILD_VST2 "Build the 2.x plugin (what OBS loads through its built-in VST 2.x filter)" ON)
 
 if(CORRIDOR_JUCE_DIR)
   add_subdirectory("${CORRIDOR_JUCE_DIR}" "${CMAKE_BINARY_DIR}/juce" EXCLUDE_FROM_ALL)
@@ -14,7 +14,7 @@ else()
   FetchContent_MakeAvailable(juce)
 endif()
 
-set(_formats VST3 Standalone)
+set(_formats VST3)
 if(CORRIDOR_BUILD_VST2)
   if(NOT CORRIDOR_FST_DIR)
     # download only: SOURCE_SUBDIR has no CMakeLists.txt, so FST's own project is not added

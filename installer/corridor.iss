@@ -31,23 +31,20 @@ Name: "full"; Description: "Everything"
 Name: "custom"; Description: "Choose what to install"; Flags: iscustom
 
 [Components]
-Name: "obs";  Description: "OBS filter (shows up as ""Corridor Leveler"" in OBS's filter list)"; Types: full custom
-Name: "vst3"; Description: "VST3 plugin (DAWs; OBS via a VST3 host add-on)"; Types: full custom
-Name: "vst2"; Description: "2.x plugin (OBS's built-in VST filter, older DAWs)"; Types: full custom
-Name: "app";  Description: "Standalone app (test with your microphone)"; Types: full custom
+Name: "vst2"; Description: "2.x plugin (OBS's built-in VST 2.x filter, older DAWs)"; Types: full custom
+Name: "vst3"; Description: "VST3 plugin (DAWs)"; Types: full custom
+
+[InstallDelete]
+; parts that earlier versions installed and this one no longer ships
+Type: filesandordirs; Name: "{commonappdata}\obs-studio\plugins\corridor-leveler"
+Type: files; Name: "{app}\Corridor Leveler.exe"
 
 [Files]
-Source: "{#SrcDir}\obs\corridor-leveler.dll"; DestDir: "{commonappdata}\obs-studio\plugins\corridor-leveler\bin\64bit"; Components: obs; Flags: ignoreversion
-Source: "{#SrcDir}\obs\data\*"; DestDir: "{commonappdata}\obs-studio\plugins\corridor-leveler\data"; Components: obs; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#SrcDir}\vst3\Corridor Leveler.vst3\*"; DestDir: "{commoncf64}\VST3\Corridor Leveler.vst3"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SrcDir}\vst2\Corridor Leveler.dll"; DestDir: "{commonpf64}\VSTPlugins"; Components: vst2; Flags: ignoreversion
-Source: "{#SrcDir}\app\Corridor Leveler.exe"; DestDir: "{app}"; Components: app; Flags: ignoreversion
+Source: "{#SrcDir}\vst3\Corridor Leveler.vst3\*"; DestDir: "{commoncf64}\VST3\Corridor Leveler.vst3"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SrcDir}\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcDir}\README.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
 [Icons]
-Name: "{group}\Corridor Leveler"; Filename: "{app}\Corridor Leveler.exe"; Components: app
+Name: "{group}\Read me"; Filename: "{app}\README.txt"
 Name: "{group}\Uninstall Corridor Leveler"; Filename: "{uninstallexe}"
-
-[Run]
-Filename: "{app}\Corridor Leveler.exe"; Description: "Open the standalone app now"; Flags: postinstall nowait skipifsilent unchecked; Components: app

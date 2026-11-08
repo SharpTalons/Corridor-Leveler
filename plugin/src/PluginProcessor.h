@@ -1,4 +1,4 @@
-// Corridor Leveler - JUCE plugin processor (VST3, VST2, Standalone).
+// Corridor Leveler - JUCE plugin processor (VST3, VST2).
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #pragma once
 
