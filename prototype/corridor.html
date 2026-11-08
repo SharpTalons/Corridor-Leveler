@@ -4,13 +4,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: the plugin window is the page's centre of gravity. Header strip with in/out meters, a big target dial that doubles as a live meter, three tactile control strips beside it, a mode/measure row, and a full-width action bar. "Expand" opens the spectrum and history underneath. A test bench and plain explanation follow. */
+/* Layout: one plugin window. Input meter down the left edge, output meter down the right, and between them a scrolling level graph that fills the window. The knob deck floats over the lower part of the graph. Expand adds a spectrum panel below. Test bench and explanation follow. */
 :root{
-  /* page */
   --bg:#e9e9e4; --fg:#16181b; --muted:#5d636b; --line:#d3d4ce;
-  /* plugin, light */
-  --p-bg:#f4f4f0; --p-surface:#fcfcfa; --p-sunk:#e8e8e2; --p-ink:#141619; --p-muted:#626870; --p-line:#d6d7d0;
-  --p-accent:#17756a; --p-accent-soft:#cfe5e1; --p-boost:#2672b5; --p-cut:#c24d33; --p-limit:#c7302b; --p-ok:#2b7d47;
+  --p-bg:#f4f4f0; --p-surface:#fcfcfa; --p-sunk:#e6e6e0; --p-graph:#eeeee9; --p-ink:#141619; --p-muted:#626870; --p-line:#d6d7d0;
+  --p-accent:#17756a; --p-accent-soft:#cfe5e1; --p-boost:#2672b5; --p-cut:#c24d33; --p-limit:#c7302b; --p-ok:#2b7d47; --p-warn:#b7862a;
   --p-shadow:0 30px 60px -34px rgba(20,24,28,.45);
   --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -19,8 +17,8 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1114;--fg:#e8eae6;--muted:#9aa1a8;--line:#2a2e33;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#0f1114;--fg:#e8eae6;--muted:#9aa1a8;--line:#2a2e33;color-scheme:dark}
 .plugin[data-ptheme="dark"]{
-  --p-bg:#1a1d21; --p-surface:#22262b; --p-sunk:#14171a; --p-ink:#eceee9; --p-muted:#a0a7ae; --p-line:#333940;
-  --p-accent:#4cc2ae; --p-accent-soft:#1f3b37; --p-boost:#62a9e8; --p-cut:#ee7b5f; --p-limit:#f0605a; --p-ok:#6cc58b;
+  --p-bg:#1a1d21; --p-surface:#23272c; --p-sunk:#14171a; --p-graph:#181b1f; --p-ink:#eceee9; --p-muted:#a0a7ae; --p-line:#333940;
+  --p-accent:#4cc2ae; --p-accent-soft:#1f3b37; --p-boost:#62a9e8; --p-cut:#ee7b5f; --p-limit:#f0605a; --p-ok:#6cc58b; --p-warn:#e0b354;
   --p-shadow:0 30px 60px -30px rgba(0,0,0,.8); color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -34,112 +32,93 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;margin:0;line-height:1.1;t
 .intro .sub{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
 .intro p{margin:0;color:var(--muted)}
 .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-button,input,select{font:inherit;color:inherit}
+button,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--p-accent);outline-offset:2px}
 
 /* ================= plugin ================= */
-.plugin{background:var(--p-bg);color:var(--p-ink);border:1px solid var(--p-line);border-radius:18px;box-shadow:var(--p-shadow);overflow:hidden;
-  max-width:900px;width:100%;margin:0 auto;transition:max-width .25s ease}
-.plugin.wide{max-width:1100px}
-.p-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:12px 16px;border-bottom:1px solid var(--p-line);background:var(--p-surface)}
-.logo{font-family:var(--f-display);font-weight:800;font-size:17px;letter-spacing:.14em}
-.io{display:grid;grid-template-columns:auto minmax(90px,200px) auto;gap:3px 8px;align-items:center;flex:1 1 220px;max-width:340px;font-family:var(--f-mono);font-size:11px;color:var(--p-muted)}
-.io .bar{position:relative;height:7px;border-radius:4px;background:var(--p-sunk);overflow:hidden}
-.io .bar i{position:absolute;inset:0 auto 0 0;width:0;background:var(--p-muted);border-radius:4px}
-.io .bar.out i{background:var(--p-ink)}
-.io .bar u{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--p-accent)}
-.io .num{min-width:5ch;text-align:right;color:var(--p-ink);font-variant-numeric:tabular-nums}
-.tools{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap}
+.plugin{background:var(--p-bg);color:var(--p-ink);border:1px solid var(--p-line);border-radius:16px;box-shadow:var(--p-shadow);overflow:hidden;width:100%}
+.p-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:9px 14px;border-bottom:1px solid var(--p-line);background:var(--p-surface)}
+.logo{font-family:var(--f-display);font-weight:800;font-size:16px;letter-spacing:.14em;margin-right:auto}
 .tbtn{background:transparent;border:1px solid transparent;border-radius:8px;padding:5px 9px;font-size:13px;font-weight:600;color:var(--p-ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .tbtn:hover{background:var(--p-sunk)}
 .tbtn[aria-expanded="true"],.tbtn[aria-pressed="true"]{background:var(--p-accent-soft);color:var(--p-accent)}
 .tbtn svg{width:16px;height:16px}
-.help{padding:14px 18px;border-bottom:1px solid var(--p-line);background:var(--p-surface);display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 24px;font-size:13.5px}
+.help{padding:14px 18px;border-bottom:1px solid var(--p-line);background:var(--p-surface);display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 24px;font-size:13.5px}
 .help b{display:block;font-family:var(--f-display);font-size:14px}
 .help p{margin:0;color:var(--p-muted)}
 
-.p-main{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:22px 30px;padding:24px 22px 10px;align-items:center}
-.dialwrap{position:relative;width:100%;max-width:340px;aspect-ratio:1;margin:0 auto}
-.dialwrap canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y}
-.dial-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;gap:0}
-.tnum{pointer-events:auto;width:4.6ch;text-align:center;border:0;border-bottom:2px solid transparent;background:transparent;font-family:var(--f-display);font-weight:800;
-  font-size:clamp(42px,8vw,62px);letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;padding:0;color:var(--p-ink);cursor:text}
-.tnum:hover{border-bottom-color:var(--p-line)}
-.tnum:focus{outline:0;border-bottom-color:var(--p-accent)}
-.tunit{font-family:var(--f-mono);font-size:13px;color:var(--p-muted);margin-top:4px}
-.tlab{font-family:var(--f-display);font-weight:700;font-size:14px;letter-spacing:.16em;text-transform:uppercase;margin-top:2px}
-.tnow{font-family:var(--f-mono);font-size:12px;color:var(--p-muted);margin-top:8px;font-variant-numeric:tabular-nums}
+.body{display:grid;grid-template-columns:52px minmax(0,1fr) 52px;background:var(--p-graph)}
+.meter{position:relative;border-right:1px solid var(--p-line);background:var(--p-surface)}
+.meter.out{border-right:0;border-left:1px solid var(--p-line)}
+.meter canvas{position:absolute;inset:0;width:100%;height:100%}
+.stage{position:relative;height:500px;min-width:0}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y}
 
-.strips{display:flex;flex-direction:column;gap:12px;min-width:0}
-.strip{background:var(--p-surface);border:1px solid var(--p-line);border-radius:14px;padding:12px 14px 10px;display:flex;flex-direction:column;gap:8px;min-width:0}
-.strip .st-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.strip .st-lab{font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:.08em;text-transform:uppercase}
-.strip .st-help{font-size:12.5px;color:var(--p-muted);margin:-4px 0 0}
-.st-val{display:flex;align-items:baseline;gap:4px;border-radius:8px;padding:1px 6px;background:var(--p-sunk);cursor:text}
-.st-val:focus-within{box-shadow:0 0 0 2px var(--p-accent)}
-.st-val input{width:5.4ch;border:0;background:transparent;outline:0;text-align:right;font:700 16px var(--f-mono);font-variant-numeric:tabular-nums;padding:0;color:var(--p-ink)}
-.st-val span{font:12px var(--f-mono);color:var(--p-muted)}
-.track{position:relative;height:30px;border-radius:9px;background:var(--p-sunk);cursor:ew-resize;touch-action:pan-y;overflow:hidden}
-.track .fill{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,var(--p-accent-soft),color-mix(in srgb,var(--p-accent) 45%,var(--p-accent-soft)));border-right:3px solid var(--p-accent)}
-.track .ticks{position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),color-mix(in srgb,var(--p-ink) 12%,transparent) calc(10% - 1px) 10%)}
-.track .mark{position:absolute;top:5px;bottom:5px;width:3px;margin-left:-1px;border-radius:2px;background:var(--p-ink);opacity:.75;transition:left .08s linear}
-.track .mark.hot{background:var(--p-limit);opacity:1}
-.strip[aria-disabled="true"]{opacity:.45}
-.strip[aria-disabled="true"] .track{cursor:default}
-.ends{display:flex;justify-content:space-between;font-size:11.5px;color:var(--p-muted);font-family:var(--f-mono);margin-top:-2px}
+.deck{position:absolute;left:0;right:0;bottom:0;padding:40px 18px 12px;display:flex;flex-direction:column;gap:6px;pointer-events:none;
+  background:linear-gradient(to bottom,transparent,color-mix(in srgb,var(--p-graph) 82%,transparent) 32%,var(--p-graph) 70%)}
+.deck > *{pointer-events:auto}
+.krow{display:flex;align-items:flex-end;justify-content:space-between;gap:10px 14px;flex-wrap:wrap}
+.kgroup{display:flex;align-items:flex-end;gap:14px}
+.knob{display:flex;flex-direction:column;align-items:center;gap:3px;width:96px}
+.knob.big{width:124px}
+.knob.small{width:76px}
+.kdial{position:relative;width:84px;height:84px;cursor:ns-resize;touch-action:none;border-radius:50%}
+.knob.big .kdial{width:112px;height:112px}
+.knob.small .kdial{width:58px;height:58px}
+.kdial svg{width:100%;height:100%;overflow:visible;display:block}
+.kdial .trk{fill:none;stroke:var(--p-sunk);stroke-width:7;stroke-linecap:round}
+.kdial .val{fill:none;stroke:var(--p-accent);stroke-width:7;stroke-linecap:round}
+.kdial .body{fill:var(--p-surface);stroke:var(--p-line);stroke-width:1.5}
+.kdial .ind{fill:var(--p-ink)}
+.kdial .live{fill:var(--p-bg);stroke:var(--p-ink);stroke-width:2}
+.kdial:hover .body{stroke:var(--p-muted)}
+.kval{display:flex;align-items:baseline;gap:3px;border-radius:6px;padding:0 5px;cursor:text}
+.kval:hover{background:var(--p-sunk)}
+.kval:focus-within{background:var(--p-sunk);box-shadow:0 0 0 2px var(--p-accent)}
+.kval input{width:5ch;border:0;background:transparent;outline:0;text-align:right;font:600 14px var(--f-mono);font-variant-numeric:tabular-nums;padding:0;color:var(--p-ink)}
+.knob.big .kval input{font-size:17px}
+.kval span{font:11px var(--f-mono);color:var(--p-muted)}
+.klab{font-family:var(--f-display);font-weight:700;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase}
 
-.p-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px 24px;padding:14px 22px 18px}
-.applied{display:grid;grid-template-columns:auto 1fr;align-items:baseline;column-gap:6px;min-width:190px}
-.applied .gnum{font-family:var(--f-display);font-weight:800;font-size:38px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
-.applied .gnum.up{color:var(--p-boost)} .applied .gnum.down{color:var(--p-cut)}
-.applied .gdb{font-family:var(--f-mono);font-size:13px;color:var(--p-muted)}
-.applied .glab{grid-column:1/-1;font-family:var(--f-display);font-weight:700;font-size:13px;letter-spacing:.12em;text-transform:uppercase;margin-top:4px}
-.applied .gstate{grid-column:1/-1;font-size:12.5px;color:var(--p-muted)}
-.modes{display:inline-grid;grid-template-columns:1fr 1fr;background:var(--p-sunk);border-radius:999px;padding:4px;border:1px solid var(--p-line)}
-.modes button{border:0;background:transparent;border-radius:999px;padding:8px 20px;font-family:var(--f-display);font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:14px;cursor:pointer;color:var(--p-muted);display:flex;flex-direction:column;align-items:center;line-height:1.15}
-.modes button small{font-family:var(--f-body);font-weight:500;letter-spacing:0;text-transform:none;font-size:11.5px}
+.center{display:flex;flex-direction:column;align-items:center;gap:8px;padding-bottom:14px}
+.modes{display:inline-grid;grid-template-columns:1fr 1fr;background:var(--p-sunk);border-radius:999px;padding:3px;border:1px solid var(--p-line)}
+.modes button{border:0;background:transparent;border-radius:999px;padding:6px 16px;font-family:var(--f-display);font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:13px;cursor:pointer;color:var(--p-muted)}
 .modes button[aria-checked="true"]{background:var(--p-ink);color:var(--p-bg)}
-.units{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-.units .row{display:flex;gap:2px}
-.units button{border:0;background:transparent;border-radius:8px;padding:5px 9px;font-family:var(--f-display);font-weight:700;font-size:15px;color:var(--p-muted);cursor:pointer;letter-spacing:.03em}
-.units button:hover{color:var(--p-ink)}
-.units button[aria-checked="true"]{color:var(--p-ink);box-shadow:inset 0 -3px 0 var(--p-accent)}
-.units .subrow button{font-size:12.5px;padding:3px 9px;font-family:var(--f-mono)}
-.units .subrow button[aria-checked="true"]{background:var(--p-accent-soft);color:var(--p-accent);box-shadow:none}
-.units .lab{font-size:11px;color:var(--p-muted);font-family:var(--f-mono)}
-
-.p-foot{border-top:1px solid var(--p-line);background:var(--p-surface)}
-.analyze{width:100%;border:0;background:transparent;padding:16px 20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
-.analyze b{font-family:var(--f-display);font-weight:800;font-size:28px;letter-spacing:.14em;text-transform:uppercase;color:var(--p-ink)}
-.analyze span{font-size:13px;color:var(--p-muted)}
-.analyze:hover b{color:var(--p-accent)}
-.analyze.busy b{color:var(--p-accent)}
-.analyze .prog{width:min(340px,70%);height:4px;border-radius:2px;background:var(--p-sunk);overflow:hidden;margin-top:6px}
-.analyze .prog i{display:block;height:100%;width:0;background:var(--p-accent)}
-.say{margin:0;padding:15px 20px;font-size:15px;text-align:center;min-height:56px;display:flex;align-items:center;justify-content:center}
-.say .dot{width:9px;height:9px;border-radius:50%;background:var(--p-muted);margin-right:10px;flex:none}
+.analyze{border:1px solid var(--p-line);background:var(--p-surface);border-radius:10px;padding:6px 16px;font-family:var(--f-display);font-weight:800;font-size:14px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;position:relative;overflow:hidden;min-width:140px}
+.analyze:hover{border-color:var(--p-accent);color:var(--p-accent)}
+.analyze.busy{color:var(--p-accent);border-color:var(--p-accent)}
+.analyze i{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--p-accent)}
+.applied{display:flex;flex-direction:column;align-items:flex-end;padding-bottom:10px;min-width:118px}
+.applied .gnum{font-family:var(--f-display);font-weight:800;font-size:30px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+.applied .gnum.up{color:var(--p-boost)} .applied .gnum.down{color:var(--p-cut)}
+.applied .glab{font-family:var(--f-display);font-weight:700;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
+.say{margin:0;font-size:13.5px;text-align:center;color:var(--p-ink);display:flex;align-items:center;justify-content:center;gap:8px;min-height:22px}
+.say .dot{width:8px;height:8px;border-radius:50%;background:var(--p-muted);flex:none}
 .say[data-s="on"] .dot{background:var(--p-ok)} .say[data-s="boosting"] .dot{background:var(--p-boost)}
-.say[data-s="cutting"] .dot,.say[data-s="ceiling"] .dot{background:var(--p-cut)}
+.say[data-s="cutting"] .dot,.say[data-s="ceiling"] .dot,.say[data-s="range"] .dot{background:var(--p-cut)}
+.say[data-s="held"] .dot,.say[data-s="analyzing"] .dot{background:var(--p-accent)}
 
-/* expanded */
-.x{border-top:1px solid var(--p-line);padding:16px;display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px}
-.panel{background:var(--p-surface);border:1px solid var(--p-line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
-.panel h3{font-size:13px;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.panel h3 .legend{font-family:var(--f-mono);font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--p-muted);font-weight:400;display:flex;gap:12px}
+.x{border-top:1px solid var(--p-line);padding:14px;background:var(--p-bg)}
+.panel{background:var(--p-surface);border:1px solid var(--p-line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.panel h3{font-size:13px;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.legend{font-family:var(--f-mono);font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--p-muted);font-weight:400;display:flex;gap:12px}
 .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
-.panel canvas{width:100%;display:block;border-radius:8px;background:var(--p-sunk)}
-#rta{height:280px} #hist{height:180px}
-.chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
-.chips button{border:1px solid var(--p-line);background:var(--p-sunk);border-radius:999px;padding:4px 11px;font-size:12.5px;cursor:pointer;color:var(--p-muted)}
+.chips{display:flex;gap:4px;margin-left:auto}
+.chips button{border:1px solid var(--p-line);background:var(--p-sunk);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--p-muted);letter-spacing:0;text-transform:none;font-family:var(--f-body);font-weight:500}
 .chips button[aria-pressed="true"]{background:var(--p-accent-soft);color:var(--p-accent);border-color:var(--p-accent)}
-.mini{font-size:12.5px;color:var(--p-muted);margin:0}
+#rta{width:100%;height:260px;display:block;border-radius:8px;background:var(--p-sunk)}
 
-@media (max-width:720px){
-  .p-main{grid-template-columns:1fr;padding:18px 14px 8px}
-  .p-row{padding:12px 14px 16px}
-  .units{align-items:flex-start}
-  .x{grid-template-columns:1fr;padding:12px}
-  #rta{height:220px}
+@media (max-width:760px){
+  .body{grid-template-columns:34px minmax(0,1fr) 34px}
+  .stage{height:auto}
+  .stage canvas{position:relative;display:block;height:300px}
+  .deck{position:static;background:var(--p-graph);padding:10px 8px 12px;grid-column:1/-1}
+  .krow{justify-content:center}
+  .kgroup{gap:6px}
+  .knob{width:84px} .knob.big{width:104px}
+  .kdial{width:70px;height:70px} .knob.big .kdial{width:92px;height:92px}
+  .applied{align-items:center}
+  #rta{height:200px}
 }
 
 /* ================= bench & explainer ================= */
@@ -174,84 +153,61 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
 .how p,.how li{margin:0;color:var(--muted);font-size:14px}
 .how ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
 .how b{color:var(--fg);font-weight:600}
-@media (prefers-reduced-motion:reduce){.plugin,.track .mark{transition:none}}
 </style>
 
 <div class="page">
   <header class="intro">
     <h1>Corridor Leveler</h1>
     <div class="sub">Interactive prototype · Windows VST3 plugin for OBS and DAWs</div>
-    <p>Set a target and Corridor keeps your audio there. In Ride mode it moves the gain continuously. In Hold mode it analyzes a section, then locks one fixed correction. The plugin window below runs live on test audio, and you can also play your own file.</p>
+    <p>Set a target and Corridor keeps your audio there. Ride mode moves the gain continuously. Hold mode analyzes a section, then locks one fixed correction. The window below runs live on test audio, and you can also play your own file.</p>
   </header>
 
   <section class="plugin" id="plugin" data-ptheme="light" aria-label="Plugin window">
     <div class="p-head">
       <div class="logo">CORRIDOR</div>
-      <div class="io" aria-label="Input and output level">
-        <span>IN</span><div class="bar"><i id="ioInBar"></i><u id="ioInT"></u></div><span class="num" id="ioIn">—</span>
-        <span>OUT</span><div class="bar out"><i id="ioOutBar"></i><u id="ioOutT"></u></div><span class="num" id="ioOut">—</span>
-      </div>
-      <div class="tools">
-        <button class="tbtn" id="resetBtn" type="button">Reset</button>
-        <button class="tbtn" id="themeBtn" type="button" aria-pressed="false" aria-label="Dark plugin theme"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/></svg></button>
-        <button class="tbtn" id="helpBtn" type="button" aria-expanded="false" aria-controls="help" aria-label="Help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.2v.1" stroke-linecap="round"/></svg></button>
-        <button class="tbtn" id="expandBtn" type="button" aria-expanded="false" aria-controls="xpanel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="expandTxt">Expand</span></button>
-      </div>
+      <button class="tbtn" id="resetBtn" type="button">Reset</button>
+      <button class="tbtn" id="themeBtn" type="button" aria-pressed="false" aria-label="Dark plugin theme"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/></svg></button>
+      <button class="tbtn" id="helpBtn" type="button" aria-expanded="false" aria-controls="help" aria-label="Help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.2v.1" stroke-linecap="round"/></svg></button>
+      <button class="tbtn" id="expandBtn" type="button" aria-expanded="false" aria-controls="xpanel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="expandTxt">Expand</span></button>
     </div>
 
     <div class="help" id="help" hidden>
-      <div><b>Target</b><p>The level you want, in the chosen measurement. Drag the ring, scroll, or click the number to type.</p></div>
-      <div><b>Threshold</b><p>Below this, the plugin stops adjusting. Breaths, room noise and fades never trigger a boost.</p></div>
-      <div><b>Response</b><p>Slow gives smooth, near-invisible changes. Fast catches sudden jumps sooner.</p></div>
-      <div><b>Ceiling</b><p>The loudest the output may ever get. Boosts stop short of it, and a look-ahead limiter catches stray peaks.</p></div>
-      <div><b>Ride or Hold</b><p>Ride adjusts all the time. Hold applies one fixed correction, measured when you press Analyze.</p></div>
-      <div><b>On the dial</b><p>The hollow dot is the incoming level and the solid dot is the result. The coloured arc between them is the gain being applied.</p></div>
+      <div><b>Target</b><p>The RMS level you want. Also drag the TARGET line on the graph.</p></div>
+      <div><b>Threshold</b><p>Below this RMS level it stops adjusting, so silence, breaths and noise never trigger a boost.</p></div>
+      <div><b>Response</b><p>Slow gives smooth, gradual changes. Fast reacts quickly to sudden jumps.</p></div>
+      <div><b>Range</b><p>The most it may boost or cut, in either direction.</p></div>
+      <div><b>Ceiling</b><p>The highest peak level the output may reach. A look-ahead limiter catches stray peaks.</p></div>
+      <div><b>The graph</b><p>Grey is the input RMS, the coloured line is the output RMS. The lane along the top shows the gain applied.</p></div>
     </div>
 
-    <div class="p-main">
-      <div class="dialwrap" id="dialwrap">
-        <canvas id="dial" role="slider" tabindex="0" aria-label="Target level"></canvas>
-        <div class="dial-center">
-          <input id="targetIn" class="tnum" inputmode="decimal" autocomplete="off" aria-label="Target value">
-          <span class="tunit" id="tUnit">LUFS-S</span>
-          <span class="tlab">Target</span>
-          <span class="tnow" id="tNow">in — · out —</span>
+    <div class="body">
+      <div class="meter in" aria-label="Input peak meter"><canvas id="mIn"></canvas></div>
+      <div class="stage" id="stage">
+        <canvas id="graph" aria-label="Scrolling level graph. Drag the target, threshold and ceiling lines."></canvas>
+        <div class="deck" id="deck">
+          <div class="krow">
+            <div class="kgroup" id="kLeft"></div>
+            <div class="center">
+              <div class="modes" role="radiogroup" aria-label="Mode">
+                <button role="radio" id="modeRide" type="button">Ride</button>
+                <button role="radio" id="modeHold" type="button">Hold</button>
+              </div>
+              <button class="analyze" id="analyze" type="button" disabled><span id="anLab">Analyze</span><i id="anProg"></i></button>
+            </div>
+            <div class="kgroup" id="kRight"></div>
+            <div class="applied"><span class="gnum" id="gNum">+0.0</span><span class="glab">Gain · dB</span></div>
+          </div>
+          <p class="say" id="say" data-s="waiting"><span class="dot"></span><span id="sayTxt">Starting…</span></p>
         </div>
       </div>
-      <div class="strips" id="mainStrips"></div>
-    </div>
-
-    <div class="p-row">
-      <div class="applied" aria-live="off">
-        <span class="gnum" id="gNum">+0.0</span><span class="gdb">dB</span>
-        <span class="glab">Applied gain</span>
-        <span class="gstate" id="gState">Waiting for signal</span>
-      </div>
-      <div class="modes" role="radiogroup" aria-label="Mode">
-        <button role="radio" id="modeRide" type="button">Ride<small>adjusts continuously</small></button>
-        <button role="radio" id="modeHold" type="button">Hold<small>one fixed correction</small></button>
-      </div>
-      <div class="units">
-        <div class="row" role="radiogroup" aria-label="Measure by" id="unitRow"></div>
-        <div class="row subrow" role="radiogroup" aria-label="LUFS time window" id="subRow"></div>
-      </div>
-    </div>
-
-    <div class="p-foot">
-      <button class="analyze" id="analyze" type="button" hidden><b>Analyze</b><span id="anTxt">Play a typical section, then press</span><div class="prog"><i id="anProg"></i></div></button>
-      <p class="say" id="say" data-s="waiting"><span class="dot"></span><span id="sayTxt">Starting…</span></p>
+      <div class="meter out" aria-label="Output peak meter"><canvas id="mOut"></canvas></div>
     </div>
 
     <div class="x" id="xpanel" hidden>
       <div class="panel">
         <h3>Spectrum <span class="legend"><span><i style="background:var(--p-muted)"></i>input</span><span><i style="background:var(--p-accent)"></i>output</span></span>
-          <span class="chips" style="margin-left:auto"><button type="button" id="tiltBtn" aria-pressed="true">4.5 dB/oct tilt</button><button type="button" id="freezeBtn" aria-pressed="false">Freeze</button></span></h3>
+          <span class="chips"><button type="button" id="tiltBtn" aria-pressed="true">4.5 dB/oct tilt</button><button type="button" id="freezeBtn" aria-pressed="false">Freeze</button></span></h3>
         <canvas id="rta" aria-label="Real-time spectrum of input and output"></canvas>
-      </div>
-      <div class="panel">
-        <h3>Last 15 seconds <span class="legend"><span><i style="background:var(--p-muted)"></i>in</span><span><i style="background:var(--p-ink)"></i>out</span></span></h3>
-        <canvas id="hist" aria-label="Level and gain history"></canvas>
-        <p class="mini">Top: level against the target. Bottom: gain applied, blue for boost, red for cut, with limiter activity along the base.</p>
       </div>
     </div>
   </section>
@@ -282,21 +238,14 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
 
   <section class="how">
     <h2>How it works</h2>
-    <div><h3>Two modes</h3><p><b>Ride</b> moves the gain all the time, like a hand riding a fader. Use it for voices and anything whose level keeps changing. <b>Hold</b> measures a typical section when you press Analyze, works out one correction, and locks it. Use it for steady material, or to set a consistent starting level across many tracks.</p></div>
-    <div><h3>Four ways to measure</h3><ul>
-      <li><b>dBFS</b>: peak level, the loudest instant.</li>
-      <li><b>VU</b>: classic average meter, where 0 VU equals −18 dBFS.</li>
-      <li><b>RMS</b>: average power over 300 ms.</li>
-      <li><b>LUFS</b>: perceived loudness. M is 400 ms, S is 3 s, and I is everything since playback started or Reset was pressed.</li></ul>
-      <p style="margin-top:6px">When you switch, the target and threshold are converted so they keep roughly the same meaning.</p></div>
-    <div><h3>Four controls</h3><ul>
-      <li><b>Target</b>: where you want the level, in the chosen measurement.</li>
-      <li><b>Response</b>: slow gives smooth, gradual changes that are nearly invisible. Fast reacts quickly to sudden jumps in volume.</li>
-      <li><b>Threshold</b>: below this it stops adjusting, so silence and noise never trigger a boost.</li>
-      <li><b>Ceiling</b>: the output never goes past it. Boosts stop short of it, and the limiter catches the rest.</li></ul></div>
-    <div><h3>Safety and views</h3><ul>
-      <li><b>Headroom protection</b>: a look-ahead brick-wall limiter at the ceiling catches stray peaks after the gain correction.</li>
-      <li><b>Expanded view</b>: live spectrum of input against output, plus level and gain history.</li></ul></div>
+    <div><h3>Two modes</h3><p><b>Ride</b> moves the gain all the time, like a hand riding a fader. Use it for voices and anything whose level keeps changing. <b>Hold</b> measures a typical section when you press Analyze, works out one correction, and locks it. Use it for steady material.</p></div>
+    <div><h3>Measuring</h3><p>The level it corrects is measured as <b>RMS</b>, the average power over 300 ms. The meters on both edges show <b>peak level in dBFS</b>: input on the left, output on the right.</p></div>
+    <div><h3>Five controls</h3><ul>
+      <li><b>Target</b>: the RMS level you want.</li>
+      <li><b>Threshold</b>: below this it stops adjusting.</li>
+      <li><b>Response</b>: slow and smooth, or fast and responsive.</li>
+      <li><b>Range</b>: the most it may boost or cut.</li>
+      <li><b>Ceiling</b>: the highest peak the output may reach. A look-ahead brick-wall limiter catches stray peaks.</li></ul></div>
   </section>
 </div>
 
@@ -308,37 +257,25 @@ const K20 = Math.LN10 / 20;
 const fromDB = d => Math.exp(d * K20);
 const toDB = x => x > 1e-10 ? 20 * Math.log10(x) : -200;
 const lufs = ms => ms > 1e-13 ? -0.691 + 10 * Math.log10(ms) : -120;
+const msDB = ms => ms > 1e-13 ? 10 * Math.log10(ms) : -120;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 function rng(seed){ let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const fmt = (v, dec = 1, signed = false) => (v < -0.00001 && Math.abs(v).toFixed(dec) !== (0).toFixed(dec) ? "−" : (signed && v > 0.00001 && Math.abs(v).toFixed(dec) !== (0).toFixed(dec) ? "+" : "")) + Math.abs(v).toFixed(dec);
+const fmt = (v, dec = 1, signed = false) => { const t = Math.abs(v).toFixed(dec), z = t === (0).toFixed(dec); return (v < 0 && !z ? "−" : signed && v > 0 && !z ? "+" : "") + t; };
 
-/* ================= measurement units ================= */
-// offsets relative to LUFS so target/threshold keep roughly the same meaning when switching
-const U = {
-  dbfs: { name:"dBFS", lo:-60, hi:0,  tMin:-30, tMax:0,  thMin:-60, thMax:-10, off:12 },
-  vu:   { name:"VU",   lo:-40, hi:6,  tMin:-20, tMax:6,  thMin:-50, thMax:0,   off:21 },
-  rms:  { name:"RMS",  lo:-60, hi:0,  tMin:-40, tMax:-3, thMin:-75, thMax:-15, off:0 },
-  lufs: { name:"LUFS", lo:-60, hi:0,  tMin:-40, tMax:-5, thMin:-75, thMax:-15, off:0 }
-};
-const unitLabel = () => P.unit === "lufs" ? "LUFS-" + P.sub : P.unit === "rms" ? "dBFS RMS" : U[P.unit].name;
-const shortUnit = () => P.unit === "lufs" ? "LUFS" : P.unit === "rms" ? "dB" : U[P.unit].name;
-
-const DEFAULTS = { unit:"lufs", sub:"S", target:-18, threshold:-42, response:50, ceiling:-1, mode:"ride" };
-// fixed internals (not user controls): limiter release, a sanity limit on gain
-const LIM_RELEASE = 80, GAIN_LIMIT = 30;
+/* ================= parameters ================= */
+// Leveling is measured as RMS (dBFS, 300 ms). Meters show peak dBFS.
+const DEFAULTS = { target:-20, threshold:-48, response:50, range:12, ceiling:-1, mode:"ride" };
 const P = Object.assign({}, DEFAULTS);
 const B = { material:"mic", script:true, talk:0, noise:-58, source:"sim", bypass:false };
-
+const LIM_RELEASE = 80; // fixed internal limiter release (ms)
 const SPEC = {
-  target:    { label:"Target", min:() => U[P.unit].tMin, max:() => U[P.unit].tMax, step:0.5, dec:1, unit:() => shortUnit() },
-  threshold: { label:"Threshold", min:() => U[P.unit].thMin, max:() => U[P.unit].thMax, step:0.5, dec:1, unit:() => shortUnit(),
-               help:"Below this it stops adjusting, so silence and noise never trigger a boost.", ends:["quieter", "louder"], mark:"in" },
-  response:  { label:"Response", min:0, max:100, step:1, dec:0, unit:() => "",
-               help:"Slow: smooth, gradual changes. Fast: reacts quickly to sudden jumps.", ends:["slow · invisible", "fast · responsive"] },
-  ceiling:   { label:"Ceiling", min:-12, max:0, step:0.1, dec:1, unit:() => "dBFS",
-               help:"The loudest the output may get. The hairline shows the current output peak.", ends:["−12", "0 dBFS"], mark:"out" }
+  target:    { label:"Target",    min:-40, max:-6,  step:0.5, dec:1, unit:"dB RMS", big:true, live:"out" },
+  threshold: { label:"Threshold", min:-70, max:-20, step:0.5, dec:1, unit:"dB RMS", live:"in" },
+  response:  { label:"Response",  min:0,   max:100, step:1,   dec:0, unit:"" },
+  range:     { label:"Range",     min:0,   max:24,  step:0.5, dec:1, unit:"± dB" },
+  ceiling:   { label:"Ceiling",   min:-12, max:0,   step:0.1, dec:1, unit:"dBFS", small:true }
 };
-const val = (s, k) => typeof s[k] === "function" ? s[k]() : s[k];
+
 /* ================= DSP building blocks ================= */
 class Biquad{
   constructor(c){ this.set(c); this.z1 = 0; this.z2 = 0; }
@@ -362,112 +299,85 @@ function measureLUFS(gen, fs, sec){ const k = kWeight(fs); let s = 0; const N = 
 
 /* ---------- meter: LUFS-M (400 ms), LUFS-S (3 s), RMS (300 ms), peak ---------- */
 
-/* ---------- meter: peak, RMS/VU (300 ms), LUFS M/S/I ---------- */
+
+/* ---------- meter: peak (dBFS) and RMS (300 ms) ---------- */
 class Meter{
   constructor(fs){
-    this.fs = fs; this.k = kWeight(fs); this.sub = Math.round(fs / 100);
-    this.n = 0; this.aK = 0; this.aR = 0; this.p = 0;
-    this.rK = new Float32Array(300); this.rR = new Float32Array(30); this.rP = new Float32Array(30); this.i = 0; this.j = 0;
-    this.M = -120; this.S = -120; this.R = -120; this.Pk = -120; this.H = -120; this.hT = 0; this.I = -120;
-    this.bK = 0; this.bR = 0; this.bP = 0; this.cnt = 0; this.gates = [];
+    this.fs = fs; this.sub = Math.round(fs / 100);
+    this.n = 0; this.aR = 0; this.p = 0;
+    this.rR = new Float32Array(30); this.rP = new Float32Array(30); this.j = 0;
+    this.R = -120; this.Pk = -120; this.H = -120; this.hT = 0; this.bR = 0; this.bP = 0;
   }
   push(x){
-    const y = this.k[1].run(this.k[0].run(x));
-    this.aK += y * y; this.aR += x * x; const a = x < 0 ? -x : x; if (a > this.p) this.p = a;
+    this.aR += x * x; const a = x < 0 ? -x : x; if (a > this.p) this.p = a;
     if (++this.n >= this.sub){
-      const n = this.n; this.bK = this.aK / n; this.bR = this.aR / n; this.bP = this.p;
-      this.aK = 0; this.aR = 0; this.p = 0; this.n = 0; this.calc(); return true;
+      this.bR = this.aR / this.n; this.bP = this.p; this.aR = 0; this.p = 0; this.n = 0;
+      this.rR[this.j] = this.bR; this.rP[this.j] = this.bP; this.j = (this.j + 1) % 30;
+      let sR = 0; for (let k = 0; k < 30; k++) sR += this.rR[k];
+      this.R = msDB(sR / 30);
+      const pd = toDB(this.bP);
+      this.Pk = pd > this.Pk ? pd : this.Pk - 0.35;           // peak meter, ~35 dB/s fall
+      if (pd > this.H){ this.H = pd; this.hT = 150; } else if (--this.hT < 0) this.H -= 0.25;
+      return true;
     }
     return false;
   }
-  calc(){
-    this.rK[this.i] = this.bK; this.i = (this.i + 1) % 300;
-    this.rR[this.j] = this.bR; this.rP[this.j] = this.bP; this.j = (this.j + 1) % 30;
-    let sM = 0, sS = 0, sR = 0, pk = 0;
-    for (let k = 0; k < 300; k++){ const v = this.rK[(this.i - 1 - k + 300) % 300]; sS += v; if (k < 40) sM += v; }
-    for (let k = 0; k < 30; k++){ sR += this.rR[k]; if (this.rP[k] > pk) pk = this.rP[k]; }
-    this.M = lufs(sM / 40); this.S = lufs(sS / 300); this.R = sR > 1e-13 ? 10 * Math.log10(sR / 30) : -120; this.Pk = toDB(pk);
-    const pd = toDB(this.bP);
-    if (pd > this.H){ this.H = pd; this.hT = 120; } else if (--this.hT < 0) this.H -= 0.3;
-    // integrated (BS.1770 gating), a 400 ms block every 100 ms
-    if (++this.cnt % 10 === 0 && this.M > -70){
-      this.gates.push(sM / 40); if (this.gates.length > 7200) this.gates.shift();
-      let s = 0; for (const e of this.gates) s += e;
-      const rel = lufs(s / this.gates.length) - 10; let s2 = 0, c2 = 0;
-      for (const e of this.gates) if (lufs(e) >= rel){ s2 += e; c2++; }
-      this.I = c2 ? lufs(s2 / c2) : -120;
-    }
-  }
-  resetI(){ this.gates = []; this.I = -120; }
-  read(u, sub){ return u === "lufs" ? (sub === "M" ? this.M : sub === "I" ? this.I : this.S) : u === "rms" ? this.R : u === "vu" ? this.R + 21.01 : this.Pk; }
-  short(u){ return u === "lufs" ? this.M : u === "rms" ? this.R : u === "vu" ? this.R + 21.01 : this.Pk; }
 }
 
-/* ---------- the leveler ---------- */
+/* ---------- the leveler (RMS detection) ---------- */
 class Leveler{
   constructor(){
-    this.N = 300; this.e = new Float32Array(300); this.r = new Float32Array(300); this.p = new Float32Array(300);
-    this.act = new Uint8Array(300); this.i = 0;
+    this.N = 300; this.r = new Float32Array(300); this.p = new Float32Array(300); this.act = new Uint8Array(300); this.i = 0;
     this.g = 0; this.state = "waiting"; this.activeT = 0; this.L = null; this.sl = -120; this.pk1 = -120;
-    this.sI = 0; this.cI = 0; this.holdG = null; this.holdInfo = null; this.an = null;
+    this.holdG = null; this.holdInfo = null; this.an = null;
   }
-  resetI(){ this.sI = 0; this.cI = 0; }
   block(m){
-    const N = this.N, i = this.i, u = P.unit;
-    this.e[i] = m.bK; this.r[i] = m.bR; this.p[i] = m.bP;
-    const sl = m.short(u), active = sl >= P.threshold;
+    const N = this.N, i = this.i;
+    this.r[i] = m.bR; this.p[i] = m.bP;
+    const sl = m.R, active = sl >= P.threshold;
     this.act[i] = active ? 1 : 0; this.sl = sl;
-
-    // gated detector: only blocks above the threshold count
-    let L = null;
-    if (u === "lufs" && P.sub === "I"){
-      if (active){ this.sI += m.bK; this.cI++; }
-      L = this.cI >= 40 ? lufs(this.sI / this.cI) : null;
-    } else {
-      const win = u === "lufs" ? (P.sub === "M" ? 40 : 300) : 30;
-      let s = 0, c = 0, mx = 0;
-      for (let k = 0; k < win; k++){
-        const j = (i - k + N) % N;
-        if (this.act[j]){ c++; s += u === "lufs" ? this.e[j] : this.r[j]; if (this.p[j] > mx) mx = this.p[j]; }
-      }
-      if (c >= Math.min(win, 10)) L = u === "lufs" ? lufs(s / c) : u === "dbfs" ? toDB(mx) : (s > 0 ? 10 * Math.log10(s / c) : -120) + (u === "vu" ? 21.01 : 0);
-    }
+    // gated RMS over 300 ms: only blocks above the threshold count
+    let s = 0, c = 0;
+    for (let k = 0; k < 30; k++){ const j = (i - k + N) % N; if (this.act[j]){ c++; s += this.r[j]; } }
+    this.L = c >= 10 ? msDB(s / c) : null;
     let pk = 0; for (let k = 0; k < 100; k++){ const v = this.p[(i - k + N) % N]; if (v > pk) pk = v; }
-    this.pk1 = toDB(pk); this.L = L; this.i = (i + 1) % N;
+    this.pk1 = toDB(pk); this.i = (i + 1) % N;
 
-    // Analyze (Hold mode): collect active blocks
     if (this.an){
       this.an.t += 0.01;
-      if (active){ this.an.s += u === "lufs" ? m.bK : m.bR; this.an.c++; if (m.bP > this.an.pk) this.an.pk = m.bP; }
+      if (active){ this.an.s += m.bR; this.an.c++; if (m.bP > this.an.pk) this.an.pk = m.bP; }
       if (this.an.t >= 20) lockAnalysis();
     }
 
-    const dt = 0.01, sc = 0.15 * Math.pow(40, P.response / 100), g = this.g;
+    const dt = 0.01, sc = 0.15 * Math.pow(40, P.response / 100), g = this.g, L = this.L;
     let target = g, rate = 0, st;
     if (P.mode === "hold"){
       target = this.holdG == null ? g : this.holdG; rate = 12;
       st = this.an ? "analyzing" : this.holdG == null ? "unset" : "held";
     } else if (!active){
-      this.activeT = 0; st = "waiting";            // below the threshold: stop adjusting
+      this.activeT = 0; st = "waiting";
     } else {
       this.activeT += dt;
       if (L === null || this.activeT < 0.15) st = "waiting";
       else {
         const out = L + g, d = Math.abs(out - P.target);
         target = P.target - L;
-        rate = clamp(1.5 + 0.8 * d, 1.5, 12) * sc;  // further from target = faster, scaled by Response
+        rate = clamp(1.5 + 0.8 * d, 1.5, 12) * sc;
         st = d < 0.5 ? "on" : out < P.target ? "boosting" : "cutting";
       }
-      // ceiling: never boost peaks past it
       const gC = P.ceiling - this.pk1;
       if (target > gC){ target = gC; if (st === "boosting" || st === "on" || g > gC + 0.1) st = "ceiling"; if (g > gC) rate = Math.max(rate, 30); }
+      if (target > P.range || target < -P.range){ if (st === "boosting" || st === "cutting") st = "range"; }
     }
-    target = clamp(target, -GAIN_LIMIT, GAIN_LIMIT);
+    target = clamp(target, -P.range, P.range);
     const step = rate * dt;
     this.g = target > g ? Math.min(target, g + step) : Math.max(target, g - step);
+    if (this.g > P.range) this.g = Math.max(P.range, g - 12 * dt);
+    if (this.g < -P.range) this.g = Math.min(-P.range, g + 12 * dt);
     this.state = st;
   }
 }
+
 class Limiter{
   constructor(fs){
     this.fs = fs; const L = Math.max(1, Math.round(fs * 0.005)); this.L = L; this.cap = L + 4;
@@ -477,7 +387,7 @@ class Limiter{
   }
   setup(){ this.rel = 1 - Math.exp(-1 / (LIM_RELEASE * 0.001 * this.fs)); this.c = fromDB(P.ceiling); }
   process(x){
-    const c = this.c, a = x < 0 ? -x : x, req = (a > c) ? c / a : 1;
+    const c = this.c, a = x < 0 ? -x : x, req = (true && a > c) ? c / a : 1;
     while (this.sz > 0){ const b = (this.t - 1 + this.cap) % this.cap; if (this.qv[b] >= req){ this.t = b; this.sz--; } else break; }
     this.qv[this.t] = req; this.qi[this.t] = this.n; this.t = (this.t + 1) % this.cap; this.sz++;
     while (this.qi[this.h] < this.n - (this.L + 1)){ this.h = (this.h + 1) % this.cap; this.sz--; }
@@ -486,7 +396,7 @@ class Limiter{
     this.env += (tg - this.env) * (tg < this.env ? this.att : this.rel);
     const d = this.buf[this.w]; this.buf[this.w] = x; this.w = (this.w + 1) % (this.L + 1);
     let y = d * this.env;
-    if (y > c) y = c; else if (y < -c) y = -c;
+    if (true){ if (y > c) y = c; else if (y < -c) y = -c; }
     if (this.env < this.minEnv) this.minEnv = this.env;
     return y;
   }
@@ -617,7 +527,7 @@ class FileSrc{
 
 
 /* ================= engine ================= */
-const HMAX = 300; let hist = [];
+const HMAX = 500; let hist = [];
 const FFTN = 4096;
 class Engine{
   constructor(fs){
@@ -634,7 +544,7 @@ class Engine{
         this.lev.block(this.inM);
         this.gInc = (this.lev.g - this.gCur) / this.inM.sub;
         this.lim.setup(); this.inG = fromDB(B.talk);
-        if (++this.blocks % 5 === 0) this.snap();
+        if (++this.blocks % 2 === 0) this.snap();
       }
       this.gCur += this.gInc;
       let y = this.lim.process(x * fromDB(this.gCur));
@@ -645,7 +555,7 @@ class Engine{
     }
   }
   snap(){
-    hist.push({ i:this.inM.short(P.unit), o:this.outM.short(P.unit), g:B.bypass ? 0 : this.lev.g, r:B.bypass ? 0 : toDB(this.lim.minEnv) });
+    hist.push({ i:this.inM.R, o:this.outM.R, g:B.bypass ? 0 : this.lev.g, r:B.bypass ? 0 : toDB(this.lim.minEnv) });
     this.lim.minEnv = 1;
     if (hist.length > HMAX) hist.shift();
   }
@@ -674,134 +584,101 @@ function stopAudio(){
 function volume(){ const v = +$("#vol").value / 100; return v * v; }
 function setListen(on){ const b = $("#listen"); b.setAttribute("aria-pressed", on); b.textContent = on ? "■ Stop" : "▶ Listen"; }
 
+
+
 /* ================= Analyze & Hold ================= */
 let anMsg = "";
 function startAnalysis(){ engine.lev.an = { t:0, s:0, c:0, pk:0 }; anMsg = ""; }
 function lockAnalysis(){
   const lev = engine.lev, an = lev.an; lev.an = null; if (!an) return;
   if (an.c < 100){ anMsg = "Not enough sound above the threshold. Play a louder section, or lower the threshold, and analyze again."; return; }
-  const u = P.unit;
-  const measured = u === "lufs" ? lufs(an.s / an.c) : u === "dbfs" ? toDB(an.pk) : 10 * Math.log10(an.s / an.c) + (u === "vu" ? 21.01 : 0);
-  let g = P.target - measured, ceil = false;
+  const measured = msDB(an.s / an.c);
+  let g = P.target - measured, why = "";
   const room = P.ceiling - toDB(an.pk);
-  if (g > room){ g = room; ceil = true; }
-  g = clamp(g, -GAIN_LIMIT, GAIN_LIMIT);
-  lev.holdG = g; lev.holdInfo = { measured, unit:unitLabel(), ceil, secs:an.c / 100 };
-  anMsg = "";
+  if (g > room){ g = room; why = " Limited by the ceiling."; }
+  if (Math.abs(g) > P.range){ g = clamp(g, -P.range, P.range); why = " Limited by the range."; }
+  lev.holdG = g; lev.holdInfo = { measured, secs:an.c / 100, why };
 }
 
-/* ================= parameter changes ================= */
-function setParam(k, v, quiet){
+/* ================= parameters ================= */
+function setParam(k, v){
   const s = SPEC[k];
-  v = Math.round(clamp(v, val(s, "min"), val(s, "max")) / s.step) * s.step;
-  P[k] = +v.toFixed(3);
-  refresh();
-}
-function setUnit(u, sub){
-  if (u !== P.unit){
-    const d = U[u].off - U[P.unit].off; P.unit = u;
-    P.target = clamp(P.target + d, U[u].tMin, U[u].tMax);
-    P.threshold = clamp(P.threshold + d, U[u].thMin, U[u].thMax);
-    hist = [];
-  }
-  if (sub) P.sub = sub;
-  engine.lev.resetI();
+  P[k] = +(Math.round(clamp(v, s.min, s.max) / s.step) * s.step).toFixed(3);
   refresh();
 }
 function setMode(m){
   if (m === P.mode) return;
-  if (m === "hold" && engine.lev.holdG == null) engine.lev.holdG = engine.lev.g;
+  if (m === "hold" && engine.lev.holdG == null) engine.lev.holdG = clamp(engine.lev.g, -P.range, P.range);
   if (m === "ride") engine.lev.an = null;
   P.mode = m; refresh();
 }
 
-/* ================= control strips ================= */
-const strips = {};
-function makeStrip(parent, key){
+/* ================= knobs ================= */
+const knobs = {};
+function arcPath(a1, a2, r){
+  const p = a => [50 + r * Math.sin(a * Math.PI / 180), 50 - r * Math.cos(a * Math.PI / 180)];
+  const [x1, y1] = p(a1), [x2, y2] = p(a2);
+  return `M${x1.toFixed(2)} ${y1.toFixed(2)}A${r} ${r} 0 ${a2 - a1 > 180 ? 1 : 0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+}
+function makeKnob(parent, key){
   const s = SPEC[key];
-  const el = document.createElement("div"); el.className = "strip"; el.dataset.key = key;
-  el.innerHTML = `<div class="st-top"><span class="st-lab" id="lab-${key}">${s.label}</span><label class="st-val"><input id="in-${key}" inputmode="decimal" autocomplete="off" aria-label="${s.label} value"><span id="u-${key}"></span></label></div>
-    ${s.help ? `<p class="st-help">${s.help}</p>` : ""}
-    <div class="track" id="tr-${key}" role="slider" tabindex="0" aria-labelledby="lab-${key}"><div class="ticks"></div><div class="fill"></div>${s.mark ? `<div class="mark" id="mk-${key}"></div>` : ""}</div>
-    ${s.ends ? `<div class="ends"><span>${s.ends[0]}</span><span>${s.ends[1]}</span></div>` : ""}`;
+  const el = document.createElement("div");
+  el.className = "knob" + (s.big ? " big" : s.small ? " small" : "");
+  el.innerHTML = `<div class="kdial" tabindex="0" role="slider" id="dial-${key}" aria-label="${s.label}" aria-valuemin="${s.min}" aria-valuemax="${s.max}">
+      <svg viewBox="0 0 100 100" aria-hidden="true"><path class="trk" d="${arcPath(-135, 135, 44)}"/><path class="val"/><circle class="body" cx="50" cy="50" r="33"/><circle class="ind" r="4.5"/>${s.live ? '<circle class="live" r="4"/>' : ""}</svg></div>
+    <label class="kval"><input id="in-${key}" inputmode="decimal" autocomplete="off" aria-label="${s.label} value"><span>${s.unit}</span></label>
+    <span class="klab">${s.label}</span>`;
   parent.appendChild(el);
-  const tr = el.querySelector(".track"), fill = el.querySelector(".fill"), inp = el.querySelector("input"), un = el.querySelector(`#u-${key}`);
-  const pct = () => (P[key] - val(s, "min")) / (val(s, "max") - val(s, "min"));
-  strips[key] = () => {
-    fill.style.width = (pct() * 100).toFixed(2) + "%";
-    const txt = fmt(P[key], s.dec, key === "target");
-    if (document.activeElement !== inp) inp.value = txt;
-    un.textContent = s.unit();
-    tr.setAttribute("aria-valuemin", val(s, "min")); tr.setAttribute("aria-valuemax", val(s, "max"));
-    tr.setAttribute("aria-valuenow", P[key]); tr.setAttribute("aria-valuetext", txt + " " + s.unit());
+  const dial = el.querySelector(".kdial"), valp = el.querySelector(".val"), ind = el.querySelector(".ind"), live = el.querySelector(".live"), inp = el.querySelector("input");
+  const ang = v => -135 + clamp((v - s.min) / (s.max - s.min), 0, 1) * 270;
+  const pt = (a, r) => [50 + r * Math.sin(a * Math.PI / 180), 50 - r * Math.cos(a * Math.PI / 180)];
+  knobs[key] = {
+    draw(){
+      const a = ang(P[key]);
+      valp.setAttribute("d", a > -134.5 ? arcPath(-135, a, 44) : "");
+      const [x, y] = pt(a, 22); ind.setAttribute("cx", x.toFixed(2)); ind.setAttribute("cy", y.toFixed(2));
+      const t = fmt(P[key], s.dec);
+      if (document.activeElement !== inp) inp.value = t;
+      dial.setAttribute("aria-valuenow", P[key]); dial.setAttribute("aria-valuetext", t + " " + s.unit);
+    },
+    live(v){ if (!live) return; const show = v > s.min - 20; live.style.display = show ? "" : "none"; if (show){ const [x, y] = pt(ang(v), 44); live.setAttribute("cx", x.toFixed(2)); live.setAttribute("cy", y.toFixed(2)); } }
   };
   const commit = () => { const v = parseFloat(inp.value.replace("−", "-").replace(",", ".")); if (isFinite(v)) setParam(key, v); else refresh(); };
   inp.addEventListener("change", commit);
   inp.addEventListener("keydown", e => { if (e.key === "Enter"){ commit(); inp.blur(); } if (e.key === "Escape"){ inp.blur(); refresh(); } });
-  inp.addEventListener("blur", () => refresh());
-  let drag = false;
-  const fromX = e => { const r = tr.getBoundingClientRect(); const t = clamp((e.clientX - r.left) / r.width, 0, 1); setParam(key, val(s, "min") + t * (val(s, "max") - val(s, "min"))); };
-  tr.addEventListener("pointerdown", e => { if (el.getAttribute("aria-disabled") === "true") return; drag = true; tr.setPointerCapture(e.pointerId); tr.focus(); fromX(e); });
-  tr.addEventListener("pointermove", e => { if (drag) fromX(e); });
-  tr.addEventListener("pointerup", () => drag = false); tr.addEventListener("pointercancel", () => drag = false);
-  tr.addEventListener("dblclick", () => setParam(key, DEFAULTS[key]));
-  tr.addEventListener("wheel", e => { e.preventDefault(); setParam(key, P[key] + (e.deltaY < 0 ? 1 : -1) * s.step * (e.shiftKey ? 1 : 2)); }, { passive:false });
-  tr.addEventListener("keydown", e => {
+  inp.addEventListener("blur", refresh);
+  inp.addEventListener("focus", () => inp.select());
+  let y0 = 0, v0 = 0, drag = false;
+  dial.addEventListener("pointerdown", e => { drag = true; y0 = e.clientY; v0 = P[key]; dial.setPointerCapture(e.pointerId); dial.focus(); e.preventDefault(); });
+  dial.addEventListener("pointermove", e => { if (drag) setParam(key, v0 + (y0 - e.clientY) / 180 * (s.max - s.min) * (e.shiftKey ? 0.2 : 1)); });
+  dial.addEventListener("pointerup", () => drag = false); dial.addEventListener("pointercancel", () => drag = false);
+  dial.addEventListener("dblclick", () => setParam(key, DEFAULTS[key]));
+  dial.addEventListener("wheel", e => { e.preventDefault(); setParam(key, P[key] + (e.deltaY < 0 ? 1 : -1) * s.step * (e.shiftKey ? 1 : 2)); }, { passive:false });
+  dial.addEventListener("keydown", e => {
     const big = e.shiftKey ? 5 : 1;
     if (e.key === "ArrowUp" || e.key === "ArrowRight"){ setParam(key, P[key] + s.step * big); e.preventDefault(); }
     if (e.key === "ArrowDown" || e.key === "ArrowLeft"){ setParam(key, P[key] - s.step * big); e.preventDefault(); }
   });
 }
-["threshold", "response", "ceiling"].forEach(k => makeStrip($("#mainStrips"), k));
+["target", "threshold"].forEach(k => makeKnob($("#kLeft"), k));
+["response", "range", "ceiling"].forEach(k => makeKnob($("#kRight"), k));
 
-
-/* unit + mode selectors */
-const unitBtns = [["dbfs", "dBFS"], ["vu", "VU"], ["rms", "RMS"], ["lufs", "LUFS"]].map(([u, label]) => {
-  const b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "radio"); b.textContent = label; b.id = "unit-" + u;
-  b.addEventListener("click", () => setUnit(u)); $("#unitRow").appendChild(b); return [u, b];
-});
-const subBtns = [["M", "M · 400 ms"], ["S", "S · 3 s"], ["I", "I · all"]].map(([v, label]) => {
-  const b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "radio"); b.textContent = label; b.id = "sub-" + v;
-  b.addEventListener("click", () => setUnit("lufs", v)); $("#subRow").appendChild(b); return [v, b];
-});
 $("#modeRide").addEventListener("click", () => setMode("ride"));
 $("#modeHold").addEventListener("click", () => setMode("hold"));
 $("#analyze").addEventListener("click", () => engine.lev.an ? lockAnalysis() : startAnalysis());
 
-/* target number */
-const tIn = $("#targetIn");
-const tCommit = () => { const v = parseFloat(tIn.value.replace("−", "-").replace(",", ".")); if (isFinite(v)) setParam("target", v); else refresh(); };
-tIn.addEventListener("change", tCommit);
-tIn.addEventListener("keydown", e => { if (e.key === "Enter"){ tCommit(); tIn.blur(); } if (e.key === "Escape"){ tIn.blur(); refresh(); }
-  if (e.key === "ArrowUp"){ setParam("target", P.target + 0.5); e.preventDefault(); } if (e.key === "ArrowDown"){ setParam("target", P.target - 0.5); e.preventDefault(); } });
-tIn.addEventListener("blur", () => refresh());
-tIn.addEventListener("focus", () => tIn.select());
-
 function refresh(){
-  for (const k in strips) strips[k]();
-  if (document.activeElement !== tIn) tIn.value = fmt(P.target, 1);
-  $("#tUnit").textContent = unitLabel();
-  unitBtns.forEach(([u, b]) => b.setAttribute("aria-checked", String(P.unit === u)));
-  subBtns.forEach(([v, b]) => b.setAttribute("aria-checked", String(P.sub === v)));
-  $("#subRow").hidden = P.unit !== "lufs";
+  for (const k in knobs) knobs[k].draw();
   $("#modeRide").setAttribute("aria-checked", String(P.mode === "ride"));
   $("#modeHold").setAttribute("aria-checked", String(P.mode === "hold"));
-  $("#analyze").hidden = P.mode !== "hold";
-  $("#say").hidden = P.mode === "hold";
-  const d = $("#dial"); d.setAttribute("aria-valuenow", P.target); d.setAttribute("aria-valuetext", fmt(P.target, 1) + " " + unitLabel());
-  d.setAttribute("aria-valuemin", U[P.unit].tMin); d.setAttribute("aria-valuemax", U[P.unit].tMax);
+  const a = $("#analyze"); a.disabled = P.mode !== "hold";
+  a.title = P.mode === "hold" ? "" : "Switch to Hold to analyze";
 }
 
-/* ================= dial ================= */
-const dial = $("#dial"), dx = dial.getContext("2d");
-let DL = null, dDrag = null, dHover = null;
-const A0 = -135, A1 = 135;
-const v2a = v => { const u = U[P.unit]; return A0 + clamp((v - u.lo) / (u.hi - u.lo), 0, 1) * (A1 - A0); };
-const a2v = a => { const u = U[P.unit]; return u.lo + (clamp(a, A0, A1) - A0) / (A1 - A0) * (u.hi - u.lo); };
-const rad = a => (a - 90) * Math.PI / 180;
+/* ================= canvases ================= */
 function colors(){
   const cs = getComputedStyle($("#plugin")), c = {};
-  ["p-bg","p-surface","p-sunk","p-ink","p-muted","p-line","p-accent","p-accent-soft","p-boost","p-cut","p-limit","p-ok"].forEach(k => c[k.slice(2)] = cs.getPropertyValue("--" + k).trim());
+  ["p-bg","p-surface","p-sunk","p-graph","p-ink","p-muted","p-line","p-accent","p-accent-soft","p-boost","p-cut","p-limit","p-ok","p-warn"].forEach(k => c[k.slice(2)] = cs.getPropertyValue("--" + k).trim());
   return c;
 }
 let C = colors();
@@ -813,83 +690,106 @@ function fitCanvas(cv){
   const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return [r.width, r.height, ctx];
 }
 const MONO = '"JetBrains Mono", ui-monospace, Consolas, monospace';
-function drawDial(){
-  const [W, H, g] = fitCanvas(dial);
+const DB_LO = -60;
+
+/* ---------- main graph ---------- */
+let GL = null, gDrag = null, gHover = null;
+const overlaid = () => getComputedStyle($("#deck")).position === "absolute";
+function drawGraph(){
+  const cv = $("#graph"), [W, H, g] = fitCanvas(cv);
   g.clearRect(0, 0, W, H);
-  const cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 26, lw = Math.max(10, R * 0.09);
-  DL = { cx, cy, R, lw };
-  const arc = (a1, a2, r, w, col, cap) => { g.beginPath(); g.arc(cx, cy, r, rad(a1), rad(a2)); g.lineWidth = w; g.strokeStyle = col; g.lineCap = cap || "round"; g.stroke(); };
-  // soft body
-  g.beginPath(); g.arc(cx, cy, R - lw / 2 - 4, 0, 7); g.fillStyle = C.surface; g.fill();
-  g.lineWidth = 1; g.strokeStyle = C.line; g.stroke();
-  // track
-  arc(A0, A1, R, lw, C.sunk);
-  // ignored zone (below threshold)
-  arc(A0, v2a(P.threshold), R, lw, alpha(C.muted, 0.18), "butt");
-  const aT = v2a(P.target);
-  // ticks + labels
-  const u = U[P.unit], stepT = P.unit === "vu" ? 5 : 10;
-  g.font = `10.5px ${MONO}`; g.textAlign = "center"; g.textBaseline = "middle";
-  for (let v = Math.ceil(u.lo / stepT) * stepT; v <= u.hi; v += stepT){
-    const a = rad(v2a(v)), r1 = R + lw / 2 + 3, r2 = R + lw / 2 + 8;
-    g.beginPath(); g.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2); g.lineWidth = 1.2; g.strokeStyle = C.muted; g.stroke();
-    if (v % (stepT * 2) === 0 || v === u.hi){ g.fillStyle = C.muted; g.fillText(v === 0 ? "0" : fmt(v, 0), cx + Math.cos(a) * (R + lw / 2 + 17), cy + Math.sin(a) * (R + lw / 2 + 17)); }
+  const lane = 66, top = lane + 26, scaleW = 34;
+  const bottom = overlaid() ? H - $("#deck").offsetHeight * 0.6 : H - 10;
+  const x0 = 0, x1 = W - scaleW, w = x1 - x0;
+  const y = v => top + clamp(-v, 0, -DB_LO) / -DB_LO * (bottom - top);
+  GL = { y, top, bottom, x1 };
+  // grid + scale
+  g.font = `10.5px ${MONO}`; g.textBaseline = "middle"; g.textAlign = "right";
+  for (let v = 0; v >= DB_LO; v -= 6){
+    const yy = Math.round(y(v)) + 0.5;
+    g.fillStyle = alpha(C.muted, v % 12 === 0 ? 0.2 : 0.1); g.fillRect(x0, yy, w, 1);
+    g.fillStyle = C.muted; g.fillText(v === 0 ? "0" : fmt(v, 0), W - 5, yy);
   }
-  // threshold notch
-  const aTh = rad(v2a(P.threshold));
-  g.beginPath(); g.moveTo(cx + Math.cos(aTh) * (R - lw / 2), cy + Math.sin(aTh) * (R - lw / 2)); g.lineTo(cx + Math.cos(aTh) * (R + lw / 2), cy + Math.sin(aTh) * (R + lw / 2));
-  g.lineWidth = 2; g.strokeStyle = C.muted; g.setLineDash([3, 2]); g.stroke(); g.setLineDash([]);
-  // live: input (hollow) -> output (solid), gain arc between
-  const lev = engine.lev, inV = engine.inM.read(P.unit, P.sub), outV = engine.outM.read(P.unit, P.sub);
-  const show = inV > u.lo - 1;
-  if (show){
-    const ai = v2a(inV), ao = v2a(outV), rr = R - lw / 2 - 9;
-    if (Math.abs(ao - ai) > 0.8) arc(Math.min(ai, ao), Math.max(ai, ao), rr, 4, ao > ai ? C.boost : C.cut);
-    const dot = (a, r, fillc, strokec) => { const t = rad(a); g.beginPath(); g.arc(cx + Math.cos(t) * r, cy + Math.sin(t) * r, 5.5, 0, 7); if (fillc){ g.fillStyle = fillc; g.fill(); } if (strokec){ g.lineWidth = 2; g.strokeStyle = strokec; g.stroke(); } };
-    dot(ai, rr, C.surface, C.muted);
-    dot(ao, rr, C.ink, null);
+  // history traces
+  const n = hist.length, sx = w / (HMAX - 1), X = k => x1 - (n - 1 - k) * sx;
+  if (n > 1){
+    g.beginPath(); g.moveTo(X(0), H);
+    for (let k = 0; k < n; k++) g.lineTo(X(k), y(hist[k].i));
+    g.lineTo(X(n - 1), H); g.closePath(); g.fillStyle = alpha(C.muted, 0.1); g.fill();
+    const line = (key, col, lw) => { g.beginPath(); for (let k = 0; k < n; k++){ const yy = y(hist[k][key]); k ? g.lineTo(X(k), yy) : g.moveTo(X(k), yy); } g.strokeStyle = col; g.lineWidth = lw; g.lineJoin = "round"; g.stroke(); };
+    line("i", alpha(C.muted, 0.9), 1.2);
+    line("o", C.accent, 2.4);
   }
-  // target pointer: a pin through the ring
-  const at = rad(aT);
-  g.beginPath(); g.moveTo(cx + Math.cos(at) * (R - lw / 2 - 2), cy + Math.sin(at) * (R - lw / 2 - 2)); g.lineTo(cx + Math.cos(at) * (R + lw / 2 + 2), cy + Math.sin(at) * (R + lw / 2 + 2));
-  g.lineWidth = 4; g.lineCap = "round"; g.strokeStyle = C.ink; g.stroke();
-  if (dHover === "ring" || dDrag === "ring"){ arc(A0, A1, R + lw / 2 + 1, 1.5, alpha(C.accent, 0.5)); }
+  // reference lines with tags
+  const tag = (v, label, col, dash, key) => {
+    const yy = Math.round(y(v)) + 0.5, hot = gHover === key || gDrag === key;
+    g.strokeStyle = col; g.lineWidth = hot ? 2.2 : 1.3; g.setLineDash(dash); g.beginPath(); g.moveTo(x0, yy); g.lineTo(x1, yy); g.stroke(); g.setLineDash([]);
+    g.font = `600 10.5px ${MONO}`; const txt = `${label} ${fmt(v, 1)}`, tw = g.measureText(txt).width + 12;
+    g.fillStyle = hot ? col : alpha(C.graph, 0.92); g.fillRect(8, yy - 9, tw, 18);
+    g.strokeStyle = col; g.lineWidth = 1; g.strokeRect(8.5, yy - 8.5, tw - 1, 17);
+    g.fillStyle = hot ? C.graph : col; g.textAlign = "left"; g.fillText(txt, 14, yy + 0.5);
+  };
+  tag(P.ceiling, "CEILING", C.limit, [2, 3], "ceiling");
+  tag(P.threshold, "THRESHOLD", C.muted, [6, 4], "threshold");
+  tag(P.target, "TARGET", C.accent, [], "target");
+  // gain lane
+  const mid = 8 + lane / 2, half = lane / 2 - 4, Rg = Math.max(P.range, 1), yG = v => mid - clamp(v, -Rg, Rg) / Rg * half;
+  g.fillStyle = alpha(C.surface, 0.75); g.fillRect(x0, 8, w, lane);
+  g.fillStyle = C.line; g.fillRect(x0, Math.round(mid), w, 1);
+  g.fillStyle = alpha(C.line, 0.9); g.fillRect(x0, Math.round(yG(Rg)), w, 1); g.fillRect(x0, Math.round(yG(-Rg)), w, 1);
+  if (n > 1){
+    const area = (sign, col) => { g.beginPath(); g.moveTo(X(0), mid); for (let k = 0; k < n; k++) g.lineTo(X(k), yG(sign > 0 ? Math.max(hist[k].g, 0) : Math.min(hist[k].g, 0))); g.lineTo(X(n - 1), mid); g.closePath(); g.fillStyle = alpha(col, 0.55); g.fill(); };
+    area(1, C.boost); area(-1, C.cut);
+    for (let k = 0; k < n; k++) if (hist[k].r < -0.2){ g.fillStyle = C.limit; g.fillRect(X(k) - sx / 2, 8 + lane - 4, Math.max(1.5, sx), 4); }
+  }
+  g.font = `600 10.5px ${MONO}`; g.textAlign = "left"; g.fillStyle = C.muted;
+  g.fillText(`GAIN  ±${fmt(Rg, 0)} dB range`, 10, 18);
+  g.textAlign = "right"; g.fillText("+" + fmt(Rg, 0), W - 5, yG(Rg) + 1); g.fillText("−" + fmt(Rg, 0), W - 5, yG(-Rg) - 1);
+  g.fillText("0", W - 5, mid);
+  g.textAlign = "left"; g.fillStyle = C.limit; g.fillText("limiter", 10, 8 + lane - 10);
+  // analyze shading (Hold)
+  const an = engine.lev.an;
+  if (an && n > 1){ const span = Math.min(n - 1, Math.round(an.t * 50)); g.fillStyle = alpha(C.accent, 0.08); g.fillRect(X(n - 1 - span), top, X(n - 1) - X(n - 1 - span), bottom - top); }
 }
-function dialHit(x, y, tol){
-  if (!DL) return null;
-  const r = Math.hypot(x - DL.cx, y - DL.cy);
-  if (Math.abs(r - DL.R) < DL.lw / 2 + tol){ const a = Math.atan2(x - DL.cx, -(y - DL.cy)) * 180 / Math.PI; if (a >= A0 - 8 && a <= A1 + 8) return "ring"; }
-  return null;
+function graphHit(y){
+  if (!GL) return null;
+  let best = null, bd = 9;
+  for (const k of ["target", "threshold", "ceiling"]){ const d = Math.abs(GL.y(P[k]) - y); if (d < bd){ bd = d; best = k; } }
+  return best;
 }
-function dpos(e){ const r = dial.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
-function dialApply(x, y){
-  const a = Math.atan2(x - DL.cx, -(y - DL.cy)) * 180 / Math.PI, v = a2v(a);
-  if (dDrag === "ring") setParam("target", v);
+const gcv = $("#graph");
+const gpos = e => { const r = gcv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+const gVal = y => -clamp((y - GL.top) / (GL.bottom - GL.top), 0, 1) * -DB_LO;
+gcv.addEventListener("touchstart", e => { const r = gcv.getBoundingClientRect(); if (graphHit(e.touches[0].clientY - r.top)) e.preventDefault(); }, { passive:false });
+gcv.addEventListener("pointerdown", e => { const [, y] = gpos(e), h = graphHit(y); if (h){ gDrag = h; gcv.setPointerCapture(e.pointerId); } });
+gcv.addEventListener("pointermove", e => { const [, y] = gpos(e); if (gDrag){ setParam(gDrag, gVal(y)); return; } gHover = graphHit(y); gcv.style.cursor = gHover ? "ns-resize" : "default"; });
+gcv.addEventListener("pointerup", () => gDrag = null); gcv.addEventListener("pointercancel", () => gDrag = null);
+gcv.addEventListener("pointerleave", () => { if (!gDrag) gHover = null; });
+
+/* ---------- edge meters (peak dBFS) ---------- */
+function drawMeter(id, m, side){
+  const cv = $(id), [W, H, g] = fitCanvas(cv);
+  g.clearRect(0, 0, W, H);
+  const top = 40, bot = H - 10, narrow = W < 44;
+  const y = v => top + clamp(-v, 0, -DB_LO) / -DB_LO * (bot - top);
+  const bw = narrow ? 10 : 12, bx = side === "in" ? W - bw - 6 : 6;
+  g.fillStyle = C.sunk; g.fillRect(bx, top, bw, bot - top);
+  const v = m.Pk;
+  if (v > DB_LO){
+    const seg = (a, b, col) => { const ya = y(Math.min(v, b)), yb = y(a); if (v > a){ g.fillStyle = col; g.fillRect(bx, ya, bw, yb - ya); } };
+    seg(DB_LO, -18, C.accent); seg(-18, -6, C.warn); seg(-6, 6, C.limit);
+  }
+  if (m.H > DB_LO){ g.fillStyle = m.H > -0.1 ? C.limit : C.ink; g.fillRect(bx, y(Math.min(m.H, 0)) - 1, bw, 2); }
+  g.font = `10px ${MONO}`; g.textBaseline = "middle"; g.fillStyle = C.muted;
+  if (!narrow){
+    g.textAlign = side === "in" ? "right" : "left";
+    for (let t = 0; t >= DB_LO; t -= 12) g.fillText(t === 0 ? "0" : fmt(t, 0), side === "in" ? bx - 4 : bx + bw + 4, y(t));
+  }
+  g.textAlign = "center"; g.font = `600 10.5px ${MONO}`; g.fillStyle = m.H > -0.1 ? C.limit : C.ink;
+  g.fillText(m.H > DB_LO ? fmt(m.H, 1) : "—", W / 2, 11);
+  g.font = `10px ${MONO}`; g.fillStyle = C.muted; g.fillText(side === "in" ? "IN" : "OUT", W / 2, 25);
 }
-let vDrag = null;
-dial.addEventListener("touchstart", e => { const t = e.touches[0], r = dial.getBoundingClientRect(); if (dialHit(t.clientX - r.left, t.clientY - r.top, 18)) e.preventDefault(); }, { passive:false });
-dial.addEventListener("pointerdown", e => {
-  const [x, y] = dpos(e), h = dialHit(x, y, e.pointerType === "touch" ? 18 : 10);
-  dial.setPointerCapture(e.pointerId);
-  if (h){ dDrag = h; dialApply(x, y); }
-  else if (e.pointerType !== "touch"){ vDrag = { y, v:P.target }; }
-});
-dial.addEventListener("pointermove", e => {
-  const [x, y] = dpos(e);
-  if (dDrag){ dialApply(x, y); return; }
-  if (vDrag){ const u = U[P.unit]; setParam("target", vDrag.v + (vDrag.y - y) / 220 * (u.tMax - u.tMin) * (e.shiftKey ? 0.25 : 1)); return; }
-  dHover = dialHit(x, y, 10); dial.style.cursor = dHover ? "pointer" : "ns-resize";
-});
-const dEnd = () => { dDrag = null; vDrag = null; };
-dial.addEventListener("pointerup", dEnd); dial.addEventListener("pointercancel", dEnd);
-dial.addEventListener("pointerleave", () => { if (!dDrag) dHover = null; });
-dial.addEventListener("wheel", e => { e.preventDefault(); setParam("target", P.target + (e.deltaY < 0 ? 0.5 : -0.5) * (e.shiftKey ? 1 : 2)); }, { passive:false });
-dial.addEventListener("dblclick", () => setParam("target", DEFAULTS.target + U[P.unit].off));
-dial.addEventListener("keydown", e => {
-  const big = e.shiftKey ? 5 : 1;
-  if (e.key === "ArrowUp" || e.key === "ArrowRight"){ setParam("target", P.target + 0.5 * big); e.preventDefault(); }
-  if (e.key === "ArrowDown" || e.key === "ArrowLeft"){ setParam("target", P.target - 0.5 * big); e.preventDefault(); }
-});
+["#mIn", "#mOut"].forEach(id => $(id).addEventListener("click", () => { engine.inM.H = engine.outM.H = -120; }));
 
 /* ================= spectrum (RTA) ================= */
 const fft = (() => {
@@ -954,99 +854,6 @@ function drawRTA(){
 $("#tiltBtn").addEventListener("click", e => { tilt = !tilt; e.currentTarget.setAttribute("aria-pressed", tilt); });
 $("#freezeBtn").addEventListener("click", e => { frozen = !frozen; e.currentTarget.setAttribute("aria-pressed", frozen); });
 
-/* ================= history ================= */
-function drawHist(){
-  const cv = $("#hist"), [W, H, g] = fitCanvas(cv);
-  g.clearRect(0, 0, W, H);
-  const u = U[P.unit], padL = 32, w = W - padL - 6, top = 6, h1 = H * 0.62, sTop = h1 + 10, sB = H - 6;
-  const y = v => top + (u.hi - clamp(v, u.lo, u.hi)) / (u.hi - u.lo) * (h1 - top);
-  g.font = `10px ${MONO}`; g.textBaseline = "middle"; g.textAlign = "right";
-  for (let v = u.hi; v >= u.lo; v -= (P.unit === "vu" ? 10 : 12)){ g.fillStyle = alpha(C.muted, 0.18); g.fillRect(padL, Math.round(y(v)), w, 1); g.fillStyle = C.muted; g.fillText(v === 0 ? "0" : fmt(v, 0), padL - 4, y(v)); }
-  g.fillStyle = C.accent; g.fillRect(padL, Math.round(y(P.target)) - 1, w, 2.5);
-  g.strokeStyle = C.muted; g.setLineDash([4, 3]); g.lineWidth = 1; g.beginPath(); g.moveTo(padL, y(P.threshold)); g.lineTo(padL + w, y(P.threshold)); g.stroke(); g.setLineDash([]);
-  const n = hist.length, sx = w / (HMAX - 1), X = k => padL + w - (n - 1 - k) * sx;
-  const line = (key, col, lw) => { g.beginPath(); for (let k = 0; k < n; k++){ const yy = y(hist[k][key]); k ? g.lineTo(X(k), yy) : g.moveTo(X(k), yy); } g.strokeStyle = col; g.lineWidth = lw; g.lineJoin = "round"; g.stroke(); };
-  if (n > 1){ line("i", alpha(C.muted, 0.85), 1.3); line("o", C.ink, 2); }
-  const Rg = Math.max(12, Math.ceil(Math.max(0, ...hist.map(h => Math.abs(h.g))) / 6) * 6), mid = (sTop + sB) / 2, half = (sB - sTop) / 2 - 1, yG = v => mid - clamp(v, -Rg, Rg) / Rg * half;
-  g.fillStyle = alpha(C.muted, 0.1); g.fillRect(padL, sTop, w, sB - sTop);
-  g.fillStyle = C.line; g.fillRect(padL, Math.round(mid), w, 1);
-  g.fillStyle = C.muted; g.textAlign = "right"; g.fillText("+" + Rg, padL - 4, sTop + 5); g.fillText("−" + Rg, padL - 4, sB - 5);
-  if (n > 1){
-    const area = (sign, col) => { g.beginPath(); g.moveTo(X(0), mid); for (let k = 0; k < n; k++) g.lineTo(X(k), yG(sign > 0 ? Math.max(hist[k].g, 0) : Math.min(hist[k].g, 0))); g.lineTo(X(n - 1), mid); g.closePath(); g.fillStyle = alpha(col, 0.6); g.fill(); };
-    area(1, C.boost); area(-1, C.cut);
-    for (let k = 0; k < n; k++) if (hist[k].r < -0.2){ const hh = clamp(-hist[k].r, 0, 12) / 12 * half; g.fillStyle = C.limit; g.fillRect(X(k) - sx / 2, sB - hh, Math.max(1.5, sx), hh); }
-  }
-}
-
-/* ================= live readouts ================= */
-const GSTATE = {
-  waiting:"Below the threshold: not adjusting", on:"On target", boosting:"Riding up", cutting:"Riding down",
-  ceiling:"Boost stopped by the ceiling", held:"Holding a fixed correction", analyzing:"Analyzing… gain unchanged", unset:"Holding. Press Analyze to measure."
-};
-function sentence(){
-  const lev = engine.lev, L = lev.L, g = lev.g, un = shortUnit(), r = v => fmt(v, 1), d = v => fmt(v, 1, true);
-  if (B.bypass) return "Bypassed on the test bench. You're hearing the raw input.";
-  switch (lev.state){
-    case "on":       return `On target at ${r(L + g)} ${un} (${d(g)} dB applied).`;
-    case "boosting": return `Coming in at ${r(L)} ${un}, below the ${r(P.target)} target. Lifting it (${d(g)} dB so far).`;
-    case "cutting":  return `Coming in at ${r(L)} ${un}, above the ${r(P.target)} target. Lowering it (${d(g)} dB so far).`;
-    case "ceiling":  return `It would need more boost, but the peaks would pass the ${r(P.ceiling)} dBFS ceiling. Held at ${d(g)} dB.`;
-    default:         return lev.sl < P.threshold ? `Below the ${r(P.threshold)} threshold (silence, breaths or noise). Not adjusting; gain stays at ${d(g)} dB.` : "Sound just started. Measuring it before acting.";
-  }
-}
-let uiT = 0;
-function updateUI(t){
-  if (t - uiT < 100) return; uiT = t;
-  const lev = engine.lev, u = U[P.unit], g = B.bypass ? 0 : lev.g;
-  const inV = engine.inM.read(P.unit, P.sub), outV = engine.outM.read(P.unit, P.sub);
-  const pc = v => (clamp((v - u.lo) / (u.hi - u.lo), 0, 1) * 100).toFixed(1) + "%";
-  $("#ioInBar").style.width = pc(inV); $("#ioOutBar").style.width = pc(outV);
-  $("#ioInT").style.left = $("#ioOutT").style.left = pc(P.target);
-  $("#ioIn").textContent = inV > u.lo ? fmt(inV, 1) : "—"; $("#ioOut").textContent = outV > u.lo ? fmt(outV, 1) : "—";
-  $("#tNow").textContent = `in ${inV > u.lo ? fmt(inV, 1) : "—"} · out ${outV > u.lo ? fmt(outV, 1) : "—"}`;
-  const gn = $("#gNum"); gn.textContent = fmt(g, 1, true); gn.className = "gnum" + (g > 0.05 ? " up" : g < -0.05 ? " down" : "");
-  $("#gState").textContent = B.bypass ? "Bypassed" : GSTATE[lev.state] || "";
-  const say = $("#say"); say.dataset.s = lev.state; $("#sayTxt").textContent = sentence();
-  // strip markers
-  const mk = $("#mk-threshold"); if (mk){ const s = SPEC.threshold; mk.style.left = (clamp((lev.sl - s.min()) / (s.max() - s.min()), 0, 1) * 100).toFixed(1) + "%"; }
-  const mc = $("#mk-ceiling"); if (mc){ const pk = engine.outM.H; mc.style.left = (clamp((pk + 12) / 12, 0, 1) * 100).toFixed(1) + "%"; mc.classList.toggle("hot", pk > P.ceiling - 0.3); }
-  // analyze button
-  if (P.mode === "hold"){
-    const an = lev.an, btn = $("#analyze");
-    btn.classList.toggle("busy", !!an);
-    btn.querySelector("b").textContent = an ? "Lock" : lev.holdInfo ? "Analyze again" : "Analyze";
-    $("#anProg").style.width = an ? (Math.min(1, an.t / 20) * 100).toFixed(1) + "%" : "0%";
-    $("#anTxt").textContent = an ? `Listening ${an.t.toFixed(1)} s (${(an.c / 100).toFixed(1)} s above threshold). Press to lock, or it locks at 20 s.`
-      : anMsg ? anMsg
-      : lev.holdInfo ? `Holding ${fmt(lev.holdG, 1, true)} dB. Measured ${fmt(lev.holdInfo.measured, 1)} ${lev.holdInfo.unit} over ${lev.holdInfo.secs.toFixed(1)} s.` + (lev.holdInfo.ceil ? " Limited by the ceiling." : "")
-      : `Play a typical section, press Analyze, then press again to lock. Until then it holds ${fmt(lev.holdG ?? 0, 1, true)} dB.`;
-  }
-  // bench
-  const sim = engine.sim, onFile = B.source === "file";
-  document.querySelectorAll("#sits button").forEach((b, i) => b.setAttribute("aria-current", String(!onFile && !sim.ev && B.script && i === sim.segIdx)));
-  $("#evNow").textContent = onFile ? "Playing: " + (fileSrc ? fileSrc.name : "no file loaded") : "Now: " + sim.label;
-}
-
-
-/* ================= header tools ================= */
-$("#resetBtn").addEventListener("click", () => {
-  Object.assign(P, DEFAULTS, { mode:P.mode }); hist = []; engine.lev.resetI(); engine.inM.resetI(); engine.outM.resetI(); anMsg = "";
-  refresh();
-});
-function setPTheme(dark){
-  $("#plugin").dataset.ptheme = dark ? "dark" : "light";
-  const b = $("#themeBtn"); b.setAttribute("aria-pressed", String(dark)); b.setAttribute("aria-label", dark ? "Light plugin theme" : "Dark plugin theme");
-  C = colors();
-  try{ localStorage.setItem("corridor-ptheme", dark ? "dark" : "light"); } catch(e){}
-}
-$("#themeBtn").addEventListener("click", () => setPTheme($("#plugin").dataset.ptheme !== "dark"));
-$("#helpBtn").addEventListener("click", e => { const h = $("#help"); h.hidden = !h.hidden; e.currentTarget.setAttribute("aria-expanded", String(!h.hidden)); });
-function setExpanded(on){
-  $("#xpanel").hidden = !on; $("#plugin").classList.toggle("wide", on);
-  $("#expandBtn").setAttribute("aria-expanded", String(on)); $("#expandTxt").textContent = on ? "Collapse" : "Expand";
-  try{ localStorage.setItem("corridor-expanded", on ? "1" : "0"); } catch(e){}
-}
-$("#expandBtn").addEventListener("click", () => setExpanded($("#xpanel").hidden));
 
 /* ================= test bench ================= */
 function benchSeg(){
@@ -1093,6 +900,59 @@ $("#file").addEventListener("change", async e => {
   } catch(err){ $("#fileName").textContent = "That file couldn't be read. Try a WAV or MP3."; }
 });
 
+
+
+/* ================= status ================= */
+function sentence(){
+  const lev = engine.lev, L = lev.L, g = lev.g, r = v => fmt(v, 1), d = v => fmt(v, 1, true);
+  if (B.bypass) return "Bypassed on the test bench. You're hearing the raw input.";
+  if (P.mode === "hold"){
+    if (lev.an) return `Analyzing: ${lev.an.t.toFixed(1)} s, ${(lev.an.c / 100).toFixed(1)} s above the threshold. Press Lock when you've heard a typical section (it locks by itself at 20 s).`;
+    if (anMsg) return anMsg;
+    if (lev.holdInfo) return `Holding ${d(lev.holdG)} dB. Measured ${r(lev.holdInfo.measured)} dB RMS over ${lev.holdInfo.secs.toFixed(1)} s.${lev.holdInfo.why}`;
+    return `Holding ${d(lev.holdG ?? 0)} dB. Play a typical section and press Analyze.`;
+  }
+  switch (lev.state){
+    case "on":       return `On target: ${r(L + g)} dB RMS with ${d(g)} dB applied.`;
+    case "boosting": return `Coming in at ${r(L)} dB RMS, below the ${r(P.target)} target. Lifting it (${d(g)} dB so far).`;
+    case "cutting":  return `Coming in at ${r(L)} dB RMS, above the ${r(P.target)} target. Lowering it (${d(g)} dB so far).`;
+    case "ceiling":  return `More boost would push peaks past the ${r(P.ceiling)} dBFS ceiling. Held at ${d(g)} dB.`;
+    case "range":    return `It needs more than the ±${fmt(P.range, 1)} dB range allows. Held at ${d(g)} dB.`;
+    default:         return lev.sl < P.threshold ? `Below the ${r(P.threshold)} dB threshold (silence, breaths or noise). Not adjusting; gain stays at ${d(g)} dB.` : "Sound just started. Measuring it before acting.";
+  }
+}
+let uiT = 0;
+function updateUI(t){
+  knobs.target.live(engine.outM.R); knobs.threshold.live(engine.inM.R);
+  if (t - uiT < 100) return; uiT = t;
+  const lev = engine.lev, g = B.bypass ? 0 : lev.g;
+  const gn = $("#gNum"); gn.textContent = fmt(g, 1, true); gn.className = "gnum" + (g > 0.05 ? " up" : g < -0.05 ? " down" : "");
+  const say = $("#say"); say.dataset.s = P.mode === "hold" ? (lev.an ? "analyzing" : "held") : lev.state; $("#sayTxt").textContent = sentence();
+  const a = $("#analyze"); a.classList.toggle("busy", !!lev.an);
+  $("#anLab").textContent = lev.an ? "Lock" : lev.holdInfo ? "Analyze again" : "Analyze";
+  $("#anProg").style.width = lev.an ? (Math.min(1, lev.an.t / 20) * 100).toFixed(1) + "%" : "0";
+  const sim = engine.sim, onFile = B.source === "file";
+  document.querySelectorAll("#sits button").forEach((b, i) => b.setAttribute("aria-current", String(!onFile && !sim.ev && B.script && i === sim.segIdx)));
+  $("#evNow").textContent = onFile ? "Playing: " + (fileSrc ? fileSrc.name : "no file loaded") : "Now: " + sim.label;
+}
+
+/* ================= header tools ================= */
+$("#resetBtn").addEventListener("click", () => { Object.assign(P, DEFAULTS, { mode:P.mode }); anMsg = ""; refresh(); });
+function setPTheme(dark){
+  $("#plugin").dataset.ptheme = dark ? "dark" : "light";
+  const b = $("#themeBtn"); b.setAttribute("aria-pressed", String(dark)); b.setAttribute("aria-label", dark ? "Light plugin theme" : "Dark plugin theme");
+  C = colors();
+  try{ localStorage.setItem("corridor-ptheme", dark ? "dark" : "light"); } catch(e){}
+}
+$("#themeBtn").addEventListener("click", () => setPTheme($("#plugin").dataset.ptheme !== "dark"));
+$("#helpBtn").addEventListener("click", e => { const h = $("#help"); h.hidden = !h.hidden; e.currentTarget.setAttribute("aria-expanded", String(!h.hidden)); });
+function setExpanded(on){
+  $("#xpanel").hidden = !on;
+  $("#expandBtn").setAttribute("aria-expanded", String(on)); $("#expandTxt").textContent = on ? "Collapse" : "Expand";
+  try{ localStorage.setItem("corridor-expanded", on ? "1" : "0"); } catch(e){}
+}
+$("#expandBtn").addEventListener("click", () => setExpanded($("#xpanel").hidden));
+
 /* ================= start ================= */
 let startDark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
 try{ const s = localStorage.getItem("corridor-ptheme"); if (s) startDark = s === "dark"; } catch(e){}
@@ -1100,15 +960,16 @@ setPTheme(startDark);
 let startX = false; try{ startX = localStorage.getItem("corridor-expanded") === "1"; } catch(e){}
 setExpanded(startX);
 benchSeg(); buildSits(); refresh();
-engine.render(null, engine.fs * 9);
+engine.render(null, engine.fs * 11);
 let last = performance.now();
 function frame(t){
   const dt = Math.min(0.1, Math.max(0, (t - last) / 1000)); last = t;
   if (!running) engine.render(null, Math.round(dt * engine.fs));
-  drawDial();
-  if (!$("#xpanel").hidden){ updateSpectrum(); drawRTA(); drawHist(); }
+  drawGraph(); drawMeter("#mIn", engine.inM, "in"); drawMeter("#mOut", engine.outM, "out");
+  if (!$("#xpanel").hidden){ updateSpectrum(); drawRTA(); }
   updateUI(t);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
 </script>
