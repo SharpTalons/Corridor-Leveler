@@ -81,7 +81,7 @@ void Processor::reset() {
     in_.reset(in_.block); out_.reset(out_.block);
     for (auto& d : wetDelay_) std::fill(d.begin(), d.end(), 0.f);
     for (auto& d : dryDelay_) std::fill(d.begin(), d.end(), 0.f);
-    dw_ = 0; qh_ = qt_ = qsz_ = 0; qn_ = 0; env_ = 1.f; minEnv_ = 1.f;
+    dw_ = 0; qh_ = qt_ = qsz_ = 0; qn_ = 0; env_ = 1.f; minEnv_ = 1.f; slotPeak_ = 0.f;
     ms_.fill(0.0); pk_.fill(0.f); act_.fill(0); li_ = 0;
     gCur_ = g_; gInc_ = 0.f;
     activeT_ = 0.f; silentT_ = 10.f; crest_ = 10.f; perc_ = false; prevBlockDb_ = -120.f; onsetRate_ = 0.f;
@@ -264,9 +264,11 @@ void Processor::controlBlock() {
     t_.holdGain.store(holdG_ == kNoHold ? 0.f : holdG_);
 
     // history every 20 ms
+    slotPeak_ = std::max(slotPeak_, in_.blockPeak);
     if (++blocks_ % 2 == 0) {
         const int w = histCount_.load(std::memory_order_relaxed);
-        hist_[size_t(w % kHistorySize)] = Snapshot{in_.rmsDb, out_.rmsDb, p_.bypass ? 0.f : g_, p_.bypass ? 0.f : linToDb(minEnv_)};
+        hist_[size_t(w % kHistorySize)] = Snapshot{in_.rmsDb, out_.rmsDb, p_.bypass ? 0.f : g_, p_.bypass ? 0.f : linToDb(minEnv_), linToDb(slotPeak_), an_.on};
+        slotPeak_ = 0.f;
         histCount_.store(w + 1, std::memory_order_release);
         t_.limiterDb.store(linToDb(minEnv_));
         minEnv_ = 1.f;

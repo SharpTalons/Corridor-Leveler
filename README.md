@@ -4,7 +4,7 @@ An automatic level rider for streaming and recording. Set a target and Corridor 
 there: quiet passages are lifted, loud ones lowered, silence and room noise are never boosted, and
 the output never goes past the ceiling. A Windows plugin (VST3 and 2.x) for OBS and any Windows DAW.
 
-![Corridor Leveler window](docs/window-dark.png)
+![Corridor Leveler window](docs/window-1120.png)
 
 ## Formats
 
@@ -17,8 +17,9 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
 
 ## Controls
 
-- **Ride / Hold**: Ride adjusts the gain continuously. Hold measures a typical section when you
-  press **Analyze**, then locks one fixed correction (press again to **Lock**, or it locks after 20 s).
+- **Ride / Hold**: Ride adjusts the gain continuously. Hold opens an analysis panel under the window:
+  press **Analyze**, play a typical section while the live input waveform lights up yellow, then press
+  **Lock** (or it locks after 20 s). One fixed correction is then held.
 - **Threshold** (dB RMS): below this it stops adjusting, so silence, breaths and noise never trigger a boost.
 - **Target** (dB RMS): the level you want.
 - **Response**: slow (1.5 s averaging, smooth) to fast (0.3 s). Drums and other percussive material are
@@ -30,8 +31,11 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
 - **Ease in silence**: off, the gain freezes below the threshold; on, after 2 s of silence it glides back to 0 dB.
 - **Bypass**: click-free, and keeps the same latency so nothing jumps.
 
-The window can be resized freely (it keeps a 16:9 shape), has light and dark themes, input peak meter on
-the left, output on the right, and shows the latency in the bottom-right corner (5 ms at every sample rate).
+The window can be resized freely (it keeps its shape), has an input peak meter on
+the left, output on the right, the applied gain in the bottom-right corner and the latency in the bottom-left
+(5 ms at every sample rate).
+
+![Hold mode with the analysis panel open](docs/window-hold.png)
 
 ## Installing
 

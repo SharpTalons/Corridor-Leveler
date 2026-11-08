@@ -113,33 +113,46 @@ static void snapshots(const File& dir) {
     runSine(proc, 48000, -70.f, 1.5, ph);
     runSine(proc, 48000, -13.f, 2.5, ph);
     runSine(proc, 48000, -24.f, 3.0, ph);
-    for (bool dark : {true, false}) {
-        proc.darkTheme = dark;
-        for (int w : {1120, 960}) {
-            proc.editorWidth = w;
-            std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
-            static_cast<CorridorEditor*>(ed.get())->refreshNow();
-            CHECK(ed->getWidth() == w, "editor width %d", ed->getWidth());
-            CHECK(std::abs(ed->getHeight() - int(std::round(w * 630.0 / 1120.0))) <= 1, "editor height %d", ed->getHeight());
-            CHECK(ed->isResizable(), "editor not resizable");
-            const Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f);
-            if (dark && w == 1120) {  // the update prompt, as a person would see it
-                SharedResourcePointer<updates::Checker> chk;
-                updates::Release r; r.version = "0.2.0"; r.bytes = 5435658; r.page = updates::kReleasesPage; r.asset = "https://example.invalid/x.exe";
-                chk->setKnownForTest(r, true);
-                MessageManager::getInstance()->runDispatchLoopUntil(200);
-                const Image pimg = ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f);
-                FileOutputStream pos(dir.getChildFile("window-update-prompt.png"));
-                PNGImageFormat().writeImageToStream(pimg, pos);
-                chk->setKnownForTest({}, false);
-                MessageManager::getInstance()->runDispatchLoopUntil(100);
-            }
-            const File f = dir.getChildFile(String("window-") + (dark ? "dark" : "light") + "-" + String(w) + ".png");
-            f.deleteFile();
-            FileOutputStream os(f);
-            PNGImageFormat().writeImageToStream(img, os);
-            std::printf("  wrote %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
+    auto save = [&](const Image& img, const String& name) {
+        const File f = dir.getChildFile(name);
+        f.deleteFile();
+        FileOutputStream os(f);
+        PNGImageFormat().writeImageToStream(img, os);
+        std::printf("  wrote %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
+    };
+    for (int w : {1120, 960}) {
+        proc.editorWidth = w;
+        std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
+        static_cast<CorridorEditor*>(ed.get())->refreshNow();
+        CHECK(ed->getWidth() == w, "editor width %d", ed->getWidth());
+        CHECK(std::abs(ed->getHeight() - int(std::round(w * 630.0 / 1120.0))) <= 1, "editor height %d", ed->getHeight());
+        CHECK(ed->isResizable(), "editor not resizable");
+        const Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f);
+        if (w == 1120) {  // the update prompt, as a person would see it
+            SharedResourcePointer<updates::Checker> chk;
+            updates::Release r; r.version = "0.2.0"; r.bytes = 5435658; r.page = updates::kReleasesPage; r.asset = "https://example.invalid/x.exe";
+            chk->setKnownForTest(r, true);
+            MessageManager::getInstance()->runDispatchLoopUntil(200);
+            save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-update-prompt.png");
+            chk->setKnownForTest({}, false);
+            MessageManager::getInstance()->runDispatchLoopUntil(100);
         }
+        save(img, "window-" + String(w) + ".png");
+    }
+    // Hold mode: the analysis panel opens under the window while a section is measured
+    {
+        proc.editorWidth = 1120;
+        if (auto* m = proc.state().getParameter(ids::mode)) m->setValueNotifyingHost(1.f);
+        std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
+        proc.core().requestAnalyzeStart();
+        runSine(proc, 48000, -28.f, 2.0, ph);
+        runSine(proc, 48000, -70.f, 0.6, ph);
+        runSine(proc, 48000, -22.f, 1.4, ph);
+        static_cast<CorridorEditor*>(ed.get())->refreshNow();
+        const int h = int(std::round(1120.0 * (630 + CorridorEditor::drawerH) / 1120.0));
+        CHECK(std::abs(ed->getHeight() - h) <= 1, "hold-mode editor height %d, expected %d", ed->getHeight(), h);
+        save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-hold.png");
+        if (auto* m = proc.state().getParameter(ids::mode)) m->setValueNotifyingHost(0.f);
     }
 }
 
