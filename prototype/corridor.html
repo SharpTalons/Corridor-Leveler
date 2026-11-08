@@ -6,18 +6,18 @@
 <style>
 /* Layout: one landscape plugin window at a fixed 1120 x 630 design size, zoomed to fit. Input meter down the left edge, output meter down the right, and between them a scrolling level graph on one even 0 to −70 dB scale. The controls sit at the bottom, blended over the lower part of the graph. Test bench and explanation follow. */
 :root{
-  --bg:#e9e9e4; --fg:#16181b; --muted:#5d636b; --line:#d3d4ce;
-  --p-bg:#f4f4f0; --p-surface:#fcfcfa; --p-sunk:#e6e6e0; --p-graph:#eeeee9; --p-ink:#141619; --p-muted:#626870; --p-line:#d6d7d0;
+  --bg:#ffffff; --fg:#000000; --muted:#5f6368; --line:#d9d9d9;
+  --p-bg:#ffffff; --p-surface:#ffffff; --p-sunk:#ebebeb; --p-graph:#ffffff; --p-ink:#000000; --p-muted:#5f6368; --p-line:#dcdcdc;
   --p-accent:#17756a; --p-accent-soft:#cfe5e1; --p-boost:#2672b5; --p-cut:#c24d33; --p-limit:#c7302b; --p-ok:#2b7d47; --p-warn:#b7862a;
   --p-shadow:0 30px 60px -34px rgba(20,24,28,.45);
   --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1114;--fg:#e8eae6;--muted:#9aa1a8;--line:#2a2e33;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#0f1114;--fg:#e8eae6;--muted:#9aa1a8;--line:#2a2e33;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000000;--fg:#ffffff;--muted:#a3a3a3;--line:#2b2b2b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#000000;--fg:#ffffff;--muted:#a3a3a3;--line:#2b2b2b;color-scheme:dark}
 .plugin[data-ptheme="dark"]{
-  --p-bg:#1a1d21; --p-surface:#23272c; --p-sunk:#14171a; --p-graph:#181b1f; --p-ink:#eceee9; --p-muted:#a0a7ae; --p-line:#333940;
+  --p-bg:#000000; --p-surface:#000000; --p-sunk:#1c1c1c; --p-graph:#000000; --p-ink:#ffffff; --p-muted:#a3a3a3; --p-line:#2e2e2e;
   --p-accent:#4cc2ae; --p-accent-soft:#1f3b37; --p-boost:#62a9e8; --p-cut:#ee7b5f; --p-limit:#f0605a; --p-ok:#6cc58b; --p-warn:#e0b354;
   --p-shadow:0 30px 60px -30px rgba(0,0,0,.8); color-scheme:dark;
 }
@@ -631,7 +631,7 @@ function makeKnob(parent, key){
     if (e.key === "ArrowDown" || e.key === "ArrowLeft"){ setParam(key, P[key] - s.step * big); e.preventDefault(); }
   });
 }
-["target", "threshold"].forEach(k => makeKnob($("#kLeft"), k));
+["threshold", "target"].forEach(k => makeKnob($("#kLeft"), k));
 ["response", "range", "ceiling"].forEach(k => makeKnob($("#kRight"), k));
 
 $("#modeRide").addEventListener("click", () => setMode("ride"));
