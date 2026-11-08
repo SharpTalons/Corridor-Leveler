@@ -23,6 +23,7 @@
   --p-rim: rgba(255, 255, 255, .38); --p-rim-soft: rgba(255, 255, 255, .1); --p-shade: rgba(0, 0, 0, .4);
   --p-bloom-a: rgba(255, 255, 255, .035); --p-bloom-b: rgba(255, 255, 255, .025); --p-bloom-c: rgba(255, 255, 255, 0);
   --p-meter-off: rgba(255, 255, 255, .07); --p-on: rgba(255, 255, 255, .2);
+  --p-data: #4fd1bf; --p-data-text: #6fdccd;  /* the one hue: on the output and its target only */
 }
 .unit[data-ptheme="light"] {
   --p-bg: #f2f2f4; --p-ink: #1d1d1f; --p-label: #48484c; --p-muted: #6e6e73;
@@ -32,6 +33,7 @@
   --p-rim: rgba(255, 255, 255, .95); --p-rim-soft: rgba(0, 0, 0, .06); --p-shade: rgba(0, 0, 0, .08);
   --p-bloom-a: rgba(255, 255, 255, .7); --p-bloom-b: rgba(255, 255, 255, .5); --p-bloom-c: rgba(255, 255, 255, 0);
   --p-meter-off: rgba(0, 0, 0, .07); --p-on: rgba(0, 0, 0, .08);
+  --p-data: #149483; --p-data-text: #0f7a6c;
 }
 
 html, body { background: var(--page); color: var(--page-ink); }
@@ -60,7 +62,7 @@ header.page p { margin: 0; color: var(--page-muted); max-width: 62ch; line-heigh
 .drawer-side .cap { font-size: 15px; font-weight: 600; }
 .readout { font-size: 13px; color: var(--p-muted); line-height: 1.6; font-variant-numeric: tabular-nums; }
 .readout b { color: var(--p-ink); font-weight: 600; }
-.readout .hot { color: var(--p-accent-text); font-weight: 600; }
+.readout .hot { color: var(--p-data-text); font-weight: 600; }
 .wave { min-width: 0; height: 124px; border-radius: 18px; background: rgba(0, 0, 0, .28); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .35), 0 1px 0 var(--p-rim-soft); }
 .unit[data-ptheme="light"] .wave { background: rgba(255, 255, 255, .5); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .1), 0 1px 0 #fff; }
 .wave canvas { display: block; width: 100%; height: 100%; }
@@ -154,7 +156,7 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
         <li>Every control is glass: it blurs and slightly magnifies the graph behind it, with a bright rim where the light catches the edge. The rim follows your pointer.</li>
         <li>The header and the two meters float over a full-bleed graph. The controls have no box: the graph frosts and fades into the window colour under them, so they sit in the graph itself.</li>
         <li>Dials are clear glass discs with a light value ring and pointer. Ride / Hold is a glass capsule whose selected side is a droplet that slides across.</li>
-        <li>Neutral and quiet: greys and the window colour only. Target is the solid line, Threshold dashed, Ceiling dotted-grey. The one colour left is a muted red, shown only for clipping and when the ceiling or range holds the gain back.</li>
+        <li>Neutral and quiet: greys and the window colour only. Target is the solid line, Threshold dashed, Ceiling dotted-grey. One calm teal marks what the screen is about: the output line, the Target line and dial, "On target" and the stretch being measured. A muted red appears only for clipping and when the ceiling or range holds the gain back.</li>
         <li>Dark by default; the sun / moon switch turns the plugin light. Hold slides a glass sheet out under the window with the live waveform.</li>
       </ul>
     </section>
@@ -170,11 +172,11 @@ const css = (n, el = unit) => getComputedStyle(el).getPropertyValue(n).trim();
 const FONT = css('--font-ui', root);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const C = {};
-const TOKENS = ['p-bg','p-ink','p-label','p-muted','p-accent','p-accent-text','p-green','p-green-text','p-red','p-trace','p-out','p-meter','p-on','p-grid','p-glass','p-glass-strong','p-rim','p-rim-soft','p-shade','p-bloom-a','p-bloom-b','p-bloom-c','p-meter-off'];
+const TOKENS = ['p-bg','p-ink','p-label','p-muted','p-accent','p-accent-text','p-green','p-green-text','p-red','p-trace','p-out','p-meter','p-on','p-data','p-data-text','p-grid','p-glass','p-glass-strong','p-rim','p-rim-soft','p-shade','p-bloom-a','p-bloom-b','p-bloom-c','p-meter-off'];
 let dark = true;
 function readTokens() {
   TOKENS.forEach(k => C[k.slice(2)] = css('--' + k));
-  const roles = [['bg','Window'],['ink','Values, Target, rings'],['label','Names'],['muted','Scale, hints'],['out','Output trace'],['trace','Input trace'],['green','Threshold line'],['meter','Meters'],['red','Clipping only'],['glass','Glass tint']];
+  const roles = [['bg','Window'],['ink','Values, dial rings'],['label','Names'],['muted','Scale, hints'],['data','Output, Target (the one hue)'],['trace','Input trace'],['green','Threshold line'],['meter','Meters'],['red','Clipping only'],['glass','Glass tint']];
   document.getElementById('swatches').innerHTML = roles.map(([k, n]) => `<div class="sw"><i style="background:${C[k]}"></i><div><b>${n}</b><span>${C[k]}</span></div></div>`).join('');
 }
 readTokens();
@@ -188,7 +190,7 @@ const PM = '±';
 const knobs = [
   { id: 'thr', label: 'Threshold', min: -70, max: -20, x: 290, y: 496, r: 30, val: v => fmt(v) + ' dB' },
   { id: 'resp', label: 'Response', min: 0, max: 100, x: 400, y: 496, r: 30, val: v => (v < 34 ? 'Slow ' : v > 66 ? 'Fast ' : 'Medium ') + Math.round(v) },
-  { id: 'tgt', label: 'Target', min: -40, max: -6, x: 560, y: 478, r: 44, val: v => fmt(v) + ' dB RMS' },
+  { id: 'tgt', label: 'Target', min: -40, max: -6, x: 560, y: 478, r: 44, val: v => fmt(v) + ' dB RMS', col: 'data' },
   { id: 'rng', label: 'Range', min: 0, max: 24, x: 720, y: 496, r: 30, val: v => PM + fmt(v) + ' dB' },
   { id: 'ceil', label: 'Ceiling', min: -12, max: 0, x: 830, y: 496, r: 30, val: v => fmt(v) + ' dBFS' },
 ];
@@ -348,20 +350,20 @@ function drawBackdrop() {
     ctx.strokeStyle = C.trace; ctx.lineWidth = 1.3; ctx.lineJoin = 'round'; ctx.stroke();
     ctx.save();
     ctx.beginPath(); for (let k = 0; k < n; k++) { const y = yOf(hist[k].o); k ? ctx.lineTo(X(k), y) : ctx.moveTo(X(k), y); }
-    ctx.strokeStyle = C.out; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.strokeStyle = C.data; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.stroke();
     ctx.restore();
   }
-  if (analyzing) { const span = Math.min(n - 1, anT / dt); ctx.fillStyle = C.accent; ctx.globalAlpha = .08; ctx.fillRect(X(n - 1 - span), GT, span * sx, GB - GT); ctx.globalAlpha = 1; }
+  if (analyzing) { const span = Math.min(n - 1, anT / dt); ctx.fillStyle = C.data; ctx.globalAlpha = .08; ctx.fillRect(X(n - 1 - span), GT, span * sx, GB - GT); ctx.globalAlpha = 1; }
   const line = (id, col, dash, w) => {
     const y = Math.round(yOf(P[id])) + .5, hot = hover === 'line-' + id || drag?.id === 'line-' + id;
     ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = hot ? 2.6 : w;
     ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]);
   };
-  line('ceil', C.muted, [5, 5], 1.2); line('thr', C.green, [7, 5], 1.4); line('tgt', C.accent, [], 2);
+  line('ceil', C.muted, [5, 5], 1.2); line('thr', C.green, [7, 5], 1.4); line('tgt', C.data, [], 2);
   // legend
   const lx = PX1 - 330, ly = 80;
   ctx.fillStyle = C.trace; ctx.fillRect(lx, ly - 1, 16, 2); text('Input', lx + 22, ly, 12, C.muted, 'left');
-  ctx.fillStyle = C.out; ctx.fillRect(lx + 76, ly - 1.5, 16, 3); text('Output', lx + 98, ly, 12, C.muted, 'left');
+  ctx.fillStyle = C.data; ctx.fillRect(lx + 76, ly - 1.5, 16, 3); text('Output', lx + 98, ly, 12, C.muted, 'left');
   text('RMS, last 10 s', PX1 - 22, ly, 12, C.muted, 'right');
 }
 
@@ -507,7 +509,7 @@ function drawHeader() {
 }
 
 function drawTags() {
-  const tags = [['ceil', 'Ceiling', C.muted, C.label], ['thr', 'Threshold', C.green, C['green-text']], ['tgt', 'Target', C.accent, C['accent-text']]];
+  const tags = [['ceil', 'Ceiling', C.muted, C.label], ['thr', 'Threshold', C.green, C['green-text']], ['tgt', 'Target', C.data, C['data-text']]];
   for (const [id, name, col, colText] of tags) {
     const lineY = yOf(P[id]), under = lineY > FADE_TOP + 24;
     const y = under ? FADE_TOP + 22 : lineY;
@@ -521,7 +523,7 @@ function drawTags() {
 }
 
 const STATES = {
-  on: ['On target', 'ink'], boost: ['Boosting', 'label'], cut: ['Cutting', 'label'], ceiling: ['Held back by the ceiling', 'red'],
+  on: ['On target', 'data'], boost: ['Boosting', 'label'], cut: ['Cutting', 'label'], ceiling: ['Held back by the ceiling', 'red'],
   range: ['At the edge of the range', 'red'], wait: ['Below the threshold, not adjusting', 'muted'], return: ['Easing back to 0 dB', 'label'],
   held: ['Holding a fixed gain', 'ink'], analyzing: ['Analyzing', 'ink'],
 };
@@ -646,7 +648,7 @@ function drawDrawer() {
   const n = wave.length, stp = w / WAVE;
   for (let i = 0; i < n; i++) {
     const s = wave[i], x = w - (n - i) * stp, a = s.a * (mid - 8 * d);
-    wctx.fillStyle = s.an ? C.accent : C.trace; wctx.globalAlpha = s.act ? 1 : .35;
+    wctx.fillStyle = s.an ? C.data : C.trace; wctx.globalAlpha = s.act ? 1 : .35;
     wctx.fillRect(x, mid - a * s.up, Math.max(d, stp * .9), a * s.up + a);
   }
   wctx.globalAlpha = 1;
