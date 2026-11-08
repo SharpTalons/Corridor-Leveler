@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
-project(CorridorLeveler VERSION 0.1.0 LANGUAGES C CXX)
+# Version: MAJOR.MINOR from the VERSION file, PATCH supplied by CI (number of commits on main).
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" CORRIDOR_BASE_VERSION LIMIT_COUNT 1)
+string(STRIP "${CORRIDOR_BASE_VERSION}" CORRIDOR_BASE_VERSION)
+set(CORRIDOR_VERSION "${CORRIDOR_BASE_VERSION}.0" CACHE STRING "Version baked into the plugins and installer")
+project(CorridorLeveler VERSION ${CORRIDOR_VERSION} LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

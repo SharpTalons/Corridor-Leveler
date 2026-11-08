@@ -37,9 +37,15 @@ the left, output on the right, and shows the latency in the bottom-right corner 
 
 ## Installing
 
-Download **CorridorLeveler-…-Windows-Setup.exe** from the latest
-[Build workflow run](../../actions/workflows/build.yml) (artifact *CorridorLeveler-Windows-Setup*) or from
-Releases, run it, and restart OBS. See `installer/README.txt` for where each part goes.
+Download the latest **CorridorLeveler-…-Windows-Setup.exe** from [Releases](../../releases/latest), run it,
+and restart OBS. See `installer/README.txt` for where each part goes.
+
+## Versions and releases
+
+Every commit that lands on `main` builds the installer and publishes it as a new GitHub Release.
+The version is `MAJOR.MINOR.N`: `MAJOR.MINOR` comes from the `VERSION` file and `N` is the number of
+commits on `main`, so it goes up by itself. To start a new minor or major version, edit `VERSION`
+(for example `0.2` or `1.0`). The same number is built into the plugins, the installer and the release tag.
 
 ## Building
 
