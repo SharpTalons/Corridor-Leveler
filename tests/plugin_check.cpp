@@ -7,13 +7,23 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 #include "../plugin/src/PluginEditor.h"
 #include "../plugin/src/PluginProcessor.h"
+#include "../plugin/src/Updates.h"
 
 using namespace juce;
 
 int checkVst2Binary(const char* path);  // tests/vst2_host.cpp (FST)
+
+static void setenv_portable() {  // keep the window snapshots off the network
+#ifdef _WIN32
+    _putenv_s("CORRIDOR_NO_UPDATE_CHECK", "1");
+#else
+    setenv("CORRIDOR_NO_UPDATE_CHECK", "1", 1);
+#endif
+}
 
 static int failures = 0;
 #define CHECK(c, ...) do { if (!(c)) { ++failures; std::printf("  FAIL %s  ", #c); std::printf(__VA_ARGS__); std::printf("\n"); } } while (0)
@@ -71,6 +81,27 @@ static void checkBinary(AudioPluginFormatManager& fm, const String& path, const 
     }
 }
 
+static void checkUpdates() {
+    std::printf("update check: version comparison and release parsing\n");
+    using updates::isNewer;
+    CHECK(isNewer("0.10.0", "0.9.9"), "0.10.0 > 0.9.9");
+    CHECK(!isNewer("1.0.0", "1.0.0"), "equal is not newer");
+    CHECK(isNewer("v0.1.23", "0.1.22"), "leading v");
+    CHECK(!isNewer("0.1.22-beta", "0.1.22"), "suffix ignored");
+    CHECK(!isNewer("0.1.21", "0.1.22"), "older is not newer");
+    CHECK(isNewer("1", "0.9.9"), "short versions pad");
+    const auto r = updates::parseLatest(R"({"tag_name":"v0.1.23","html_url":"https://github.com/o/r/releases/tag/v0.1.23",
+        "assets":[{"name":"notes.txt","browser_download_url":"https://x/notes.txt","size":10},
+                  {"name":"CorridorLeveler-0.1.23-Windows-Setup.exe","browser_download_url":"https://github.com/o/r/releases/download/v0.1.23/CorridorLeveler-0.1.23-Windows-Setup.exe","size":5425143}]})");
+    CHECK(r.valid() && r.version == "0.1.23", "version '%s'", r.version.toRawUTF8());
+    CHECK(r.asset.endsWith("CorridorLeveler-0.1.23-Windows-Setup.exe") && r.bytes == 5425143, "asset '%s'", r.asset.toRawUTF8());
+    CHECK(!updates::parseLatest("{}").valid(), "no release");
+    CHECK(!updates::parseLatest("not json").valid(), "bad json");
+    const auto fb = updates::parseLatest(R"({"tag_name":"v0.2.5"})");
+    CHECK(fb.asset.endsWith("/download/v0.2.5/CorridorLeveler-0.2.5-Windows-Setup.exe"), "fallback '%s'", fb.asset.toRawUTF8());
+    std::printf("  current version %s\n", updates::currentVersion().toRawUTF8());
+}
+
 static void snapshots(const File& dir) {
     dir.createDirectory();
     CorridorAudioProcessor proc;
@@ -84,7 +115,7 @@ static void snapshots(const File& dir) {
     runSine(proc, 48000, -24.f, 3.0, ph);
     for (bool dark : {true, false}) {
         proc.darkTheme = dark;
-        for (int w : {1120, 840}) {
+        for (int w : {1120, 960}) {
             proc.editorWidth = w;
             std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
             static_cast<CorridorEditor*>(ed.get())->refreshNow();
@@ -92,6 +123,17 @@ static void snapshots(const File& dir) {
             CHECK(std::abs(ed->getHeight() - int(std::round(w * 630.0 / 1120.0))) <= 1, "editor height %d", ed->getHeight());
             CHECK(ed->isResizable(), "editor not resizable");
             const Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f);
+            if (dark && w == 1120) {  // the update prompt, as a person would see it
+                SharedResourcePointer<updates::Checker> chk;
+                updates::Release r; r.version = "0.2.0"; r.bytes = 5435658; r.page = updates::kReleasesPage; r.asset = "https://example.invalid/x.exe";
+                chk->setKnownForTest(r, true);
+                MessageManager::getInstance()->runDispatchLoopUntil(200);
+                const Image pimg = ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f);
+                FileOutputStream pos(dir.getChildFile("window-update-prompt.png"));
+                PNGImageFormat().writeImageToStream(pimg, pos);
+                chk->setKnownForTest({}, false);
+                MessageManager::getInstance()->runDispatchLoopUntil(100);
+            }
             const File f = dir.getChildFile(String("window-") + (dark ? "dark" : "light") + "-" + String(w) + ".png");
             f.deleteFile();
             FileOutputStream os(f);
@@ -103,6 +145,7 @@ static void snapshots(const File& dir) {
 
 int main(int argc, char** argv) {
     ScopedJuceInitialiser_GUI init;
+    setenv_portable();
     String vst3, vst2, snapDir;
     for (int i = 1; i + 1 < argc; i += 2) {
         const String k(argv[i]), v(argv[i + 1]);
@@ -112,6 +155,7 @@ int main(int argc, char** argv) {
     fm.addFormat(std::make_unique<VST3PluginFormat>());
     if (vst3.isNotEmpty()) checkBinary(fm, vst3, "VST3");
     if (vst2.isNotEmpty()) failures += checkVst2Binary(vst2.toRawUTF8());
+    checkUpdates();
     if (snapDir.isNotEmpty()) snapshots(File(snapDir));
     if (failures) { std::printf("%d check(s) failed\n", failures); return 1; }
     std::printf("plugin checks passed\n");

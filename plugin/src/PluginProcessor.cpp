@@ -40,7 +40,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout CorridorAudioProcessor::crea
 }
 
 void CorridorAudioProcessor::prepareToPlay(double sampleRate, int) {
-    // Runs at whatever rate the host (DAW, OBS, Standalone device) is set to.
+    // Runs at whatever rate the host (DAW or OBS) is set to.
     dsp.prepare(sampleRate, juce::jmax(1, getTotalNumInputChannels()));
     setLatencySamples(dsp.latencySamples());
 }

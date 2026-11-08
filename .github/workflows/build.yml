@@ -14,7 +14,7 @@ jobs:
     name: Linux checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install build libraries
         run: |
           sudo apt-get update
@@ -24,14 +24,14 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build --parallel
-      - name: DSP core and OBS filter tests
+      - name: DSP core tests
         run: ctest --test-dir build --output-on-failure
       - name: Load the plugins like a host, render the window
         run: |
           A="build/plugin/CorridorLeveler_artefacts/Release"
           xvfb-run -a build/plugin/corridor_plugin_check_artefacts/Release/corridor_plugin_check \
             --vst3 "$A/VST3/Corridor Leveler.vst3" --vst2 "$A/VST/libCorridor Leveler.so" --snapshots screenshots
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: window-screenshots
           path: screenshots/*.png
@@ -42,7 +42,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Work out the version
@@ -68,23 +68,20 @@ jobs:
         shell: bash
         run: |
           A="build/plugin/CorridorLeveler_artefacts/Release"
-          mkdir -p stage/obs/data stage/vst3 stage/vst2 stage/app
-          cp build/obs/Release/corridor-leveler.dll stage/obs/
-          cp -r obs/data/. stage/obs/data/
+          mkdir -p stage/vst3 stage/vst2
           cp -r "$A/VST3/Corridor Leveler.vst3" stage/vst3/
           cp "$A/VST/Corridor Leveler.dll" stage/vst2/
-          cp "$A/Standalone/Corridor Leveler.exe" stage/app/
           cp LICENSE stage/LICENSE.txt
           cp installer/README.txt stage/README.txt
       - name: Build installer
         shell: pwsh
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DSrcDir=$pwd\stage" "/DAppVersion=$env:VERSION" installer\corridor.iss
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: CorridorLeveler-Windows-Setup
           path: dist/*.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: CorridorLeveler-Windows-files
           path: stage/
@@ -99,5 +96,5 @@ jobs:
           generate_release_notes: true
           make_latest: true
           body: |
-            Windows installer for Corridor Leveler ${{ env.VERSION }}: the OBS filter, VST3, 2.x plugin and Standalone app.
+            Windows installer for Corridor Leveler ${{ env.VERSION }}: the VST3 and 2.x plugins (OBS loads the 2.x plugin).
             Download **CorridorLeveler-${{ env.VERSION }}-Windows-Setup.exe** below, run it, then restart OBS.

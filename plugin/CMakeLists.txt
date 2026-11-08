@@ -1,11 +1,11 @@
-# VST3, legacy VST 2.x and Standalone builds, made with JUCE (AGPLv3 open-source licence).
+# VST3 and VST 2.x builds, made with JUCE (AGPLv3 open-source licence).
 # The 2.x format is built against FST (GPLv3), an open reimplementation of the 2.x headers,
 # because Steinberg no longer distributes that SDK.
 include(FetchContent)
 
 set(CORRIDOR_JUCE_DIR "" CACHE PATH "Use an existing JUCE checkout instead of downloading")
 set(CORRIDOR_FST_DIR "" CACHE PATH "Use an existing FST checkout instead of downloading")
-option(CORRIDOR_BUILD_VST2 "Build the legacy 2.x plugin (needed by OBS's built-in VST filter)" ON)
+option(CORRIDOR_BUILD_VST2 "Build the 2.x plugin (what OBS loads through its built-in VST 2.x filter)" ON)
 
 if(CORRIDOR_JUCE_DIR)
   add_subdirectory("${CORRIDOR_JUCE_DIR}" "${CMAKE_BINARY_DIR}/juce" EXCLUDE_FROM_ALL)
@@ -14,14 +14,13 @@ else()
   FetchContent_MakeAvailable(juce)
 endif()
 
-set(_formats VST3 Standalone)
+set(_formats VST3)
 if(CORRIDOR_BUILD_VST2)
   if(NOT CORRIDOR_FST_DIR)
-    FetchContent_Declare(fst GIT_REPOSITORY https://git.iem.at/zmoelnig/FST.git GIT_TAG 647af068765b75867e3a28b4dd8991ab9ed47f7c)
-    FetchContent_GetProperties(fst)
-    if(NOT fst_POPULATED)
-      FetchContent_Populate(fst)
-    endif()
+    # download only: SOURCE_SUBDIR has no CMakeLists.txt, so FST's own project is not added
+    FetchContent_Declare(fst GIT_REPOSITORY https://git.iem.at/zmoelnig/FST.git GIT_TAG 647af068765b75867e3a28b4dd8991ab9ed47f7c
+      SOURCE_SUBDIR download-only)
+    FetchContent_MakeAvailable(fst)
     set(CORRIDOR_FST_DIR "${fst_SOURCE_DIR}")
   endif()
   # JUCE looks for <pluginterfaces/vst2.x/aeffect.h>; point those names at FST.
@@ -49,7 +48,8 @@ juce_add_plugin(CorridorLeveler
   VST2_CATEGORY kPlugCategEffect
   COPY_PLUGIN_AFTER_BUILD FALSE)
 
-target_sources(CorridorLeveler PRIVATE src/PluginProcessor.cpp src/PluginEditor.cpp)
+target_sources(CorridorLeveler PRIVATE src/PluginProcessor.cpp src/PluginEditor.cpp src/Updates.cpp)
+target_compile_definitions(CorridorLeveler PRIVATE CORRIDOR_VERSION_STRING="${PROJECT_VERSION}")
 target_compile_definitions(CorridorLeveler PUBLIC
   JUCE_WEB_BROWSER=0
   JUCE_USE_CURL=0
@@ -64,9 +64,10 @@ target_link_libraries(CorridorLeveler
 option(CORRIDOR_BUILD_PLUGIN_CHECK "Build the plugin host check tool" ON)
 if(CORRIDOR_BUILD_PLUGIN_CHECK)
   juce_add_console_app(corridor_plugin_check PRODUCT_NAME "corridor_plugin_check")
-  target_sources(corridor_plugin_check PRIVATE ../tests/plugin_check.cpp src/PluginProcessor.cpp src/PluginEditor.cpp)
+  target_sources(corridor_plugin_check PRIVATE ../tests/plugin_check.cpp src/PluginProcessor.cpp src/PluginEditor.cpp src/Updates.cpp)
+  target_compile_definitions(corridor_plugin_check PRIVATE CORRIDOR_VERSION_STRING="${PROJECT_VERSION}")
   target_compile_definitions(corridor_plugin_check PRIVATE
-    JUCE_PLUGINHOST_VST3=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)
+    JUCE_PLUGINHOST_VST3=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1 JUCE_MODAL_LOOPS_PERMITTED=1)
   target_link_libraries(corridor_plugin_check PRIVATE corridor_core juce::juce_audio_utils juce::juce_audio_processors juce::juce_gui_basics
     juce::juce_recommended_config_flags ${CMAKE_DL_LIBS})
   # the 2.x host lives in its own file and sees only FST, never JUCE's 2.x hosting code

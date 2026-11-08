@@ -2,7 +2,7 @@
 
 An automatic level rider for streaming and recording. Set a target and Corridor keeps your audio
 there: quiet passages are lifted, loud ones lowered, silence and room noise are never boosted, and
-the output never goes past the ceiling. Built for OBS on Windows, and works in any DAW.
+the output never goes past the ceiling. A Windows plugin (VST3 and 2.x) for OBS and any Windows DAW.
 
 ![Corridor Leveler window](docs/window-dark.png)
 
@@ -10,12 +10,10 @@ the output never goes past the ceiling. Built for OBS on Windows, and works in a
 
 | Build | File | Where it's used |
 |---|---|---|
-| Native OBS filter | `corridor-leveler.dll` | OBS → Filters → **Corridor Leveler** (settings in OBS's filter panel) |
-| VST3 | `Corridor Leveler.vst3` | DAWs; OBS through a VST3 host add-on |
-| 2.x plugin | `Corridor Leveler.dll` | OBS's built-in **VST 2.x Plug-in** filter (full plugin window), older DAWs |
-| Standalone | `Corridor Leveler.exe` | Try it live with your microphone |
+| 2.x plugin | `Corridor Leveler.dll` | OBS → Filters → **VST 2.x Plug-in** → Corridor Leveler (full plugin window); DAWs |
+| VST3 | `Corridor Leveler.vst3` | DAWs |
 
-All four run the same engine (`core/`). Mono and stereo, at whatever sample rate the host uses.
+Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the host uses.
 
 ## Controls
 
@@ -40,6 +38,21 @@ the left, output on the right, and shows the latency in the bottom-right corner 
 Download the latest **CorridorLeveler-…-Windows-Setup.exe** from [Releases](../../releases/latest), run it,
 and restart OBS. See `installer/README.txt` for where each part goes.
 
+## Updates
+
+When the plugin window opens, Corridor asks this repository's public GitHub releases for the newest
+version. It is a plain request with no token and nothing about you or your computer. If a newer
+version exists, it asks once per session, with **Update** and **Ignore**:
+
+- **Update** downloads the installer with a progress bar and opens it. Close OBS or your DAW when the
+  installer asks; settings and sessions are kept.
+- **Ignore** stops the automatic prompt for that version. The next version asks again.
+- The version button in the header opens a panel with the installed version, the last result and
+  **Check for updates**, which always asks, even about an ignored version.
+- Offline, it uses the last answer it saved.
+
+This follows the `update-check` spec from fubulatu-lang/Design-Constants.
+
 ## Versions and releases
 
 Every commit that lands on `main` builds the installer and publishes it as a new GitHub Release.
@@ -61,15 +74,15 @@ cmake --build build --config Release --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-JUCE, FST and the libobs headers are downloaded at configure time. On Linux you also need the usual JUCE
-libraries (ALSA, X11, FreeType, Fontconfig). Options: `CORRIDOR_BUILD_PLUGIN`, `CORRIDOR_BUILD_OBS`,
+JUCE and FST are downloaded at configure time. Corridor Leveler ships for Windows only;
+the CI also builds on Linux purely to run the tests and render the window screenshots (that needs ALSA, X11,
+FreeType and Fontconfig development libraries). Options: `CORRIDOR_BUILD_PLUGIN`,
 `CORRIDOR_BUILD_VST2`, `CORRIDOR_BUILD_TESTS`.
 
 Tests:
 
 - `tests/test_core.cpp`: engine behaviour at 44.1 to 192 kHz: reaching the target, stereo linking, threshold
   freeze, ease, range, ceiling, bit-exact bypass delay, Hold/Analyze, drums vs voice, mono.
-- `tests/obs_harness.cpp`: loads the OBS filter with a stand-in libobs and pushes audio through it.
 - `tests/plugin_check.cpp`: loads the built VST3 and 2.x binaries like a host, checks level, latency and
   bypass, and renders the window to PNG.
 
@@ -84,4 +97,3 @@ Corridor Leveler is licensed under the **GNU AGPL v3 or later** (see `LICENSE`).
   reimplementation of the 2.x plugin headers, because Steinberg no longer distributes that SDK.
   "VST" is a Steinberg trademark. FST's authors ask that plugins built with FST not be called "VST"
   or "VST compatible", so this project refers to that build as the 2.x plugin.
-- The OBS filter compiles against the libobs headers from OBS Studio (GPLv2 or later).
