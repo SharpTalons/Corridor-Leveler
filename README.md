@@ -2,7 +2,7 @@
 
 An automatic level rider for streaming and recording. Set a target and Corridor keeps your audio
 there: quiet passages are lifted, loud ones lowered, silence and room noise are never boosted, and
-the output never goes past the ceiling. Built for OBS on Windows, and works in any DAW.
+the output never goes past the ceiling. A Windows app: for OBS and any Windows DAW.
 
 ![Corridor Leveler window](docs/window-dark.png)
 
@@ -76,8 +76,9 @@ cmake --build build --config Release --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-JUCE, FST and the libobs headers are downloaded at configure time. On Linux you also need the usual JUCE
-libraries (ALSA, X11, FreeType, Fontconfig). Options: `CORRIDOR_BUILD_PLUGIN`, `CORRIDOR_BUILD_OBS`,
+JUCE, FST and the libobs headers are downloaded at configure time. Corridor Leveler ships for Windows only;
+the CI also builds on Linux purely to run the tests and render the window screenshots (that needs ALSA, X11,
+FreeType and Fontconfig development libraries). Options: `CORRIDOR_BUILD_PLUGIN`, `CORRIDOR_BUILD_OBS`,
 `CORRIDOR_BUILD_VST2`, `CORRIDOR_BUILD_TESTS`.
 
 Tests:

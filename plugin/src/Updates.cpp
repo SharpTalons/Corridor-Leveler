@@ -243,9 +243,9 @@ void Checker::doInstall() {
 #if JUCE_WINDOWS
     if (!out.startAsProcess()) { fail("Couldn't open the installer. Download the update from the release page instead."); return; }
     { std::lock_guard<std::mutex> g(lock); messageText = "The installer is open. When it asks, close OBS or your DAW, then reopen them."; }
-#else
-    URL(r.page).launchInDefaultBrowser();
-    { std::lock_guard<std::mutex> g(lock); messageText = "The installer is for Windows. The release page is open in your browser."; }
+#else  // Corridor Leveler ships for Windows only; other builds exist just to run the tests
+    fail("Updates install on Windows.");
+    return;
 #endif
     prompt = false;
 }
