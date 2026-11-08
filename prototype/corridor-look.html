@@ -103,6 +103,7 @@ h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .12em;
         <li>Slim green meters with an olive unlit track, yellow above -6 dBFS and red above -1, yellow peak ticks, numbers on top.</li>
         <li>Grey raised buttons; an active option lights its text yellow. The controls sit on the graph and fade it out, with no panel box.</li>
         <li>Applied gain is in the readout box at the bottom right, and latency at the bottom left.</li>
+        <li>A little depth: dials stand off the panel with a bevelled edge, a dished face and a contact shadow, and their rings run in a cut groove. Buttons are raised keys that sink when on. The graph, meters, switch and readouts sit in recessed wells.</li>
       </ul>
     </section>
   </div>
@@ -136,7 +137,7 @@ const knobs = [
 const A0 = -0.75 * Math.PI, A1 = 0.75 * Math.PI; // dial sweep, 0 = straight up
 
 // ---------------- graph geometry (graph and meters share one scale: 0 to -80 dB)
-const HEAD = 40, MW = 66, GX0 = MW, GX1 = W - MW, GT = 70, GB = H - 14, RANGE_DB = 80;
+const HEAD = 40, MW = 66, GX0 = MW, GX1 = W - MW, GT = HEAD + 48, GB = H - 14, RANGE_DB = 80;
 const yOf = v => GT + Math.min(RANGE_DB, Math.max(0, -v)) / RANGE_DB * (GB - GT);
 const vOf = y => -Math.min(RANGE_DB, Math.max(0, (y - GT) / (GB - GT) * RANGE_DB));
 
@@ -233,20 +234,39 @@ function text(s, x, y, size, col, align = 'center', weight = 500, font = 'ui', s
   ctx.fillText(s, x, y);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
+// a recessed well: dark fill, shadow falling in from the top edge, a faint lit lip at the bottom
+function well(x, y, w, h, r, fill = '#141416') {
+  ctx.save();
+  roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill();
+  ctx.clip();
+  const s = ctx.createLinearGradient(0, y, 0, y + Math.min(10, h * .5));
+  s.addColorStop(0, 'rgba(0,0,0,.7)'); s.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = s; ctx.fillRect(x, y, w, h);
+  ctx.restore();
+  roundRect(x + .5, y + .5, w - 1, h - 1, r); ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.beginPath(); ctx.moveTo(x + r, y + h + .5); ctx.lineTo(x + w - r, y + h + .5); ctx.stroke();
+}
+// a raised key: drop shadow, lit top bevel, darker lower edge; pressed keys sink into a well
 function button(x, y, w, h, label, on, hot) {
   ctx.save();
-  roundRect(x, y, w, h, 7);
   if (on) {
-    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#2a2a2e'); g.addColorStop(1, '#38383d');
-    ctx.fillStyle = g; ctx.fill();
+    well(x, y, w, h, 7, '#232326');
+    const glow = ctx.createRadialGradient(x + w / 2, y + h / 2, 2, x + w / 2, y + h / 2, w * .6);
+    glow.addColorStop(0, 'rgba(245,196,28,.10)'); glow.addColorStop(1, 'rgba(245,196,28,0)');
+    roundRect(x, y, w, h, 7); ctx.fillStyle = glow; ctx.fill();
   } else {
-    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
-    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, hot ? '#55555b' : C['btn-top']); g.addColorStop(1, C['btn-bottom']);
-    ctx.fillStyle = g; ctx.fill(); ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = 'rgba(255,255,255,.13)'; ctx.beginPath(); ctx.moveTo(x + 7, y + 1.5); ctx.lineTo(x + w - 7, y + 1.5); ctx.stroke();
+    // lower edge, seen below the key face
+    roundRect(x, y + 2, w, h, 7); ctx.fillStyle = '#1d1d20';
+    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3; ctx.fill(); ctx.shadowColor = 'transparent';
+    roundRect(x, y, w, h, 7);
+    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, hot ? '#58585e' : C['btn-top']); g.addColorStop(1, C['btn-bottom']);
+    ctx.fillStyle = g; ctx.fill();
+    const sheen = ctx.createLinearGradient(0, y, 0, y + h * .5); sheen.addColorStop(0, 'rgba(255,255,255,.10)'); sheen.addColorStop(1, 'rgba(255,255,255,0)');
+    roundRect(x + 1, y + 1, w - 2, h * .5, 6); ctx.fillStyle = sheen; ctx.fill();
+    roundRect(x + .5, y + .5, w - 1, h - 1, 7); ctx.strokeStyle = C['btn-edge']; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.beginPath(); ctx.moveTo(x + 7, y + 1.5); ctx.lineTo(x + w - 7, y + 1.5); ctx.stroke();
   }
-  roundRect(x + .5, y + .5, w - 1, h - 1, 7); ctx.strokeStyle = on ? '#202023' : C['btn-edge']; ctx.lineWidth = 1; ctx.stroke();
-  text(label, x + w / 2, y + h / 2 + .5, 12.5, on ? C.yellow : C.label, 'center', 600, 'ui', 0.6);
+  text(label, x + w / 2, y + h / 2 + (on ? 1.5 : .5), 12.5, on ? C.yellow : C.label, 'center', 600, 'ui', 0.6);
   ctx.restore();
 }
 
@@ -257,7 +277,9 @@ function drawKnob(k) {
   const arc = (a0, a1, rad) => { ctx.beginPath(); ctx.arc(x, y, rad, a0 - Math.PI / 2, a1 - Math.PI / 2); };
   // ring track and value arc
   ctx.lineCap = 'round';
-  arc(A0, A1, ringR); ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 3; ctx.stroke();
+  // the ring runs in a groove cut into the panel: dark channel, lit lower lip
+  arc(A0, A1, ringR + 1); ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 7; ctx.stroke();
+  arc(A0, A1, ringR); ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.lineWidth = 6; ctx.stroke();
   if (pos > 0.003) {
     let col = C.yellow;
     if (k.grad) {
@@ -275,17 +297,28 @@ function drawKnob(k) {
       ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(mx, my, 2.6, 0, 7); ctx.fill();
     }
   }
-  // body: matte black with soft drop shadow and a lit top rim
+  // body: a raised dial. Contact shadow, a bevelled skirt lit from above, a slightly
+  // dished matte face, and a soft highlight where the light lands.
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = r * .5; ctx.shadowOffsetY = r * .14;
+  ctx.shadowColor = 'rgba(0,0,0,.8)'; ctx.shadowBlur = r * .6; ctx.shadowOffsetY = r * .22;
   ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
-  const body = ctx.createRadialGradient(x - r * .25, y - r * .35, r * .1, x, y, r);
-  body.addColorStop(0, C['knob-hi']); body.addColorStop(1, C['knob-lo']);
-  ctx.fillStyle = body; ctx.fill();
+  const skirt = ctx.createLinearGradient(0, y - r, 0, y + r);
+  skirt.addColorStop(0, '#45454b'); skirt.addColorStop(.5, '#222226'); skirt.addColorStop(1, '#0b0b0c');
+  ctx.fillStyle = skirt; ctx.fill();
   ctx.restore();
+  const fr = r * .86;
+  ctx.beginPath(); ctx.arc(x, y, fr, 0, 7);
+  const face = ctx.createLinearGradient(0, y - fr, 0, y + fr);
+  face.addColorStop(0, C['knob-lo']); face.addColorStop(1, C['knob-hi']);  // dished: darker at the top
+  ctx.fillStyle = face; ctx.fill();
+  const spec = ctx.createRadialGradient(x - r * .28, y - r * .42, 0, x - r * .28, y - r * .42, r * .75);
+  spec.addColorStop(0, 'rgba(255,255,255,.10)'); spec.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = spec; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 1; ctx.stroke();
   const rim = ctx.createLinearGradient(0, y - r, 0, y + r);
-  rim.addColorStop(0, 'rgba(255,255,255,.22)'); rim.addColorStop(.5, 'rgba(255,255,255,.04)'); rim.addColorStop(1, 'rgba(0,0,0,.6)');
+  rim.addColorStop(0, 'rgba(255,255,255,.30)'); rim.addColorStop(.45, 'rgba(255,255,255,.04)'); rim.addColorStop(1, 'rgba(0,0,0,.5)');
   ctx.beginPath(); ctx.arc(x, y, r - .5, 0, 7); ctx.strokeStyle = rim; ctx.lineWidth = 1.2; ctx.stroke();
+  if (hot) { ctx.beginPath(); ctx.arc(x, y, r + 1.5, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.stroke(); }
   // yellow dot pointer
   const [px, py] = toXY(ang, r * .74);
   ctx.fillStyle = C.yellow; ctx.beginPath(); ctx.arc(px, py, Math.max(2.6, r * .075), 0, 7); ctx.fill();
@@ -304,6 +337,7 @@ function drawMeter(x0, w, pk, hold, isIn) {
   ctx.fillStyle = bg; ctx.fillRect(x0, HEAD, w, H - HEAD);
   ctx.fillStyle = '#0d0d0f'; ctx.fillRect(isIn ? x0 + w - 1 : x0, HEAD, 1, H - HEAD);
   const bw = 7, gap = 3, bx = isIn ? x0 + w - 12 - bw * 2 - gap : x0 + 12;
+  well(bx - 3, GT - 3, bw * 2 + gap + 6, GB - GT + 6, 3, '#0e0e10');  // the bars sit in a recessed slot
   for (let ch = 0; ch < 2; ch++) {
     const cx = bx + ch * (bw + gap), p = pk - ch * rnd(0, 1.2);
     ctx.fillStyle = C['meter-off']; ctx.fillRect(cx, GT, bw, GB - GT);
@@ -314,6 +348,10 @@ function drawMeter(x0, w, pk, hold, isIn) {
       ctx.fillStyle = g; ctx.fillRect(cx, top, bw, GB - top);
     }
     if (hold > -RANGE_DB) { ctx.fillStyle = C.yellow; ctx.fillRect(cx, yOf(Math.min(0, hold)) - 1, bw, 2); }
+    // rounded glass over each bar: lit left edge, shaded right edge
+    const glass = ctx.createLinearGradient(cx, 0, cx + bw, 0);
+    glass.addColorStop(0, 'rgba(255,255,255,.16)'); glass.addColorStop(.45, 'rgba(255,255,255,.03)'); glass.addColorStop(1, 'rgba(0,0,0,.35)');
+    ctx.fillStyle = glass; ctx.fillRect(cx, GT, bw, GB - GT);
   }
   // scale: same marks as the graph
   for (let v = 0; v >= -80; v -= 5) {
@@ -324,8 +362,9 @@ function drawMeter(x0, w, pk, hold, isIn) {
     if (major) text(String(v), isIn ? bx - 10 : bx + bw * 2 + gap + 9, y, 10.5, C.muted, isIn ? 'right' : 'left', 500, 'num');
   }
   // peak readout and name
-  text(hold > -RANGE_DB ? fmt(hold) : '-inf', x0 + w / 2, HEAD + 12, 11.5, hold > -1 ? C.red : hold > -6 ? C.yellow : C.label, 'center', 500, 'num');
-  text(isIn ? 'IN' : 'OUT', x0 + w / 2, HEAD + 28, 10.5, C.muted, 'center', 600, 'ui', 1.4);
+  well(x0 + 8, HEAD + 3, w - 16, 18, 4, '#101012');
+  text(hold > -RANGE_DB ? fmt(hold) : '-inf', x0 + w / 2, HEAD + 12.5, 11.5, hold > -1 ? C.red : hold > -6 ? C.yellow : C.label, 'center', 500, 'num');
+  text(isIn ? 'IN' : 'OUT', x0 + w / 2, HEAD + 33, 10.5, C.muted, 'center', 600, 'ui', 1.4);
 }
 
 function drawGraph() {
@@ -358,7 +397,7 @@ function drawGraph() {
   // reference lines
   const line = (id, col, dash, label) => {
     const y = Math.round(yOf(P[id])) + .5, hot = hover === 'line-' + id || drag?.id === 'line-' + id;
-    ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = hot ? 2 : 1.2;
+    ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = hot ? 2.4 : id === 'tgt' ? 1.8 : 1.2;
     ctx.beginPath(); ctx.moveTo(GX0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]);
     return { y, label: label + '  ' + fmt(P[id]), col };
   };
@@ -371,18 +410,23 @@ function drawGraph() {
   // line tags (pinned above the controls when the line is under them)
   for (const tg of tags) {
     const y = Math.min(tg.y, fadeTop + 6), under = tg.y > fadeTop + 6;
-    ctx.font = `600 11px ${css('--font-ui')}`; const w = ctx.measureText(tg.label).width + (under ? 30 : 18);
+    ctx.font = `600 11px ${css('--font-ui')}`; const w = ctx.measureText(tg.label).width + tg.label.length * .8 + (under ? 30 : 20);
     roundRect(GX0 + 10, y - 10, w, 20, 5); ctx.fillStyle = 'rgba(20,20,22,.85)'; ctx.fill();
     ctx.strokeStyle = tg.col; ctx.lineWidth = 1; ctx.stroke();
     text(tg.label, GX0 + 19, y + .5, 11, tg.col, 'left', 600, 'ui', .8);
     if (under) { ctx.fillStyle = tg.col; ctx.beginPath(); const ax = GX0 + 10 + w - 12; ctx.moveTo(ax - 4, y - 2); ctx.lineTo(ax + 4, y - 2); ctx.lineTo(ax, y + 3); ctx.fill(); }
   }
   // legend
-  ctx.fillStyle = 'rgba(178,178,183,.8)'; ctx.fillRect(GX1 - 250, HEAD + 15, 16, 2);
-  text('INPUT', GX1 - 228, HEAD + 16, 10.5, C.muted, 'left', 600, 'ui', 1.2);
-  ctx.fillStyle = C.red; ctx.fillRect(GX1 - 168, HEAD + 14.5, 16, 3);
-  text('OUTPUT', GX1 - 146, HEAD + 16, 10.5, C.muted, 'left', 600, 'ui', 1.2);
+  ctx.fillStyle = 'rgba(178,178,183,.8)'; ctx.fillRect(GX1 - 344, HEAD + 15, 16, 2);
+  text('INPUT', GX1 - 322, HEAD + 16, 10.5, C.muted, 'left', 600, 'ui', 1.2);
+  ctx.fillStyle = C.red; ctx.fillRect(GX1 - 262, HEAD + 14.5, 16, 3);
+  text('OUTPUT', GX1 - 240, HEAD + 16, 10.5, C.muted, 'left', 600, 'ui', 1.2);
   text('RMS, LAST 10 S', GX1 - 40, HEAD + 16, 10.5, C.muted, 'right', 600, 'ui', 1.2);
+  // the graph is a screen set into the panel: shadow falls in from the top and both sides
+  const inset = (x0, y0, x1, y1, a) => { const s = ctx.createLinearGradient(x0, y0, x1, y1); s.addColorStop(0, `rgba(0,0,0,${a})`); s.addColorStop(1, 'rgba(0,0,0,0)'); return s; };
+  ctx.fillStyle = inset(0, HEAD, 0, HEAD + 18, .6); ctx.fillRect(GX0, HEAD, GX1 - GX0, 18);
+  ctx.fillStyle = inset(GX0, 0, GX0 + 12, 0, .45); ctx.fillRect(GX0, HEAD, 12, H - HEAD);
+  ctx.fillStyle = inset(GX1, 0, GX1 - 12, 0, .45); ctx.fillRect(GX1 - 12, HEAD, 12, H - HEAD);
 }
 
 const btn = {};
@@ -391,7 +435,7 @@ function drawDeck() {
   // Ride / Hold under the Target dial
   const t = knobs[2], bw = 64, bh = 26, by = t.y + t.r + 7 + 44;
   btn.ride = [t.x - bw, by, bw, bh]; btn.hold = [t.x, by, bw, bh];
-  roundRect(t.x - bw - 3, by - 3, bw * 2 + 6, bh + 6, 9); ctx.fillStyle = '#18181b'; ctx.fill();
+  well(t.x - bw - 4, by - 4, bw * 2 + 8, bh + 8, 10, '#151517');  // the switch sits in a recessed slot
   button(...btn.ride, 'RIDE', !P.hold, hover === 'ride');
   button(...btn.hold, 'HOLD', P.hold, hover === 'hold');
   if (P.hold) {
@@ -401,7 +445,7 @@ function drawDeck() {
   // readouts: latency bottom-left, applied gain bottom-right
   text('LATENCY 5.0 ms', GX0 + 14, H - 22, 11, C.muted, 'left', 600, 'ui', 1);
   const g = P.bypass ? 0 : gain;
-  roundRect(GX1 - 128, H - 38, 114, 28, 6); ctx.fillStyle = '#141416'; ctx.fill(); ctx.strokeStyle = '#3a3a40'; ctx.lineWidth = 1; ctx.stroke();
+  well(GX1 - 128, H - 38, 114, 28, 6, '#111113');  // an inset display
   text('GAIN', GX1 - 118, H - 23.5, 10.5, C.muted, 'left', 600, 'ui', 1.2);
   text(sgn(g) + ' dB', GX1 - 22, H - 23.5, 13, Math.abs(g) < .05 ? C.ink : C.yellow, 'right', 500, 'num');
 }
@@ -409,7 +453,10 @@ function drawDeck() {
 function drawHeader() {
   const g = ctx.createLinearGradient(0, 0, 0, HEAD); g.addColorStop(0, '#26262a'); g.addColorStop(1, C.chrome);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, HEAD);
+  ctx.fillStyle = 'rgba(255,255,255,.10)'; ctx.fillRect(0, 0, W, 1);  // lit top bevel
   ctx.fillStyle = '#0c0c0e'; ctx.fillRect(0, HEAD - 1, W, 1);
+  const drop = ctx.createLinearGradient(0, HEAD, 0, HEAD + 8); drop.addColorStop(0, 'rgba(0,0,0,.45)'); drop.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = drop; ctx.fillRect(0, HEAD, W, 8);  // the header casts a shadow on the graph
   // logo: a level held between two walls
   ctx.fillStyle = C.yellow; ctx.fillRect(18, 12, 20, 2.5); ctx.fillRect(18, 26, 20, 2.5);
   ctx.beginPath(); for (let i = 0; i <= 20; i++) { const x = 18 + i, y = 20.2 - Math.sin(i / 20 * 4 * Math.PI) * 4 * (1 - i / 28); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
