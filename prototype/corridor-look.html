@@ -1,0 +1,538 @@
+<title>Corridor Leveler Look</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: the plugin window as the hero (1120x630 design, scaled to fit), then the palette and parts sheet. Single dark look on purpose: it is the plugin's look. */
+:root {
+  color-scheme: dark;
+  --page: #121214;
+  --chrome: #1b1b1e;
+  --panel-top: #2c2c30;
+  --panel-bottom: #1c1c1f;
+  --graph-top: #2a2a2e;
+  --graph-bottom: #1a1a1d;
+  --grid: #34343a;
+  --ink: #e8e8ea;
+  --label: #c9c9cd;
+  --muted: #8b8b91;
+  --yellow: #f5c41c;
+  --yellow-deep: #c99a0e;
+  --green: #8cc63f;
+  --red: #ff5b5b;
+  --trace: #b2b2b7;
+  --meter-lit: #5cc834;
+  --meter-off: #2a321f;
+  --knob-hi: #303035;
+  --knob-lo: #141416;
+  --btn-top: #4a4a50;
+  --btn-bottom: #35353a;
+  --btn-edge: #5d5d64;
+  --font-ui: "Inter Tight", "Segoe UI", system-ui, sans-serif;
+  --font-num: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+html, body { background: var(--page); color: var(--ink); }
+body { font-family: var(--font-ui); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 28px; }
+header.page { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+header.page h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: 0.01em; text-wrap: balance; }
+header.page p { margin: 0; color: var(--muted); max-width: 62ch; line-height: 1.5; }
+.plugin { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.55), 0 0 0 1px #2e2e33; background: var(--graph-bottom); }
+.plugin canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
+.sim { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; color: var(--muted); font-size: 13px; }
+.sim .group { display: flex; gap: 6px; }
+.pill { font: 600 12px var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--label); background: linear-gradient(var(--btn-top), var(--btn-bottom)); border: 1px solid var(--btn-edge); border-radius: 7px; padding: 7px 14px; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.4); }
+.pill[aria-pressed="true"] { color: var(--yellow); background: linear-gradient(#3a3a3f, #2b2b2f); box-shadow: inset 0 2px 4px rgba(0,0,0,.5); }
+.pill:focus-visible, .sr:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--label); }
+.sheet { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 24px; }
+.sheet section { min-width: 0; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.sw { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; font-size: 12.5px; }
+.sw i { width: 34px; height: 34px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+.sw b { display: block; font-weight: 600; color: var(--ink); }
+.sw span { color: var(--muted); font-family: var(--font-num); font-size: 11.5px; }
+.notes { margin: 0; padding-left: 18px; color: var(--label); line-height: 1.6; font-size: 14px; }
+.notes li + li { margin-top: 6px; }
+.status { font-size: 14px; color: var(--label); min-height: 1.4em; }
+.status::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--dot, var(--muted)); margin-right: 8px; vertical-align: 1px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .pill { transition: none; } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+
+<div class="wrap">
+  <header class="page">
+    <h1>Corridor Leveler, new look</h1>
+    <p>A working preview for approval. Drag a dial up or down (Shift for fine steps, double-click to reset), or drag the Target, Threshold and Ceiling lines in the graph.</p>
+  </header>
+
+  <div class="plugin" id="plugin">
+    <canvas id="cv" width="1120" height="630" aria-label="Corridor Leveler plugin window preview" role="img"></canvas>
+    <!-- keyboard and screen-reader access to the dials and buttons drawn on the canvas -->
+    <input class="sr" type="range" id="k-thr" aria-label="Threshold, dB RMS" min="-70" max="-20" step="0.5">
+    <input class="sr" type="range" id="k-resp" aria-label="Response" min="0" max="100" step="1">
+    <input class="sr" type="range" id="k-tgt" aria-label="Target, dB RMS" min="-40" max="-6" step="0.5">
+    <input class="sr" type="range" id="k-rng" aria-label="Range, dB" min="0" max="24" step="0.5">
+    <input class="sr" type="range" id="k-ceil" aria-label="Ceiling, dBFS" min="-12" max="0" step="0.1">
+    <button class="sr" id="b-mode">Switch between Ride and Hold</button>
+    <button class="sr" id="b-ease">Ease in silence</button>
+    <button class="sr" id="b-bypass">Bypass</button>
+  </div>
+
+  <div class="sim">
+    <span>Preview signal</span>
+    <div class="group" role="group" aria-label="Preview signal">
+      <button class="pill" id="s-voice" aria-pressed="true">Voice</button>
+      <button class="pill" id="s-drums" aria-pressed="false">Drums</button>
+      <button class="pill" id="s-mix" aria-pressed="false">Mix</button>
+    </div>
+    <button class="pill" id="s-pause" aria-pressed="false">Pause</button>
+    <div class="status" id="status" aria-live="polite"></div>
+  </div>
+
+  <div class="sheet">
+    <section>
+      <h2>Palette</h2>
+      <div class="swatches" id="swatches"></div>
+    </section>
+    <section>
+      <h2>What changed</h2>
+      <ul class="notes">
+        <li>Charcoal graph with a soft top-to-bottom gradient and faint grid, like the reference. Input level is the grey line, output is the bold red line.</li>
+        <li>Matte black dials with a thin yellow value ring and a yellow dot pointer. Threshold's ring runs green to yellow; its line in the graph is green.</li>
+        <li>Threshold and Response on the left, a larger Target in the middle with the Ride / Hold switch under it, Range and Ceiling on the right.</li>
+        <li>Slim green meters with an olive unlit track, yellow above -6 dBFS and red above -1, yellow peak ticks, numbers on top.</li>
+        <li>Grey raised buttons; an active option lights its text yellow. The controls sit on the graph and fade it out, with no panel box.</li>
+        <li>Applied gain is in the readout box at the bottom right, and latency at the bottom left.</li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+const W = 1120, H = 630;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = {};
+['page','chrome','panel-top','panel-bottom','graph-top','graph-bottom','grid','ink','label','muted','yellow','yellow-deep','green','red','trace','meter-lit','meter-off','knob-hi','knob-lo','btn-top','btn-bottom','btn-edge'].forEach(k => C[k] = css('--' + k));
+
+// palette sheet
+const roles = [['page','Window edge'],['chrome','Header'],['graph-top','Graph top'],['graph-bottom','Graph bottom'],['grid','Grid lines'],['knob-hi','Dial face'],['knob-lo','Dial edge'],['btn-top','Button top'],['btn-bottom','Button bottom'],['ink','Values'],['label','Labels'],['muted','Scale, hints'],['yellow','Accent, Target'],['green','Threshold'],['red','Output trace'],['trace','Input trace'],['meter-lit','Meter'],['meter-off','Meter unlit']];
+document.getElementById('swatches').innerHTML = roles.map(([k, n]) => `<div class="sw"><i style="background:${C[k]}"></i><div><b>${n}</b><span>${C[k]}</span></div></div>`).join('');
+
+// ---------------- parameters
+const P = { thr: -48, tgt: -20, resp: 50, rng: 12, ceil: -1, hold: false, ease: false, bypass: false };
+const DEF = { ...P };
+const fmt = (v, d = 1) => { const s = Math.abs(v).toFixed(d); return (v < 0 && +s !== 0 ? '-' : '') + s; };
+const sgn = (v, d = 1) => (v > 0.05 ? '+' : '') + fmt(v, d);
+const PM = '±';
+const knobs = [
+  { id: 'thr', label: 'THRESHOLD', min: -70, max: -20, x: 290, y: 492, r: 34, val: v => fmt(v) + ' dB', grad: true },
+  { id: 'resp', label: 'RESPONSE', min: 0, max: 100, x: 400, y: 492, r: 34, val: v => (v < 34 ? 'Slow ' : v > 66 ? 'Fast ' : 'Medium ') + Math.round(v) },
+  { id: 'tgt', label: 'TARGET', min: -40, max: -6, x: 560, y: 466, r: 50, val: v => fmt(v) + ' dB RMS' },
+  { id: 'rng', label: 'RANGE', min: 0, max: 24, x: 720, y: 492, r: 34, val: v => PM + fmt(v) + ' dB' },
+  { id: 'ceil', label: 'CEILING', min: -12, max: 0, x: 830, y: 492, r: 34, val: v => fmt(v) + ' dBFS' },
+];
+const A0 = -0.75 * Math.PI, A1 = 0.75 * Math.PI; // dial sweep, 0 = straight up
+
+// ---------------- graph geometry (graph and meters share one scale: 0 to -80 dB)
+const HEAD = 40, MW = 66, GX0 = MW, GX1 = W - MW, GT = 70, GB = H - 14, RANGE_DB = 80;
+const yOf = v => GT + Math.min(RANGE_DB, Math.max(0, -v)) / RANGE_DB * (GB - GT);
+const vOf = y => -Math.min(RANGE_DB, Math.max(0, (y - GT) / (GB - GT) * RANGE_DB));
+
+// ---------------- simulated signal and engine (20 ms steps)
+const HIST = 500, dt = 0.02;
+const hist = [];
+let src = 'voice', paused = false, t = 0;
+let section = -24, sectionLeft = 0, gapLeft = 0, syl = 0;
+let pw = Math.pow(10, -24 / 10), gain = 0, silent = 0;
+let inPk = -120, outPk = -120, inHold = -120, outHold = -120, holdTimer = 0, outHold2 = 0;
+let analyzing = false, anSum = 0, anN = 0, anT = 0, holdGain = 0, holdValid = false, state = 'wait';
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+function inputLevel() {
+  if ((sectionLeft -= dt) <= 0) {
+    sectionLeft = rnd(3, 7);
+    section = src === 'drums' ? [-30, -24, -18, -14][Math.floor(Math.random() * 4)] : [-38, -32, -26, -20, -14, -11][Math.floor(Math.random() * 6)];
+  }
+  const noise = -66 + rnd(-2, 2);
+  if (src === 'voice') {
+    if (gapLeft > 0) { gapLeft -= dt; return noise; }
+    if (Math.random() < 0.012) { gapLeft = rnd(0.4, 1.6); return noise; }
+    syl += dt * rnd(3, 6) * 2 * Math.PI;
+    return section + 5 * Math.sin(syl) + rnd(-2, 2) - 2;
+  }
+  if (src === 'drums') {
+    const beat = 0.6, ph = t % beat, hitAge = ph, env = Math.exp(-hitAge / 0.09);
+    const accent = Math.floor(t / beat) % 2 ? 0 : -2;
+    return Math.max(noise, section + accent - 14 + 16 * env + rnd(-1, 1));
+  }
+  syl += dt * 1.3;
+  return section + 3 * Math.sin(syl) + rnd(-1.5, 1.5);
+}
+
+function step() {
+  t += dt;
+  const inDb = inputLevel();
+  const win = 1.5 - 1.2 * P.resp / 100 * (src === 'drums' ? 0.6 : 1); // drums: longer averaging
+  const active = inDb >= P.thr;
+  if (active) {
+    const a = dt / Math.max(0.3, win);
+    pw += (Math.pow(10, inDb / 10) - pw) * a;
+    silent = 0;
+  } else silent += dt;
+  const lvl = 10 * Math.log10(Math.max(pw, 1e-12));
+  const crest = src === 'drums' ? 14 : 10;
+  if (P.hold) {
+    if (analyzing) {
+      anT += dt;
+      if (active) { anSum += Math.pow(10, inDb / 10); anN++; }
+      if (anT >= 20) lockAnalyze();
+    }
+    gain += ((holdValid ? holdGain : gain) - gain) * 0.1;
+    state = analyzing ? 'analyzing' : 'held';
+  } else if (active) {
+    let want = P.tgt - lvl, lim = '';
+    if (want > P.rng) { want = P.rng; lim = 'range'; }
+    if (want < -P.rng) { want = -P.rng; lim = 'range'; }
+    const room = P.ceil - (lvl + crest);
+    if (want > room) { want = Math.max(-P.rng, room); lim = 'ceiling'; }
+    if (Math.abs(want - gain) > 0.75 || lim) gain += (want - gain) * dt / (win * 0.8);
+    state = lim || (Math.abs(P.tgt - (lvl + gain)) < 1 ? 'on' : want > gain ? 'boost' : 'cut');
+  } else {
+    if (P.ease && silent > 2) { gain *= 0.97; state = 'return'; } else state = 'wait';
+  }
+  const g = P.bypass ? 0 : gain;
+  let outDb = inDb + g;
+  const ip = inDb + crest * 0.8 + rnd(0, 3);
+  let op = ip + g;
+  if (!P.bypass && op > P.ceil) { outDb -= op - P.ceil; op = P.ceil; }
+  inPk = Math.max(ip, inPk - 0.9); outPk = Math.max(op, outPk - 0.9);
+  if (ip > inHold || (holdTimer -= dt) < 0) { inHold = Math.max(ip, inHold - 0.3); }
+  if (op > outHold) outHold = op; else if ((outHold2 -= dt) < 0) outHold -= 0.3;
+  if (ip >= inHold) holdTimer = 1.5; if (op >= outHold) outHold2 = 1.5;
+  hist.push({ i: inDb, o: outDb });
+  if (hist.length > HIST) hist.shift();
+  lastLvl = lvl;
+}
+let lastLvl = -24;
+function lockAnalyze() {
+  analyzing = false;
+  if (anN < 25) { holdValid = false; return; }
+  const m = 10 * Math.log10(anSum / anN);
+  holdGain = Math.max(-P.rng, Math.min(P.rng, P.tgt - m, P.ceil - (m + 10)));
+  holdValid = true;
+}
+
+// ---------------- drawing helpers
+function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function text(s, x, y, size, col, align = 'center', weight = 500, font = 'ui', spacing = 0) {
+  ctx.font = `${weight} ${size}px ${font === 'num' ? css('--font-num') : css('--font-ui')}`;
+  ctx.fillStyle = col; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (spacing && 'letterSpacing' in ctx) ctx.letterSpacing = spacing + 'px';
+  ctx.fillText(s, x, y);
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+function button(x, y, w, h, label, on, hot) {
+  ctx.save();
+  roundRect(x, y, w, h, 7);
+  if (on) {
+    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#2a2a2e'); g.addColorStop(1, '#38383d');
+    ctx.fillStyle = g; ctx.fill();
+  } else {
+    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, hot ? '#55555b' : C['btn-top']); g.addColorStop(1, C['btn-bottom']);
+    ctx.fillStyle = g; ctx.fill(); ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(255,255,255,.13)'; ctx.beginPath(); ctx.moveTo(x + 7, y + 1.5); ctx.lineTo(x + w - 7, y + 1.5); ctx.stroke();
+  }
+  roundRect(x + .5, y + .5, w - 1, h - 1, 7); ctx.strokeStyle = on ? '#202023' : C['btn-edge']; ctx.lineWidth = 1; ctx.stroke();
+  text(label, x + w / 2, y + h / 2 + .5, 12.5, on ? C.yellow : C.label, 'center', 600, 'ui', 0.6);
+  ctx.restore();
+}
+
+function drawKnob(k) {
+  const v = P[k.id], pos = (v - k.min) / (k.max - k.min), ang = A0 + pos * (A1 - A0);
+  const { x, y, r } = k, ringR = r + 7, hot = hover === k.id || drag?.id === k.id;
+  const toXY = (a, rad) => [x + Math.sin(a) * rad, y - Math.cos(a) * rad];
+  const arc = (a0, a1, rad) => { ctx.beginPath(); ctx.arc(x, y, rad, a0 - Math.PI / 2, a1 - Math.PI / 2); };
+  // ring track and value arc
+  ctx.lineCap = 'round';
+  arc(A0, A1, ringR); ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 3; ctx.stroke();
+  if (pos > 0.003) {
+    let col = C.yellow;
+    if (k.grad) {
+      const [sx, sy] = toXY(A0, ringR), [ex, ey] = toXY(A1, ringR);
+      col = ctx.createLinearGradient(sx, sy, ex, ey); col.addColorStop(0, C.green); col.addColorStop(0.55, '#c6c62a'); col.addColorStop(1, C.yellow);
+    }
+    arc(A0, ang, ringR); ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.stroke();
+    ctx.save(); ctx.globalAlpha = .18; ctx.lineWidth = 10; ctx.stroke(); ctx.restore();
+  }
+  // live marker: Target shows the output level, Threshold the input level
+  if (k.id === 'tgt' || k.id === 'thr') {
+    const lv = k.id === 'tgt' ? (hist.length ? avgOut() : -90) : (hist.length ? avgIn() : -90);
+    if (lv > k.min - 0.01 && lv < k.max + 0.01) {
+      const [mx, my] = toXY(A0 + (lv - k.min) / (k.max - k.min) * (A1 - A0), ringR);
+      ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(mx, my, 2.6, 0, 7); ctx.fill();
+    }
+  }
+  // body: matte black with soft drop shadow and a lit top rim
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = r * .5; ctx.shadowOffsetY = r * .14;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+  const body = ctx.createRadialGradient(x - r * .25, y - r * .35, r * .1, x, y, r);
+  body.addColorStop(0, C['knob-hi']); body.addColorStop(1, C['knob-lo']);
+  ctx.fillStyle = body; ctx.fill();
+  ctx.restore();
+  const rim = ctx.createLinearGradient(0, y - r, 0, y + r);
+  rim.addColorStop(0, 'rgba(255,255,255,.22)'); rim.addColorStop(.5, 'rgba(255,255,255,.04)'); rim.addColorStop(1, 'rgba(0,0,0,.6)');
+  ctx.beginPath(); ctx.arc(x, y, r - .5, 0, 7); ctx.strokeStyle = rim; ctx.lineWidth = 1.2; ctx.stroke();
+  // yellow dot pointer
+  const [px, py] = toXY(ang, r * .74);
+  ctx.fillStyle = C.yellow; ctx.beginPath(); ctx.arc(px, py, Math.max(2.6, r * .075), 0, 7); ctx.fill();
+  ctx.save(); ctx.globalAlpha = .35; ctx.beginPath(); ctx.arc(px, py, r * .14, 0, 7); ctx.fill(); ctx.restore();
+  if (focusId === k.id) { ctx.beginPath(); ctx.arc(x, y, ringR + 7, 0, 7); ctx.strokeStyle = C.yellow; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]); }
+  // label and value
+  const ly = y + ringR + 15;
+  text(k.label, x, ly, k.id === 'tgt' ? 13.5 : 12.5, C.label, 'center', 600, 'ui', 1.4);
+  text(k.val(v), x, ly + 16, 12, hot ? C.yellow : C.muted, 'center', 500, 'num');
+}
+function avg(f) { const n = Math.min(40, hist.length); let s = 0, c = 0; for (let i = hist.length - n; i < hist.length; i++) { if (hist[i].i >= P.thr) { s += Math.pow(10, hist[i][f] / 10); c++; } } return c ? 10 * Math.log10(s / c) : -90; }
+const avgIn = () => avg('i'), avgOut = () => avg('o');
+
+function drawMeter(x0, w, pk, hold, isIn) {
+  const bg = ctx.createLinearGradient(0, HEAD, 0, H); bg.addColorStop(0, '#202023'); bg.addColorStop(1, '#151517');
+  ctx.fillStyle = bg; ctx.fillRect(x0, HEAD, w, H - HEAD);
+  ctx.fillStyle = '#0d0d0f'; ctx.fillRect(isIn ? x0 + w - 1 : x0, HEAD, 1, H - HEAD);
+  const bw = 7, gap = 3, bx = isIn ? x0 + w - 12 - bw * 2 - gap : x0 + 12;
+  for (let ch = 0; ch < 2; ch++) {
+    const cx = bx + ch * (bw + gap), p = pk - ch * rnd(0, 1.2);
+    ctx.fillStyle = C['meter-off']; ctx.fillRect(cx, GT, bw, GB - GT);
+    const top = yOf(Math.min(0, p));
+    if (p > -RANGE_DB) {
+      const g = ctx.createLinearGradient(0, GB, 0, GT);
+      g.addColorStop(0, '#2f8a1d'); g.addColorStop(1 - 6 / RANGE_DB - .001, C['meter-lit']); g.addColorStop(1 - 6 / RANGE_DB, '#d8c425'); g.addColorStop(1 - 1 / RANGE_DB, '#d8c425'); g.addColorStop(1 - 1 / RANGE_DB + .001, C.red); g.addColorStop(1, C.red);
+      ctx.fillStyle = g; ctx.fillRect(cx, top, bw, GB - top);
+    }
+    if (hold > -RANGE_DB) { ctx.fillStyle = C.yellow; ctx.fillRect(cx, yOf(Math.min(0, hold)) - 1, bw, 2); }
+  }
+  // scale: same marks as the graph
+  for (let v = 0; v >= -80; v -= 5) {
+    const y = Math.round(yOf(v)) + .5, major = v % 10 === 0;
+    ctx.fillStyle = major ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.16)';
+    const tx = isIn ? bx - 7 : bx + bw * 2 + gap + 3;
+    ctx.fillRect(tx, y, major ? 4 : 3, 1);
+    if (major) text(String(v), isIn ? bx - 10 : bx + bw * 2 + gap + 9, y, 10.5, C.muted, isIn ? 'right' : 'left', 500, 'num');
+  }
+  // peak readout and name
+  text(hold > -RANGE_DB ? fmt(hold) : '-inf', x0 + w / 2, HEAD + 12, 11.5, hold > -1 ? C.red : hold > -6 ? C.yellow : C.label, 'center', 500, 'num');
+  text(isIn ? 'IN' : 'OUT', x0 + w / 2, HEAD + 28, 10.5, C.muted, 'center', 600, 'ui', 1.4);
+}
+
+function drawGraph() {
+  const bg = ctx.createLinearGradient(0, HEAD, 0, H);
+  bg.addColorStop(0, C['graph-top']); bg.addColorStop(1, C['graph-bottom']);
+  ctx.fillStyle = bg; ctx.fillRect(GX0, HEAD, GX1 - GX0, H - HEAD);
+  // grid, labelled every 10 dB at the right edge like the reference
+  for (let v = 0; v >= -80; v -= 5) {
+    const y = Math.round(yOf(v)) + .5;
+    ctx.fillStyle = v % 10 === 0 ? 'rgba(255,255,255,.075)' : 'rgba(255,255,255,.035)';
+    ctx.fillRect(GX0, y, GX1 - GX0 - 34, 1);
+    if (v % 10 === 0) text(String(v), GX1 - 8, y, 11, C.muted, 'right', 500, 'num');
+  }
+  for (let i = 1; i < 10; i++) { ctx.fillStyle = 'rgba(255,255,255,.025)'; ctx.fillRect(GX0 + i * (GX1 - GX0 - 34) / 10, GT, 1, GB - GT); }
+  const x1 = GX1 - 34, n = hist.length, sx = (x1 - GX0) / (HIST - 1), X = k => x1 - (n - 1 - k) * sx;
+  if (n > 1) {
+    // input: grey line over a faint fill
+    ctx.beginPath(); ctx.moveTo(X(0), GB);
+    for (let k = 0; k < n; k++) ctx.lineTo(X(k), yOf(hist[k].i));
+    ctx.lineTo(X(n - 1), GB); ctx.closePath();
+    const f = ctx.createLinearGradient(0, GT, 0, GB); f.addColorStop(0, 'rgba(180,180,186,.16)'); f.addColorStop(1, 'rgba(180,180,186,.02)');
+    ctx.fillStyle = f; ctx.fill();
+    ctx.beginPath(); for (let k = 0; k < n; k++) { const y = yOf(hist[k].i); k ? ctx.lineTo(X(k), y) : ctx.moveTo(X(k), y); }
+    ctx.strokeStyle = 'rgba(178,178,183,.75)'; ctx.lineWidth = 1.2; ctx.lineJoin = 'round'; ctx.stroke();
+    // output: bold red line
+    ctx.beginPath(); for (let k = 0; k < n; k++) { const y = yOf(hist[k].o); k ? ctx.lineTo(X(k), y) : ctx.moveTo(X(k), y); }
+    ctx.strokeStyle = C.red; ctx.lineWidth = 2.6; ctx.stroke();
+  }
+  if (analyzing) { const span = Math.min(n - 1, anT / dt); ctx.fillStyle = 'rgba(245,196,28,.07)'; ctx.fillRect(X(n - 1 - span), GT, span * sx, GB - GT); }
+  // reference lines
+  const line = (id, col, dash, label) => {
+    const y = Math.round(yOf(P[id])) + .5, hot = hover === 'line-' + id || drag?.id === 'line-' + id;
+    ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = hot ? 2 : 1.2;
+    ctx.beginPath(); ctx.moveTo(GX0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]);
+    return { y, label: label + '  ' + fmt(P[id]), col };
+  };
+  const tags = [line('ceil', 'rgba(232,232,234,.55)', [5, 4], 'CEILING'), line('thr', C.green, [7, 5], 'THRESHOLD'), line('tgt', C.yellow, [], 'TARGET')];
+  // the controls sit on the graph: fade the graph out behind them
+  const fadeTop = 382;
+  const fade = ctx.createLinearGradient(0, fadeTop, 0, H);
+  fade.addColorStop(0, 'rgba(26,26,29,0)'); fade.addColorStop(.45, 'rgba(26,26,29,.82)'); fade.addColorStop(1, 'rgba(24,24,27,.96)');
+  ctx.fillStyle = fade; ctx.fillRect(GX0, fadeTop, GX1 - GX0, H - fadeTop);
+  // line tags (pinned above the controls when the line is under them)
+  for (const tg of tags) {
+    const y = Math.min(tg.y, fadeTop + 6), under = tg.y > fadeTop + 6;
+    ctx.font = `600 11px ${css('--font-ui')}`; const w = ctx.measureText(tg.label).width + (under ? 30 : 18);
+    roundRect(GX0 + 10, y - 10, w, 20, 5); ctx.fillStyle = 'rgba(20,20,22,.85)'; ctx.fill();
+    ctx.strokeStyle = tg.col; ctx.lineWidth = 1; ctx.stroke();
+    text(tg.label, GX0 + 19, y + .5, 11, tg.col, 'left', 600, 'ui', .8);
+    if (under) { ctx.fillStyle = tg.col; ctx.beginPath(); const ax = GX0 + 10 + w - 12; ctx.moveTo(ax - 4, y - 2); ctx.lineTo(ax + 4, y - 2); ctx.lineTo(ax, y + 3); ctx.fill(); }
+  }
+  // legend
+  ctx.fillStyle = 'rgba(178,178,183,.8)'; ctx.fillRect(GX1 - 250, HEAD + 15, 16, 2);
+  text('INPUT', GX1 - 228, HEAD + 16, 10.5, C.muted, 'left', 600, 'ui', 1.2);
+  ctx.fillStyle = C.red; ctx.fillRect(GX1 - 168, HEAD + 14.5, 16, 3);
+  text('OUTPUT', GX1 - 146, HEAD + 16, 10.5, C.muted, 'left', 600, 'ui', 1.2);
+  text('RMS, LAST 10 S', GX1 - 40, HEAD + 16, 10.5, C.muted, 'right', 600, 'ui', 1.2);
+}
+
+const btn = {};
+function drawDeck() {
+  knobs.forEach(drawKnob);
+  // Ride / Hold under the Target dial
+  const t = knobs[2], bw = 64, bh = 26, by = t.y + t.r + 7 + 44;
+  btn.ride = [t.x - bw, by, bw, bh]; btn.hold = [t.x, by, bw, bh];
+  roundRect(t.x - bw - 3, by - 3, bw * 2 + 6, bh + 6, 9); ctx.fillStyle = '#18181b'; ctx.fill();
+  button(...btn.ride, 'RIDE', !P.hold, hover === 'ride');
+  button(...btn.hold, 'HOLD', P.hold, hover === 'hold');
+  if (P.hold) {
+    btn.analyze = [t.x + bw + 14, by, 100, bh];
+    button(...btn.analyze, analyzing ? 'LOCK' : holdValid ? 'ANALYZE AGAIN' : 'ANALYZE', analyzing, hover === 'analyze');
+  } else delete btn.analyze;
+  // readouts: latency bottom-left, applied gain bottom-right
+  text('LATENCY 5.0 ms', GX0 + 14, H - 22, 11, C.muted, 'left', 600, 'ui', 1);
+  const g = P.bypass ? 0 : gain;
+  roundRect(GX1 - 128, H - 38, 114, 28, 6); ctx.fillStyle = '#141416'; ctx.fill(); ctx.strokeStyle = '#3a3a40'; ctx.lineWidth = 1; ctx.stroke();
+  text('GAIN', GX1 - 118, H - 23.5, 10.5, C.muted, 'left', 600, 'ui', 1.2);
+  text(sgn(g) + ' dB', GX1 - 22, H - 23.5, 13, Math.abs(g) < .05 ? C.ink : C.yellow, 'right', 500, 'num');
+}
+
+function drawHeader() {
+  const g = ctx.createLinearGradient(0, 0, 0, HEAD); g.addColorStop(0, '#26262a'); g.addColorStop(1, C.chrome);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, HEAD);
+  ctx.fillStyle = '#0c0c0e'; ctx.fillRect(0, HEAD - 1, W, 1);
+  // logo: a level held between two walls
+  ctx.fillStyle = C.yellow; ctx.fillRect(18, 12, 20, 2.5); ctx.fillRect(18, 26, 20, 2.5);
+  ctx.beginPath(); for (let i = 0; i <= 20; i++) { const x = 18 + i, y = 20.2 - Math.sin(i / 20 * 4 * Math.PI) * 4 * (1 - i / 28); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.strokeStyle = C.yellow; ctx.lineWidth = 1.6; ctx.stroke();
+  text('CORRIDOR', 48, 20.5, 14, C.ink, 'left', 600, 'ui', 3);
+  text('LEVELER', 150, 20.5, 12, C.muted, 'left', 500, 'ui', 2);
+  // status, centred
+  text(statusText(), W / 2, 20.5, 12, C.label, 'center', 500);
+  // ease and bypass, right side: text lights yellow when on, like the reference's AUTO labels
+  btn.ease = [W - 236, 7, 150, 26]; btn.bypass = [W - 78, 7, 62, 26];
+  const eh = hover === 'ease';
+  text('EASE IN SILENCE', W - 161, 20.5, 11.5, P.ease ? C.yellow : eh ? C.ink : C.muted, 'center', 600, 'ui', 1.3);
+  ctx.beginPath(); ctx.arc(W - 47, 20, 7, -Math.PI / 2 + .7, 1.5 * Math.PI - .7); ctx.moveTo(W - 47, 11); ctx.lineTo(W - 47, 19);
+  ctx.strokeStyle = P.bypass ? C.yellow : hover === 'bypass' ? C.ink : C.muted; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.stroke();
+  if (focusId === 'ease' || focusId === 'bypass' || focusId === 'mode') {
+    const r = focusId === 'mode' ? [knobs[2].x - 67, btn.ride[1] - 3, 134, 32] : btn[focusId];
+    roundRect(...r, 6); ctx.strokeStyle = C.yellow; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+}
+
+const STATES = {
+  on: ['On target', '--green'], boost: ['Boosting', '--yellow'], cut: ['Cutting', '--yellow'], ceiling: ['Held back by the ceiling', '--red'],
+  range: ['At the edge of the range', '--red'], wait: ['Below the threshold, not adjusting', '--muted'], return: ['Easing back to 0 dB', '--label'],
+  held: ['Holding a fixed gain', '--yellow'], analyzing: ['Analyzing', '--yellow'],
+};
+function statusText() {
+  if (P.bypass) return 'Bypassed';
+  if (state === 'held') return holdValid ? 'Holding ' + sgn(holdGain) + ' dB' : 'Hold: play a typical section, then press Analyze';
+  if (state === 'analyzing') return 'Analyzing ' + anT.toFixed(1) + ' s. Press Lock after a typical section';
+  return STATES[state][0] + (state === 'boost' || state === 'cut' ? ' (' + sgn(gain) + ' dB)' : '');
+}
+
+function draw() {
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  drawGraph();
+  drawMeter(0, MW, inPk, inHold, true);
+  drawMeter(GX1, MW, P.bypass ? inPk : outPk, P.bypass ? inHold : outHold, false);
+  drawDeck();
+  drawHeader();
+}
+
+// ---------------- size
+let scale = 1;
+function fit() {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  scale = r.width / W * dpr;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.width * dpr * H / W);
+}
+new ResizeObserver(fit).observe(cv); fit();
+
+// ---------------- interaction
+let hover = null, drag = null, focusId = null;
+const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; };
+const inR = ([x, y], r) => r && x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
+function hitTest(p) {
+  for (const k of knobs) if (Math.hypot(p[0] - k.x, p[1] - k.y) < k.r + 12) return k.id;
+  for (const id of ['ride', 'hold', 'analyze', 'ease', 'bypass']) if (inR(p, btn[id])) return id;
+  if (p[0] > GX0 && p[0] < GX1 - 34 && p[1] > GT - 6) {
+    let best = null, bd = 8;
+    for (const id of ['tgt', 'thr', 'ceil']) { const d = Math.abs(yOf(P[id]) - p[1]); if (d < bd) { bd = d; best = 'line-' + id; } }
+    return best;
+  }
+  return null;
+}
+const lim = (id, v) => { const k = knobs.find(k => k.id === id); return Math.min(k.max, Math.max(k.min, v)); };
+function set(id, v) { P[id] = lim(id, v); const el = document.getElementById('k-' + id); if (el) el.value = P[id]; }
+function click(id) {
+  if (id === 'ride') { P.hold = false; analyzing = false; }
+  else if (id === 'hold') { if (!P.hold) { P.hold = true; holdGain = gain; holdValid = true; } }
+  else if (id === 'analyze') { if (analyzing) lockAnalyze(); else { analyzing = true; anSum = 0; anN = 0; anT = 0; } }
+  else if (id === 'ease') P.ease = !P.ease;
+  else if (id === 'bypass') P.bypass = !P.bypass;
+}
+cv.addEventListener('pointermove', e => {
+  const p = pt(e);
+  if (drag) {
+    if (drag.id.startsWith('line-')) set(drag.id.slice(5), vOf(p[1]));
+    else { const k = knobs.find(k => k.id === drag.id); set(k.id, drag.v0 + (drag.y0 - p[1]) / (e.shiftKey ? 900 : 220) * (k.max - k.min)); }
+    return;
+  }
+  hover = hitTest(p);
+  cv.style.cursor = !hover ? 'default' : hover.startsWith('line-') ? 'ns-resize' : knobs.some(k => k.id === hover) ? 'ns-resize' : 'pointer';
+});
+cv.addEventListener('pointerleave', () => { if (!drag) hover = null; });
+cv.addEventListener('pointerdown', e => {
+  const p = pt(e), id = hitTest(p); if (!id) return;
+  if (knobs.some(k => k.id === id) || id.startsWith('line-')) { drag = { id, y0: p[1], v0: P[id.replace('line-', '')] }; cv.setPointerCapture(e.pointerId); }
+  else click(id);
+});
+cv.addEventListener('pointerup', () => { drag = null; });
+cv.addEventListener('dblclick', e => { const id = hitTest(pt(e)); if (id && knobs.some(k => k.id === id)) set(id, DEF[id]); });
+cv.addEventListener('wheel', e => { const id = hitTest(pt(e)); const k = knobs.find(k => k.id === id); if (!k) return; e.preventDefault(); set(k.id, P[k.id] - Math.sign(e.deltaY) * (k.max - k.min) / 60); }, { passive: false });
+knobs.forEach(k => {
+  const el = document.getElementById('k-' + k.id); el.value = P[k.id];
+  el.addEventListener('input', () => { P[k.id] = +el.value; });
+  el.addEventListener('focus', () => focusId = k.id); el.addEventListener('blur', () => focusId = null);
+});
+[['b-mode', 'mode'], ['b-ease', 'ease'], ['b-bypass', 'bypass']].forEach(([elId, id]) => {
+  const el = document.getElementById(elId);
+  el.addEventListener('click', () => click(id === 'mode' ? (P.hold ? 'ride' : 'hold') : id));
+  el.addEventListener('focus', () => focusId = id); el.addEventListener('blur', () => focusId = null);
+});
+// preview signal controls
+const srcBtns = { voice: 's-voice', drums: 's-drums', mix: 's-mix' };
+Object.entries(srcBtns).forEach(([s, elId]) => document.getElementById(elId).addEventListener('click', () => {
+  src = s; sectionLeft = 0; Object.values(srcBtns).forEach(i => document.getElementById(i).setAttribute('aria-pressed', i === elId));
+}));
+const pauseBtn = document.getElementById('s-pause');
+pauseBtn.addEventListener('click', () => { paused = !paused; pauseBtn.setAttribute('aria-pressed', paused); pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
+
+// ---------------- loop: warm up so the first frame shows a full graph
+for (let i = 0; i < HIST; i++) step();
+const status = document.getElementById('status');
+let acc = 0, last = performance.now(), lastStatus = '';
+function loop(now) {
+  acc += Math.min(0.25, (now - last) / 1000); last = now;
+  if (!paused) while (acc >= dt) { step(); acc -= dt; } else acc = 0;
+  draw();
+  const s = statusText();
+  if (s !== lastStatus) { lastStatus = s; status.textContent = s; status.style.setProperty('--dot', css(P.bypass ? '--muted' : (STATES[state] || STATES.wait)[1])); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
