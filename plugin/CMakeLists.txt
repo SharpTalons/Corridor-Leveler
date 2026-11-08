@@ -49,7 +49,8 @@ juce_add_plugin(CorridorLeveler
   VST2_CATEGORY kPlugCategEffect
   COPY_PLUGIN_AFTER_BUILD FALSE)
 
-target_sources(CorridorLeveler PRIVATE src/PluginProcessor.cpp src/PluginEditor.cpp)
+target_sources(CorridorLeveler PRIVATE src/PluginProcessor.cpp src/PluginEditor.cpp src/Updates.cpp)
+target_compile_definitions(CorridorLeveler PRIVATE CORRIDOR_VERSION_STRING="${PROJECT_VERSION}")
 target_compile_definitions(CorridorLeveler PUBLIC
   JUCE_WEB_BROWSER=0
   JUCE_USE_CURL=0
@@ -64,9 +65,10 @@ target_link_libraries(CorridorLeveler
 option(CORRIDOR_BUILD_PLUGIN_CHECK "Build the plugin host check tool" ON)
 if(CORRIDOR_BUILD_PLUGIN_CHECK)
   juce_add_console_app(corridor_plugin_check PRODUCT_NAME "corridor_plugin_check")
-  target_sources(corridor_plugin_check PRIVATE ../tests/plugin_check.cpp src/PluginProcessor.cpp src/PluginEditor.cpp)
+  target_sources(corridor_plugin_check PRIVATE ../tests/plugin_check.cpp src/PluginProcessor.cpp src/PluginEditor.cpp src/Updates.cpp)
+  target_compile_definitions(corridor_plugin_check PRIVATE CORRIDOR_VERSION_STRING="${PROJECT_VERSION}")
   target_compile_definitions(corridor_plugin_check PRIVATE
-    JUCE_PLUGINHOST_VST3=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)
+    JUCE_PLUGINHOST_VST3=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1 JUCE_MODAL_LOOPS_PERMITTED=1)
   target_link_libraries(corridor_plugin_check PRIVATE corridor_core juce::juce_audio_utils juce::juce_audio_processors juce::juce_gui_basics
     juce::juce_recommended_config_flags ${CMAKE_DL_LIBS})
   # the 2.x host lives in its own file and sees only FST, never JUCE's 2.x hosting code

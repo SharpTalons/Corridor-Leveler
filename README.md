@@ -40,6 +40,21 @@ the left, output on the right, and shows the latency in the bottom-right corner 
 Download the latest **CorridorLeveler-…-Windows-Setup.exe** from [Releases](../../releases/latest), run it,
 and restart OBS. See `installer/README.txt` for where each part goes.
 
+## Updates
+
+When the plugin window opens, Corridor asks this repository's public GitHub releases for the newest
+version. It is a plain request with no token and nothing about you or your computer. If a newer
+version exists, it asks once per session, with **Update** and **Ignore**:
+
+- **Update** downloads the installer with a progress bar and opens it. Close OBS or your DAW when the
+  installer asks; settings and sessions are kept.
+- **Ignore** stops the automatic prompt for that version. The next version asks again.
+- The version button in the header opens a panel with the installed version, the last result and
+  **Check for updates**, which always asks, even about an ignored version.
+- Offline, it uses the last answer it saved. The native OBS filter has no window, so it doesn't check.
+
+This follows the `update-check` spec from fubulatu-lang/Design-Constants.
+
 ## Versions and releases
 
 Every commit that lands on `main` builds the installer and publishes it as a new GitHub Release.

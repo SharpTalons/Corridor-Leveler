@@ -6,6 +6,8 @@
 // lane on top. The controls sit at the bottom, blended over the lower part of the graph.
 #include "PluginEditor.h"
 
+#include "Updates.h"
+
 #include <cmath>
 #include <vector>
 
@@ -46,7 +48,7 @@ String fmtDb(float v, int dec = 1, bool sign = false) {
     return s;
 }
 
-constexpr float kLane = 48.f, kTop = kLane + 22.f, kDbRange = 70.f;
+constexpr float kTop = 54.f, kDbRange = 70.f;  // graph and meters share this 0 dB line
 constexpr int kHist = 500;  // 10 s at 20 ms per entry
 constexpr float kPi = MathConstants<float>::pi;
 
@@ -105,6 +107,20 @@ void drawIcon(Graphics& g, const String& name, Rectangle<float> area, Colour col
             p.startNewSubPath(cx + std::sin(a) * s * 0.36f, cy - std::cos(a) * s * 0.36f);
             p.lineTo(cx + std::sin(a) * s * 0.5f, cy - std::cos(a) * s * 0.5f);
         }
+        g.strokePath(p, st);
+    } else if (name == "download") {
+        p.startNewSubPath(cx, y + s * 0.08f); p.lineTo(cx, y + s * 0.62f);
+        p.startNewSubPath(cx - s * 0.24f, y + s * 0.4f); p.lineTo(cx, y + s * 0.64f); p.lineTo(cx + s * 0.24f, y + s * 0.4f);
+        p.startNewSubPath(x + s * 0.12f, y + s * 0.74f); p.lineTo(x + s * 0.12f, y + s * 0.9f); p.lineTo(x + s * 0.88f, y + s * 0.9f); p.lineTo(x + s * 0.88f, y + s * 0.74f);
+        g.strokePath(p, st);
+    } else if (name == "refresh") {
+        p.addCentredArc(cx, cy, s * 0.34f, s * 0.34f, 0.f, 0.5f, 2.f * kPi - 0.3f, true);
+        g.strokePath(p, st);
+        Path a; a.addTriangle(cx + s * 0.06f, y + s * 0.04f, cx + s * 0.06f, y + s * 0.36f, cx + s * 0.3f, y + s * 0.2f);
+        g.fillPath(a);
+    } else if (name == "close") {
+        p.startNewSubPath(x + s * 0.25f, y + s * 0.25f); p.lineTo(x + s * 0.75f, y + s * 0.75f);
+        p.startNewSubPath(x + s * 0.75f, y + s * 0.25f); p.lineTo(x + s * 0.25f, y + s * 0.75f);
         g.strokePath(p, st);
     } else if (name == "logo") {  // a level held between two walls: the corridor
         g.fillRoundedRectangle(x, y + s * 0.1f, s, s * 0.1f, s * 0.05f);
@@ -175,9 +191,7 @@ public:
         // lit value arc with a soft glow
         if (pos > 0.002f) {
             Path val; val.addCentredArc(cx, cy, rr, rr, 0.f, a0, ang, true);
-            g.setColour(c.accent.withAlpha(c.dark ? 0.22f : 0.16f));
-            g.strokePath(val, PathStrokeType(tw * 2.4f, PathStrokeType::curved, PathStrokeType::rounded));
-            g.setColour(c.accent);
+            g.setColour(c.ink.withAlpha(c.dark ? 0.85f : 0.8f));
             g.strokePath(val, PathStrokeType(tw - 1.f, PathStrokeType::curved, PathStrokeType::rounded));
         }
         // cap
@@ -199,13 +213,13 @@ public:
                             Colours::white.withAlpha(0.f), cx - fr * 0.35f + fr * 0.75f, cy - fr * 0.45f, true);
         g.setGradientFill(spec); g.fillPath(face);
         g.setColour(c.hilite); g.strokePath(face, PathStrokeType(1.f));
-        if (s.isMouseOverOrDragging()) { g.setColour(c.accent.withAlpha(0.5f)); g.strokePath(skirt, PathStrokeType(1.2f)); }
+        if (s.isMouseOverOrDragging()) { g.setColour(c.ink.withAlpha(0.45f)); g.strokePath(skirt, PathStrokeType(1.2f)); }
         // engraved pointer
         const float p0 = fr * 0.22f, p1 = fr * 0.86f, pw = jmax(2.f, R * 0.07f);
         const float sx = std::sin(ang), sy = -std::cos(ang);
         g.setColour(Colours::black.withAlpha(c.dark ? 0.7f : 0.25f));
         g.drawLine(cx + p0 * sx + 0.8f, cy + p0 * sy + 0.8f, cx + p1 * sx + 0.8f, cy + p1 * sy + 0.8f, pw);
-        g.setColour(c.accent);
+        g.setColour(c.dark ? c.ink : Colour(0xff1a1a1a));
         g.drawLine(cx + p0 * sx, cy + p0 * sy, cx + p1 * sx, cy + p1 * sy, pw);
 
         // live level marker on the track (Target shows the output level, Threshold the input)
@@ -231,7 +245,7 @@ public:
 
     Colour toneOf(Button& b) const {
         const String tone = b.getProperties().getWithDefault("tone", "accent");
-        return tone == "warn" ? t->warn : t->accent;
+        return tone == "warn" ? t->warn : tone == "accent" ? t->accent : t->ink;
     }
 
     void drawButtonBackground(Graphics& g, Button& b, const Colour&, bool over, bool down) override {
@@ -248,7 +262,8 @@ public:
 
     void drawButtonText(Graphics& g, TextButton& b, bool, bool) override {
         const bool on = b.getToggleState(), seg = b.getProperties().getWithDefault("segment", false);
-        const Colour col = on ? (seg ? t->ink : toneOf(b)) : (seg ? t->muted : (b.isEnabled() ? t->ink : t->muted));
+        const bool accentText = b.getProperties().getWithDefault("accentText", false);
+        const Colour col = on ? (seg ? t->ink : toneOf(b)) : (seg ? t->muted : (!b.isEnabled() ? t->muted : accentText ? t->accent : t->ink));
         const auto r = b.getLocalBounds().toFloat();
         const String icon = b.getProperties().getWithDefault("icon", "");
         const Font f = sans(float(b.getProperties().getWithDefault("fontSize", 13.0)), true);
@@ -312,10 +327,9 @@ public:
     void paint(Graphics& g) override {
         auto* lf = dynamic_cast<Look*>(&getLookAndFeel());
         const Theme& t = lf ? *lf->t : kDark;
-        auto f = sans(12.5f, true); f.setExtraKerningFactor(0.12f);
-        g.setFont(f);
+        g.setFont(sans(13.5f, true));
         g.setColour(t.ink);
-        g.drawText(title.toUpperCase(), getLocalBounds().removeFromBottom(18), Justification::centred);
+        g.drawText(title, getLocalBounds().removeFromBottom(18), Justification::centred);
     }
     Slider slider;
 
@@ -346,7 +360,7 @@ public:
             g.fillRect(getLocalBounds().toFloat());
         }
         // grid + scale
-        g.setFont(mono(10.5f));
+        g.setFont(sans(11.5f));
         for (int v = 0; v >= -66; v -= 6) {
             const float y = std::round(yOf(float(v))) + 0.5f;
             g.setColour(c.muted.withAlpha(v % 12 == 0 ? 0.22f : 0.11f)); g.fillRect(0.f, y, x1, 1.f);
@@ -368,9 +382,7 @@ public:
             fillP.lineTo(X(n - 1), H); fillP.closeSubPath();
             g.setColour(c.muted.withAlpha(0.1f)); g.fillPath(fillP);
             g.setColour(c.muted.withAlpha(0.9f)); g.strokePath(inP, PathStrokeType(1.2f, PathStrokeType::curved));
-            g.setColour(c.accent.withAlpha(0.14f)); g.strokePath(outP, PathStrokeType(8.f, PathStrokeType::curved, PathStrokeType::rounded));
-            g.setColour(c.accent.withAlpha(0.3f)); g.strokePath(outP, PathStrokeType(4.f, PathStrokeType::curved, PathStrokeType::rounded));
-            g.setColour(c.accent); g.strokePath(outP, PathStrokeType(2.2f, PathStrokeType::curved, PathStrokeType::rounded));
+            g.setColour(c.accent); g.strokePath(outP, PathStrokeType(2.f, PathStrokeType::mitered, PathStrokeType::rounded));
         }
         // analyze shading
         if (analyzing && n > 1) {
@@ -389,43 +401,25 @@ public:
                 const float dashes[] = {d1, d2};
                 g.setColour(col); g.drawDashedLine(Line<float>(0.f, y, x1, y), dashes, 2, hot ? 2.2f : 1.3f);
             }
-            const String txt = label + " " + fmtDb(v, 1);
-            auto f = mono(10.5f, true); g.setFont(f);
-            const float tw = GlyphArrangement::getStringWidth(f, txt) + 12.f;
-            Rectangle<float> box(8.f, y - 9.f, tw, 18.f);
+            const String txt = label + "  " + fmtDb(v, 1);
+            auto f = sans(12.f, true); g.setFont(f);
+            const float tw = GlyphArrangement::getStringWidth(f, txt) + 14.f;
+            Rectangle<float> box(8.f, y - 10.f, tw, 20.f);
             Path bp; bp.addRoundedRectangle(box, 4.f);
-            DropShadow(Colours::black.withAlpha(c.shadow * 0.5f), 5, {0, 1}).drawForPath(g, bp);
             g.setColour(hot ? col : c.graph.withAlpha(0.94f)); g.fillPath(bp);
             g.setColour(col); g.strokePath(bp, PathStrokeType(1.f));
             g.setColour(hot ? c.graph : col); g.drawText(txt, box.withTrimmedLeft(6.f), Justification::centredLeft);
         };
-        tag(ids::ceiling, "CEILING", c.limit, 2.f, 3.f);
-        tag(ids::threshold, "THRESHOLD", c.muted, 6.f, 4.f);
-        tag(ids::target, "TARGET", c.accent, 0.f, 0.f);
+        tag(ids::ceiling, "Ceiling", c.limit, 2.f, 3.f);
+        tag(ids::threshold, "Threshold", c.muted, 6.f, 4.f);
+        tag(ids::target, "Target", c.accent, 0.f, 0.f);
 
-        // gain lane
-        const float range = jmax(1.f, st.getRawParameterValue(ids::range)->load());
-        const float mid = 8.f + kLane * 0.5f, half = kLane * 0.5f - 4.f;
-        auto yG = [&](float v) { return mid - jlimit(-range, range, v) / range * half; };
-        g.setColour(c.surface.withAlpha(0.75f)); g.fillRect(0.f, 8.f, x1, kLane);
-        g.setColour(c.line); g.fillRect(0.f, std::round(mid), x1, 1.f);
-        g.fillRect(0.f, std::round(yG(range)), x1, 1.f); g.fillRect(0.f, std::round(yG(-range)), x1, 1.f);
-        if (n > 1) {
-            for (int sign : {1, -1}) {
-                Path a; a.startNewSubPath(X(0), mid);
-                for (int k = 0; k < n; ++k) a.lineTo(X(k), yG(sign > 0 ? jmax(0.f, hist[size_t(k)].gain) : jmin(0.f, hist[size_t(k)].gain)));
-                a.lineTo(X(n - 1), mid); a.closeSubPath();
-                g.setColour((sign > 0 ? c.boost : c.cut).withAlpha(0.55f)); g.fillPath(a);
-            }
-            g.setColour(c.limit);
-            for (int k = 0; k < n; ++k)
-                if (hist[size_t(k)].limiterDb < -0.2f) g.fillRect(X(k) - sx * 0.5f, 8.f + kLane - 4.f, jmax(1.5f, sx), 4.f);
-        }
-        g.setFont(mono(10.5f, true)); g.setColour(c.muted);
-        g.drawText("GAIN  +/-" + String(range, 0) + " dB", Rectangle<float>(10.f, 10.f, 200.f, 14.f), Justification::centredLeft);
-        g.drawText("+" + String(range, 0), Rectangle<float>(x1, yG(range) - 6.f, scaleW - 5.f, 12.f), Justification::centredRight);
-        g.drawText("0", Rectangle<float>(x1, mid - 6.f, scaleW - 5.f, 12.f), Justification::centredRight);
-        g.drawText("-" + String(range, 0), Rectangle<float>(x1, yG(-range) - 6.f, scaleW - 5.f, 12.f), Justification::centredRight);
+        // legend for the two traces, in the band above 0 dB
+        g.setFont(sans(12.f));
+        g.setColour(c.muted.withAlpha(0.9f)); g.fillRect(14.f, 25.f, 16.f, 2.f);
+        g.setColour(c.muted); g.drawText("Input", Rectangle<float>(36.f, 18.f, 60.f, 16.f), Justification::centredLeft);
+        g.setColour(c.accent); g.fillRect(96.f, 25.f, 16.f, 2.f);
+        g.setColour(c.muted); g.drawText("Output (RMS, last 10 s)", Rectangle<float>(118.f, 18.f, 220.f, 16.f), Justification::centredLeft);
 
         // inner shadow: the graph sits recessed in the panel like a screen
         const float sh = c.dark ? 0.75f : 0.14f;
@@ -497,7 +491,7 @@ public:
         }
         g.setColour(Colours::white.withAlpha(c.dark ? 0.05f : 0.25f));
         g.fillRect(bx, top, bw * 0.4f, bot - top);  // glass
-        g.setFont(mono(10.f)); g.setColour(c.muted);
+        g.setFont(sans(11.f)); g.setColour(c.muted);
         for (int v = 0; v >= -60; v -= 12)
             g.drawText(v == 0 ? "0" : String(v), Rectangle<float>(input ? 0.f : bx + bw + 4.f, y(float(v)) - 6.f, input ? bx - 6.f : W - bx - bw - 4.f, 12.f),
                        input ? Justification::centredRight : Justification::centredLeft);
@@ -505,8 +499,8 @@ public:
         drawWell(g, c, hb, 4.f);
         g.setFont(mono(11.f, true)); g.setColour(hold > -0.1f ? c.limit : c.ink);
         g.drawText(hold > -70.f ? fmtDb(hold, 1) : "-", hb, Justification::centred);
-        g.setFont(mono(10.f, true)); g.setColour(c.muted);
-        g.drawText(input ? "IN" : "OUT", Rectangle<float>(0.f, 32.f, W, 14.f), Justification::centred);
+        g.setFont(sans(11.f, true)); g.setColour(c.muted);
+        g.drawText(input ? "In" : "Out", Rectangle<float>(0.f, 32.f, W, 14.f), Justification::centred);
     }
     void mouseDown(const MouseEvent&) override { dsp.resetPeakHolds(); }
 
@@ -534,14 +528,12 @@ public:
         // applied gain, in an inset display
         const auto disp = gainBox.withHeight(42).toFloat();
         drawWell(g, c, disp, 8.f);
-        const Colour gc = gainSign > 0 ? c.boost : gainSign < 0 ? c.cut : c.ink;
         g.setFont(mono(24.f, true));
-        g.setColour(gc.withAlpha(0.25f)); g.drawText(gainText, disp.translated(0.f, 1.f), Justification::centred);
-        g.setColour(gc); g.drawText(gainText, disp, Justification::centred);
-        auto f = sans(11.5f, true); f.setExtraKerningFactor(0.12f); g.setFont(f); g.setColour(c.ink);
-        g.drawText("GAIN  DB", gainBox.withTrimmedTop(46).withHeight(16), Justification::centred);
+        g.setColour(c.ink); g.drawText(gainText + " dB", disp, Justification::centred);
+        g.setFont(sans(13.f, true)); g.setColour(c.ink);
+        g.drawText("Applied gain", gainBox.withTrimmedTop(46).withHeight(16), Justification::centred);
         // latency, bottom-right corner
-        g.setFont(mono(10.5f)); g.setColour(c.muted);
+        g.setFont(sans(11.5f)); g.setColour(c.muted);
         g.drawText(latencyText, getLocalBounds().removeFromBottom(22).reduced(12, 0), Justification::centredRight);
     }
 
@@ -549,10 +541,134 @@ private:
     const Theme*& t;
 };
 
+// ---------------------------------------------------------------- updates: About panel and prompt
+// The About panel is the "Settings row" of the update-check spec: version, last result, one action.
+class AboutPanel : public Component {
+public:
+    AboutPanel(updates::Checker& c, const Theme*& th) : checker(c), t(th) {
+        for (auto* b : {&action, &close}) { b->getProperties().set("fontSize", 13.0); addAndMakeVisible(*b); }
+        close.getProperties().set("icon", "close");
+        close.setButtonText({});
+        action.onClick = [this] {
+            if (checker.known().valid()) checker.install(); else checker.check(true);
+        };
+        close.onClick = [this] { setVisible(false); };
+        link.setFont(sans(13.f), false, Justification::centredLeft);
+        addAndMakeVisible(link);
+    }
+    void refresh() {
+        const auto r = checker.known();
+        const auto ph = checker.phase();
+        action.setButtonText(ph == updates::Checker::Phase::Checking ? "Checking..."
+                             : ph == updates::Checker::Phase::Downloading ? "Downloading " + String(int(checker.progress() * 100.f)) + "%"
+                             : r.valid() ? "Update to " + r.version : "Check for updates");
+        action.setEnabled(ph == updates::Checker::Phase::Idle);
+        action.getProperties().set("icon", r.valid() ? "download" : "refresh");
+        action.getProperties().set("accentText", r.valid());
+        link.setURL(URL(r.valid() ? r.page : String(updates::kReleasesPage)));
+        link.setColour(HyperlinkButton::textColourId, t->ink);
+        repaint();
+    }
+    void resized() override {
+        close.setBounds(getWidth() - 40, 10, 30, 30);
+        action.setBounds(20, getHeight() - 56, 190, 36);
+        link.setButtonText("Release page");
+        link.setBounds(226, getHeight() - 56, 120, 36);
+    }
+    void paint(Graphics& g) override {
+        const Theme& c = *t;
+        auto r = getLocalBounds().toFloat().reduced(1.f);
+        Path p; p.addRoundedRectangle(r, 12.f);
+        DropShadow(Colours::black.withAlpha(c.dark ? 0.7f : 0.25f), 24, {0, 8}).drawForPath(g, p);  // it floats
+        g.setColour(c.dark ? Colour(0xff111214) : c.surface); g.fillPath(p);
+        g.setColour(c.dark ? Colour(0xff2e2e2e) : c.line); g.strokePath(p, PathStrokeType(1.f));
+        drawIcon(g, "logo", Rectangle<float>(20.f, 20.f, 22.f, 20.f), c.accent);
+        g.setColour(c.ink); g.setFont(sans(16.f, true));
+        g.drawText("Corridor Leveler " + updates::currentVersion(), Rectangle<float>(52.f, 16.f, r.getWidth() - 100.f, 28.f), Justification::centredLeft);
+        g.setFont(sans(13.5f)); g.setColour(c.ink);
+        g.drawFittedText(checker.status(), Rectangle<int>(20, 56, getWidth() - 40, 40), Justification::topLeft, 2);
+        const String msg = checker.message();
+        g.setColour(c.muted); g.setFont(sans(13.f));
+        g.drawFittedText(msg.isNotEmpty() ? msg : "The check is a plain request to GitHub. Nothing about you or your computer is sent.",
+                         Rectangle<int>(20, 98, getWidth() - 40, 36), Justification::topLeft, 2);
+    }
+
+private:
+    updates::Checker& checker;
+    const Theme*& t;
+    TextButton action{"Check for updates"}, close{"x"};
+    HyperlinkButton link{"Release page", URL(updates::kReleasesPage)};
+};
+
+// The prompt: once per start, Update and Ignore. Escape or a click outside closes it for this start.
+class UpdatePrompt : public Component {
+public:
+    UpdatePrompt(updates::Checker& c, const Theme*& th) : checker(c), t(th) {
+        for (auto* b : {&update, &ignore}) { b->getProperties().set("fontSize", 14.0); addAndMakeVisible(*b); }
+        update.getProperties().set("icon", "download");
+        update.getProperties().set("accentText", true);
+        update.onClick = [this] { checker.install(); };
+        ignore.onClick = [this] { checker.ignoreKnown(); };
+        setWantsKeyboardFocus(true);
+    }
+    void refresh() {
+        const bool busy = checker.phase() == updates::Checker::Phase::Downloading;
+        update.setEnabled(!busy); ignore.setEnabled(!busy);
+        repaint();
+    }
+    Rectangle<int> box() const { return getLocalBounds().withSizeKeepingCentre(500, 190); }
+    void resized() override {
+        const auto b = box();
+        update.setBounds(b.getX() + 24, b.getBottom() - 60, 140, 38);
+        ignore.setBounds(b.getX() + 176, b.getBottom() - 60, 110, 38);
+    }
+    void mouseDown(const MouseEvent& e) override {
+        if (!box().contains(e.getPosition()) && checker.phase() != updates::Checker::Phase::Downloading) checker.dismissPrompt();
+    }
+    bool keyPressed(const KeyPress& k) override {
+        if (k == KeyPress::escapeKey && checker.phase() != updates::Checker::Phase::Downloading) { checker.dismissPrompt(); return true; }
+        return false;
+    }
+    void paint(Graphics& g) override {
+        const Theme& c = *t;
+        g.fillAll(Colours::black.withAlpha(0.55f));
+        const auto b = box().toFloat();
+        Path p; p.addRoundedRectangle(b, 14.f);
+        DropShadow(Colours::black.withAlpha(0.6f), 30, {0, 10}).drawForPath(g, p);
+        g.setColour(c.dark ? Colour(0xff111214) : c.surface); g.fillPath(p);
+        g.setColour(c.dark ? Colour(0xff2e2e2e) : c.line); g.strokePath(p, PathStrokeType(1.f));
+        const auto r = checker.known();
+        const String cur = updates::currentVersion();
+        g.setColour(c.ink); g.setFont(sans(20.f, true));
+        g.drawText("Corridor Leveler " + r.version + " is available", b.reduced(24.f).withHeight(30.f), Justification::centredLeft);
+        g.setFont(sans(14.f));
+        String body;
+        if (checker.phase() == updates::Checker::Phase::Downloading)
+            body = "Downloading... " + String(int(checker.progress() * 100.f)) + "%. The installer opens when it's done.";
+        else {
+            const String size = r.bytes > 0 ? " (" + String(double(r.bytes) / 1048576.0, 1) + " MB)" : String();
+            body = "You have " + cur + ". Update downloads the new version" + size + " and opens its installer. When it asks, close OBS or your DAW. "
+                   "Your settings and sessions are kept.";
+            if (checker.message().isNotEmpty()) body = checker.message();
+        }
+        g.drawFittedText(body, b.reduced(24.f).withTrimmedTop(40.f).withHeight(64.f).toNearestInt(), Justification::topLeft, 3);
+        if (checker.phase() == updates::Checker::Phase::Downloading) {
+            const auto bar = Rectangle<float>(b.getX() + 24.f, b.getBottom() - 92.f, b.getWidth() - 48.f, 8.f);
+            drawWell(g, c, bar, 4.f);
+            g.setColour(c.accent); g.fillRoundedRectangle(bar.withWidth(bar.getWidth() * checker.progress()), 4.f);
+        }
+    }
+
+private:
+    updates::Checker& checker;
+    const Theme*& t;
+    TextButton update{"Update"}, ignore{"Ignore"};
+};
+
 }  // namespace
 
 // ---------------------------------------------------------------- content (design size)
-class CorridorContent : public Component {
+class CorridorContent : public Component, private ChangeListener {
 public:
     explicit CorridorContent(CorridorAudioProcessor& p)
         : proc(p),
@@ -561,7 +677,8 @@ public:
           target(p.state(), ids::target, "Target", "dB RMS", 1, 96.f),
           response(p.state(), ids::response, "Response", "", 0, 72.f),
           range(p.state(), ids::range, "Range", "dB", 1, 72.f),
-          ceiling(p.state(), ids::ceiling, "Ceiling", "dBFS", 1, 54.f) {
+          ceiling(p.state(), ids::ceiling, "Ceiling", "dBFS", 1, 54.f),
+          about(*checker, theme), prompt(*checker, theme) {
         theme = p.darkTheme ? &kDark : &kLight;
         look.t = theme; look.apply();
         setLookAndFeel(&look);
@@ -609,10 +726,38 @@ public:
         ease.setTooltip("Off: the gain freezes below the threshold. On: after 2 s of silence it glides back to 0 dB.");
         themeBtn.setToggleState(p.darkTheme, dontSendNotification);
         themeBtn.onClick = [this] { applyTheme(themeBtn.getToggleState()); };
+
+        // updates: version in the header opens the About panel; a known update gets its own button
+        versionBtn.setButtonText("v" + updates::currentVersion());
+        versionBtn.getProperties().set("fontSize", 12.5);
+        versionBtn.onClick = [this] { about.refresh(); about.setVisible(!about.isVisible()); about.toFront(false); };
+        addAndMakeVisible(versionBtn);
+        updateBtn.getProperties().set("fontSize", 12.5);
+        updateBtn.getProperties().set("icon", "download");
+        updateBtn.getProperties().set("accentText", true);
+        updateBtn.onClick = [this] { if (checker->known().valid()) checker->install(); };
+        addChildComponent(updateBtn);
+        addChildComponent(about);
+        addChildComponent(prompt);
+        checker->addChangeListener(this);
+        checker->check(false);  // silent; at most one prompt per host session
         setSize(CorridorEditor::designW, CorridorEditor::designH);
         sendLookAndFeelChange();  // children were added after the look was set: let them pick up its colours
     }
-    ~CorridorContent() override { setLookAndFeel(nullptr); }
+    ~CorridorContent() override { checker->removeChangeListener(this); setLookAndFeel(nullptr); }
+
+    void changeListenerCallback(ChangeBroadcaster*) override {
+        const auto r = checker->known();
+        updateBtn.setVisible(r.valid());
+        updateBtn.setButtonText(checker->phase() == updates::Checker::Phase::Downloading
+                                    ? "Downloading " + String(int(checker->progress() * 100.f)) + "%"
+                                    : "Update to " + r.version);
+        const bool showPrompt = checker->promptVisible() || (checker->phase() == updates::Checker::Phase::Downloading && prompt.isVisible());
+        prompt.setVisible(showPrompt && r.valid());
+        if (prompt.isVisible()) { prompt.toFront(true); prompt.refresh(); }
+        about.refresh();
+        resized();
+    }
 
     void applyTheme(bool dark) {
         proc.darkTheme = dark;
@@ -641,8 +786,8 @@ public:
         auto f = sans(16.f, true); f.setExtraKerningFactor(0.18f);
         g.setFont(f); g.setColour(c.ink);
         g.drawText("CORRIDOR", Rectangle<int>(50, 0, 240, 46), Justification::centredLeft);
-        g.setFont(mono(11.f)); g.setColour(c.muted);
-        g.drawText("LEVELER", Rectangle<int>(176, 0, 120, 46), Justification::centredLeft);
+        g.setFont(sans(13.f)); g.setColour(c.muted);
+        g.drawText("Leveler", Rectangle<int>(176, 0, 120, 46), Justification::centredLeft);
         g.setColour(c.edge); g.fillRect(0, 46, getWidth(), 1);
     }
 
@@ -654,6 +799,11 @@ public:
         bypass.setBounds(head.removeFromRight(104));
         head.removeFromRight(10);
         ease.setBounds(head.removeFromRight(170));
+        head.removeFromRight(10);
+        versionBtn.setBounds(head.removeFromRight(84));
+        if (updateBtn.isVisible()) { head.removeFromRight(10); updateBtn.setBounds(head.removeFromRight(170)); }
+        about.setBounds(getWidth() - 12 - 420, 52, 420, 190);
+        prompt.setBounds(getLocalBounds());
         // body
         auto body = Rectangle<int>(0, 47, getWidth(), getHeight() - 47);
         meterIn.setBounds(body.removeFromLeft(52));
@@ -699,7 +849,7 @@ public:
         ride.setToggleState(!holdMode, dontSendNotification);
         hold.setToggleState(holdMode, dontSendNotification);
         analyze.setVisible(holdMode);
-        analyze.setButtonText(t.analyzing.load() ? "LOCK" : t.holdValid.load() ? "ANALYZE AGAIN" : "ANALYZE");
+        analyze.setButtonText(t.analyzing.load() ? "Lock" : t.holdValid.load() ? "Analyze again" : "Analyze");
         analyze.getProperties().set("icon", t.analyzing.load() ? "lock" : "target");
         analyze.setToggleState(t.analyzing.load(), dontSendNotification);
 
@@ -760,8 +910,12 @@ private:
     Meter meterIn, meterOut;
     Deck deck;
     Knob threshold, target, response, range, ceiling;
-    TextButton ride{"RIDE"}, hold{"HOLD"}, analyze{"ANALYZE"};
+    TextButton ride{"Ride"}, hold{"Hold"}, analyze{"Analyze"};
     TextButton ease{"Ease in silence"}, bypass{"Bypass"}, themeBtn{"Dark theme"};
+    TextButton versionBtn{"v0"}, updateBtn{"Update"};
+    SharedResourcePointer<updates::Checker> checker;  // declared before the panels that use it
+    AboutPanel about;
+    UpdatePrompt prompt;
     std::unique_ptr<AudioProcessorValueTreeState::ButtonAttachment> easeAtt, bypassAtt;
     Label status;
     corridor::Snapshot scratch[kHist];
