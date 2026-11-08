@@ -37,6 +37,29 @@ header.page h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: 0
 header.page p { margin: 0; color: var(--muted); max-width: 62ch; line-height: 1.5; }
 .plugin { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.55), 0 0 0 1px #2e2e33; background: var(--graph-bottom); }
 .plugin canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
+.unit { display: grid; }
+.unit .plugin { position: relative; z-index: 1; }
+.drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .32s cubic-bezier(.2,.7,.2,1); }
+.drawer.open { grid-template-rows: 1fr; }
+.drawer > div { overflow: hidden; min-height: 0; }
+.drawer-body { margin: 0 14px; padding: 14px 16px 16px; display: grid; grid-template-columns: minmax(150px, 190px) 1fr; gap: 16px; align-items: stretch;
+  background: linear-gradient(#1a1a1d, #232326); border: 1px solid #2e2e33; border-top: 0; border-radius: 0 0 10px 10px;
+  box-shadow: inset 0 10px 14px -8px rgba(0,0,0,.8), 0 14px 30px rgba(0,0,0,.45); }
+.drawer-side { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.drawer-side .cap { font-size: 11px; font-weight: 600; letter-spacing: .14em; color: var(--label); text-transform: uppercase; }
+.drawer-side .readout { font-family: var(--font-num); font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.drawer-side .readout b { color: var(--ink); font-weight: 500; }
+.drawer-side .readout .hot { color: var(--yellow); }
+.wave { min-width: 0; height: 120px; border-radius: 6px; background: #111113; box-shadow: inset 0 3px 8px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.06); }
+.wave canvas { display: block; width: 100%; height: 100%; }
+.key { font: 600 12.5px var(--font-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--label); padding: 9px 14px; border-radius: 7px; cursor: pointer;
+  background: linear-gradient(var(--btn-top), var(--btn-bottom)); border: 1px solid var(--btn-edge);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 3px 0 #1d1d20, 0 5px 10px rgba(0,0,0,.5); }
+.key:hover { background: linear-gradient(#58585e, var(--btn-bottom)); }
+.key[aria-pressed="true"] { color: var(--yellow); background: #232326; border-color: #111; box-shadow: inset 0 3px 6px rgba(0,0,0,.7); transform: translateY(2px); }
+.key:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+@media (max-width: 640px) { .drawer-body { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
 .sim { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; color: var(--muted); font-size: 13px; }
 .sim .group { display: flex; gap: 6px; }
 .pill { font: 600 12px var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--label); background: linear-gradient(var(--btn-top), var(--btn-bottom)); border: 1px solid var(--btn-edge); border-radius: 7px; padding: 7px 14px; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.4); }
@@ -65,6 +88,7 @@ h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .12em;
     <p>A working preview for approval. Drag a dial up or down (Shift for fine steps, double-click to reset), or drag the Target, Threshold and Ceiling lines in the graph.</p>
   </header>
 
+  <div class="unit">
   <div class="plugin" id="plugin">
     <canvas id="cv" width="1120" height="630" aria-label="Corridor Leveler plugin window preview" role="img"></canvas>
     <!-- keyboard and screen-reader access to the dials and buttons drawn on the canvas -->
@@ -76,6 +100,20 @@ h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .12em;
     <button class="sr" id="b-mode">Switch between Ride and Hold</button>
     <button class="sr" id="b-ease">Ease in silence</button>
     <button class="sr" id="b-bypass">Bypass</button>
+  </div>
+  <!-- Hold mode: analysis panel opens under the window -->
+  <div class="drawer" id="drawer" aria-hidden="true">
+    <div>
+      <div class="drawer-body">
+        <div class="drawer-side">
+          <span class="cap">Analyze &amp; hold</span>
+          <button class="key" id="an-btn" aria-pressed="false" tabindex="-1">Analyze</button>
+          <div class="readout" id="an-read" aria-live="polite"></div>
+        </div>
+        <div class="wave"><canvas id="wave" aria-label="Live input waveform"></canvas></div>
+      </div>
+    </div>
+  </div>
   </div>
 
   <div class="sim">
@@ -103,7 +141,7 @@ h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .12em;
         <li>Slim green meters with an olive unlit track, yellow above -6 dBFS and red above -1, yellow peak ticks, numbers on top.</li>
         <li>Grey raised buttons; an active option lights its text yellow. The controls sit on the graph and fade it out, with no panel box.</li>
         <li>Applied gain is in the readout box at the bottom right, and latency at the bottom left.</li>
-        <li>A little depth: dials stand off the panel with a bevelled edge, a dished face and a contact shadow, and their rings run in a cut groove. Buttons are raised keys that sink when on. The graph, meters, switch and readouts sit in recessed wells.</li>
+        <li>Hold opens an analysis panel under the window with the Analyze / Lock key, the live input waveform (yellow while it is being measured) and the measured level. A little depth: dials stand off the panel with a bevelled edge, a dished face and a contact shadow, and their rings run in a cut groove. Buttons are raised keys that sink when on. The graph, meters, switch and readouts sit in recessed wells.</li>
       </ul>
     </section>
   </div>
@@ -143,7 +181,7 @@ const vOf = y => -Math.min(RANGE_DB, Math.max(0, (y - GT) / (GB - GT) * RANGE_DB
 
 // ---------------- simulated signal and engine (20 ms steps)
 const HIST = 500, dt = 0.02;
-const hist = [];
+const hist = [], WAVE = 1200, wave = [];  // wave: 6 s at 4 points per 20 ms
 let src = 'voice', paused = false, t = 0;
 let section = -24, sectionLeft = 0, gapLeft = 0, syl = 0;
 let pw = Math.pow(10, -24 / 10), gain = 0, silent = 0;
@@ -212,6 +250,10 @@ function step() {
   if (ip > inHold || (holdTimer -= dt) < 0) { inHold = Math.max(ip, inHold - 0.3); }
   if (op > outHold) outHold = op; else if ((outHold2 -= dt) < 0) outHold -= 0.3;
   if (ip >= inHold) holdTimer = 1.5; if (op >= outHold) outHold2 = 1.5;
+  // waveform for the analysis panel: a few sample peaks per step, shaped like speech or hits
+  const amp = Math.max(0, (inDb + 66) / 60);  // dB scale: -66 dB at the centre line, -6 dB at the edges
+  for (let s = 0; s < 4; s++) { const a = Math.min(1, amp * (0.55 + Math.random() * 0.45)); wave.push({ a, up: Math.random() * .25 + .75, an: analyzing, act: active }); }
+  while (wave.length > WAVE) wave.shift();
   hist.push({ i: inDb, o: outDb });
   if (hist.length > HIST) hist.shift();
   lastLvl = lvl;
@@ -438,10 +480,6 @@ function drawDeck() {
   well(t.x - bw - 4, by - 4, bw * 2 + 8, bh + 8, 10, '#151517');  // the switch sits in a recessed slot
   button(...btn.ride, 'RIDE', !P.hold, hover === 'ride');
   button(...btn.hold, 'HOLD', P.hold, hover === 'hold');
-  if (P.hold) {
-    btn.analyze = [t.x + bw + 14, by, 100, bh];
-    button(...btn.analyze, analyzing ? 'LOCK' : holdValid ? 'ANALYZE AGAIN' : 'ANALYZE', analyzing, hover === 'analyze');
-  } else delete btn.analyze;
   // readouts: latency bottom-left, applied gain bottom-right
   text('LATENCY 5.0 ms', GX0 + 14, H - 22, 11, C.muted, 'left', 600, 'ui', 1);
   const g = P.bypass ? 0 : gain;
@@ -514,7 +552,7 @@ const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.l
 const inR = ([x, y], r) => r && x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
 function hitTest(p) {
   for (const k of knobs) if (Math.hypot(p[0] - k.x, p[1] - k.y) < k.r + 12) return k.id;
-  for (const id of ['ride', 'hold', 'analyze', 'ease', 'bypass']) if (inR(p, btn[id])) return id;
+  for (const id of ['ride', 'hold', 'ease', 'bypass']) if (inR(p, btn[id])) return id;
   if (p[0] > GX0 && p[0] < GX1 - 34 && p[1] > GT - 6) {
     let best = null, bd = 8;
     for (const id of ['tgt', 'thr', 'ceil']) { const d = Math.abs(yOf(P[id]) - p[1]); if (d < bd) { bd = d; best = 'line-' + id; } }
@@ -568,6 +606,42 @@ Object.entries(srcBtns).forEach(([s, elId]) => document.getElementById(elId).add
 const pauseBtn = document.getElementById('s-pause');
 pauseBtn.addEventListener('click', () => { paused = !paused; pauseBtn.setAttribute('aria-pressed', paused); pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
 
+// ---------------- analysis panel
+const drawer = document.getElementById('drawer'), anBtn = document.getElementById('an-btn'), anRead = document.getElementById('an-read');
+const wcv = document.getElementById('wave'), wctx = wcv.getContext('2d');
+anBtn.addEventListener('click', () => click('analyze'));
+function fitWave() { const r = wcv.getBoundingClientRect(), d = window.devicePixelRatio || 1; wcv.width = Math.max(1, Math.round(r.width * d)); wcv.height = Math.max(1, Math.round(r.height * d)); }
+new ResizeObserver(fitWave).observe(wcv);
+function drawDrawer() {
+  const open = P.hold;
+  if (drawer.classList.contains('open') !== open) { drawer.classList.toggle('open', open); drawer.setAttribute('aria-hidden', !open); anBtn.tabIndex = open ? 0 : -1; }
+  if (!open) return;
+  anBtn.textContent = analyzing ? 'Lock' : holdValid ? 'Analyze again' : 'Analyze';
+  anBtn.setAttribute('aria-pressed', analyzing);
+  const m = anN ? 10 * Math.log10(anSum / anN) : null;
+  const read = analyzing
+    ? `<span class="hot">Analyzing</span> <b>${anT.toFixed(1)} s</b><br>Above threshold <b>${(anN * dt).toFixed(1)} s</b><br>Measured <b>${m === null ? '-' : fmt(m) + ' dB RMS'}</b><br>Locks by itself at 20 s`
+    : holdValid ? `Holding <span class="hot">${sgn(holdGain)} dB</span><br>Play a typical section and press Analyze again to re-measure.`
+    : 'Press Analyze, then play a typical section.';
+  if (anRead.innerHTML !== read) anRead.innerHTML = read;
+  // waveform: mirrored peaks, centre line, threshold band; the part being analyzed lights yellow
+  const w = wcv.width, h = wcv.height, d = window.devicePixelRatio || 1, mid = h / 2;
+  wctx.clearRect(0, 0, w, h);
+  wctx.fillStyle = 'rgba(255,255,255,.06)'; wctx.fillRect(0, Math.round(mid), w, d);
+  const thrA = Math.min(1, Math.max(0, (P.thr + 66) / 60)) * (mid - 6 * d);
+  wctx.setLineDash([4 * d, 4 * d]); wctx.strokeStyle = 'rgba(140,198,63,.55)'; wctx.lineWidth = d;
+  [mid - thrA, mid + thrA].forEach(y => { wctx.beginPath(); wctx.moveTo(0, y); wctx.lineTo(w, y); wctx.stroke(); });
+  wctx.setLineDash([]);
+  const n = wave.length, step = w / WAVE;
+  for (let i = 0; i < n; i++) {
+    const s = wave[i], x = w - (n - i) * step, a = s.a * (mid - 6 * d);
+    wctx.fillStyle = s.an ? (s.act ? C.yellow : 'rgba(245,196,28,.35)') : (s.act ? 'rgba(178,178,183,.8)' : 'rgba(178,178,183,.3)');
+    wctx.fillRect(x, mid - a * s.up, Math.max(d, step * .9), a * s.up + a);
+  }
+  wctx.font = `600 ${10.5 * d}px ${css('--font-ui')}`; wctx.fillStyle = C.muted; wctx.textBaseline = 'top';
+  wctx.fillText('INPUT, LAST 6 S  (DASHED: THRESHOLD)', 8 * d, 7 * d);
+}
+
 // ---------------- loop: warm up so the first frame shows a full graph
 for (let i = 0; i < HIST; i++) step();
 const status = document.getElementById('status');
@@ -576,6 +650,7 @@ function loop(now) {
   acc += Math.min(0.25, (now - last) / 1000); last = now;
   if (!paused) while (acc >= dt) { step(); acc -= dt; } else acc = 0;
   draw();
+  drawDrawer();
   const s = statusText();
   if (s !== lastStatus) { lastStatus = s; status.textContent = s; status.style.setProperty('--dot', css(P.bypass ? '--muted' : (STATES[state] || STATES.wait)[1])); }
   requestAnimationFrame(loop);
