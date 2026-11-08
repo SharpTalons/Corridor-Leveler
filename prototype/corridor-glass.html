@@ -16,22 +16,22 @@
 
 /* the plugin's own two looks; .unit carries data-ptheme */
 .unit {
-  --p-bg: #07080c; --p-ink: #f5f5f7; --p-label: #c7c7cc; --p-muted: #8e8e93;
-  --p-accent: #ffd60a; --p-accent-text: #ffd60a; --p-green: #30d158; --p-green-text: #30d158; --p-red: #ff453a;
-  --p-trace: rgba(235, 235, 245, .62); --p-grid: rgba(255, 255, 255, .06);
-  --p-glass: rgba(255, 255, 255, .07); --p-glass-strong: rgba(255, 255, 255, .16);
-  --p-rim: rgba(255, 255, 255, .55); --p-rim-soft: rgba(255, 255, 255, .14); --p-shade: rgba(0, 0, 0, .45);
-  --p-bloom-a: rgba(255, 190, 60, .20); --p-bloom-b: rgba(40, 140, 255, .18); --p-bloom-c: rgba(48, 209, 88, .10);
-  --p-meter-off: rgba(255, 255, 255, .08);
+  --p-bg: #0f0f11; --p-ink: #ededef; --p-label: #b4b4b9; --p-muted: #8b8b90;
+  --p-accent: #ededef; --p-accent-text: #ededef; --p-green: #a1a1a6; --p-green-text: #b4b4b9; --p-red: #cf6a60;
+  --p-trace: rgba(235, 235, 240, .34); --p-out: rgba(245, 245, 247, .92); --p-meter: rgba(235, 235, 240, .7); --p-grid: rgba(255, 255, 255, .05);
+  --p-glass: rgba(255, 255, 255, .06); --p-glass-strong: rgba(255, 255, 255, .13);
+  --p-rim: rgba(255, 255, 255, .38); --p-rim-soft: rgba(255, 255, 255, .1); --p-shade: rgba(0, 0, 0, .4);
+  --p-bloom-a: rgba(255, 255, 255, .035); --p-bloom-b: rgba(255, 255, 255, .025); --p-bloom-c: rgba(255, 255, 255, 0);
+  --p-meter-off: rgba(255, 255, 255, .07); --p-on: rgba(255, 255, 255, .2);
 }
 .unit[data-ptheme="light"] {
-  --p-bg: #e9ecf3; --p-ink: #1c1c1e; --p-label: #3a3a3c; --p-muted: #6e6e73;
-  --p-accent: #ffb800; --p-accent-text: #8a5d00; --p-green: #34c759; --p-green-text: #1f7a37; --p-red: #ff3b30;
-  --p-trace: rgba(60, 60, 67, .55); --p-grid: rgba(0, 0, 0, .06);
-  --p-glass: rgba(255, 255, 255, .42); --p-glass-strong: rgba(255, 255, 255, .7);
-  --p-rim: rgba(255, 255, 255, .95); --p-rim-soft: rgba(0, 0, 0, .07); --p-shade: rgba(30, 40, 80, .16);
-  --p-bloom-a: rgba(255, 196, 70, .38); --p-bloom-b: rgba(60, 150, 255, .30); --p-bloom-c: rgba(52, 199, 89, .18);
-  --p-meter-off: rgba(0, 0, 0, .08);
+  --p-bg: #f2f2f4; --p-ink: #1d1d1f; --p-label: #48484c; --p-muted: #6e6e73;
+  --p-accent: #1d1d1f; --p-accent-text: #1d1d1f; --p-green: #8e8e93; --p-green-text: #48484c; --p-red: #b8483e;
+  --p-trace: rgba(60, 60, 67, .3); --p-out: rgba(29, 29, 31, .86); --p-meter: rgba(29, 29, 31, .55); --p-grid: rgba(0, 0, 0, .05);
+  --p-glass: rgba(255, 255, 255, .45); --p-glass-strong: rgba(255, 255, 255, .75);
+  --p-rim: rgba(255, 255, 255, .95); --p-rim-soft: rgba(0, 0, 0, .06); --p-shade: rgba(0, 0, 0, .08);
+  --p-bloom-a: rgba(255, 255, 255, .7); --p-bloom-b: rgba(255, 255, 255, .5); --p-bloom-c: rgba(255, 255, 255, 0);
+  --p-meter-off: rgba(0, 0, 0, .07); --p-on: rgba(0, 0, 0, .08);
 }
 
 html, body { background: var(--page); color: var(--page-ink); }
@@ -69,8 +69,8 @@ header.page p { margin: 0; color: var(--page-muted); max-width: 62ch; line-heigh
   transition: transform .15s, background-color .15s; }
 .key:hover { transform: scale(1.02); }
 .key:active { transform: scale(.97); }
-.key[aria-pressed="true"] { background: var(--p-accent); color: #1c1c1e; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 6px 18px rgba(255, 190, 0, .35); }
-.key:focus-visible, .chip:focus-visible, .sr:focus-visible { outline: 2px solid var(--p-accent, #ffb800); outline-offset: 3px; }
+.key[aria-pressed="true"] { background: var(--p-ink); color: var(--p-bg); box-shadow: 0 4px 12px var(--p-shade); }
+.key:focus-visible, .chip:focus-visible, .sr:focus-visible { outline: 2px solid var(--p-ink, #1d1d1f); outline-offset: 3px; }
 @media (max-width: 640px) { .drawer-body { grid-template-columns: 1fr; } }
 
 .sim { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; color: var(--page-muted); font-size: 14px; }
@@ -152,9 +152,9 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
       <h2>What changes</h2>
       <ul class="notes">
         <li>Every control is glass: it blurs and slightly magnifies the graph behind it, with a bright rim where the light catches the edge. The rim follows your pointer.</li>
-        <li>The header, the two meters and the control deck float over a full-bleed graph instead of sitting in fixed strips. The graph runs under the controls and stays visible through them.</li>
-        <li>Dials are clear glass discs with a coloured value ring and pointer. Ride / Hold is a glass capsule whose selected side is a droplet that slides across.</li>
-        <li>Labels are in sentence case, set like iOS: bold names, lighter values. Accents are the system yellow, green and red.</li>
+        <li>The header and the two meters float over a full-bleed graph. The controls have no box: the graph frosts and fades into the window colour under them, so they sit in the graph itself.</li>
+        <li>Dials are clear glass discs with a light value ring and pointer. Ride / Hold is a glass capsule whose selected side is a droplet that slides across.</li>
+        <li>Neutral and quiet: greys and the window colour only. Target is the solid line, Threshold dashed, Ceiling dotted-grey. The one colour left is a muted red, shown only for clipping and when the ceiling or range holds the gain back.</li>
         <li>Dark by default; the sun / moon switch turns the plugin light. Hold slides a glass sheet out under the window with the live waveform.</li>
       </ul>
     </section>
@@ -170,11 +170,11 @@ const css = (n, el = unit) => getComputedStyle(el).getPropertyValue(n).trim();
 const FONT = css('--font-ui', root);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const C = {};
-const TOKENS = ['p-bg','p-ink','p-label','p-muted','p-accent','p-accent-text','p-green','p-green-text','p-red','p-trace','p-grid','p-glass','p-glass-strong','p-rim','p-rim-soft','p-shade','p-bloom-a','p-bloom-b','p-bloom-c','p-meter-off'];
+const TOKENS = ['p-bg','p-ink','p-label','p-muted','p-accent','p-accent-text','p-green','p-green-text','p-red','p-trace','p-out','p-meter','p-on','p-grid','p-glass','p-glass-strong','p-rim','p-rim-soft','p-shade','p-bloom-a','p-bloom-b','p-bloom-c','p-meter-off'];
 let dark = true;
 function readTokens() {
   TOKENS.forEach(k => C[k.slice(2)] = css('--' + k));
-  const roles = [['bg','Window'],['ink','Values'],['label','Names'],['muted','Scale, hints'],['accent','Target, accent'],['green','Threshold'],['red','Output'],['trace','Input'],['glass','Glass tint'],['rim','Glass rim']];
+  const roles = [['bg','Window'],['ink','Values, Target, rings'],['label','Names'],['muted','Scale, hints'],['out','Output trace'],['trace','Input trace'],['green','Threshold line'],['meter','Meters'],['red','Clipping only'],['glass','Glass tint']];
   document.getElementById('swatches').innerHTML = roles.map(([k, n]) => `<div class="sw"><i style="background:${C[k]}"></i><div><b>${n}</b><span>${C[k]}</span></div></div>`).join('');
 }
 readTokens();
@@ -186,7 +186,7 @@ const fmt = (v, d = 1) => { const s = Math.abs(v).toFixed(d); return (v < 0 && +
 const sgn = (v, d = 1) => (v > 0.05 ? '+' : '') + fmt(v, d);
 const PM = '±';
 const knobs = [
-  { id: 'thr', label: 'Threshold', min: -70, max: -20, x: 290, y: 496, r: 30, val: v => fmt(v) + ' dB', col: 'green' },
+  { id: 'thr', label: 'Threshold', min: -70, max: -20, x: 290, y: 496, r: 30, val: v => fmt(v) + ' dB' },
   { id: 'resp', label: 'Response', min: 0, max: 100, x: 400, y: 496, r: 30, val: v => (v < 34 ? 'Slow ' : v > 66 ? 'Fast ' : 'Medium ') + Math.round(v) },
   { id: 'tgt', label: 'Target', min: -40, max: -6, x: 560, y: 478, r: 44, val: v => fmt(v) + ' dB RMS' },
   { id: 'rng', label: 'Range', min: 0, max: 24, x: 720, y: 496, r: 30, val: v => PM + fmt(v) + ' dB' },
@@ -348,7 +348,7 @@ function drawBackdrop() {
     ctx.strokeStyle = C.trace; ctx.lineWidth = 1.3; ctx.lineJoin = 'round'; ctx.stroke();
     ctx.save();
     ctx.beginPath(); for (let k = 0; k < n; k++) { const y = yOf(hist[k].o); k ? ctx.lineTo(X(k), y) : ctx.moveTo(X(k), y); }
-    ctx.shadowColor = C.red; ctx.shadowBlur = dark ? 10 : 4; ctx.strokeStyle = C.red; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.strokeStyle = C.out; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.stroke();
     ctx.restore();
   }
   if (analyzing) { const span = Math.min(n - 1, anT / dt); ctx.fillStyle = C.accent; ctx.globalAlpha = .08; ctx.fillRect(X(n - 1 - span), GT, span * sx, GB - GT); ctx.globalAlpha = 1; }
@@ -361,7 +361,7 @@ function drawBackdrop() {
   // legend
   const lx = PX1 - 330, ly = 80;
   ctx.fillStyle = C.trace; ctx.fillRect(lx, ly - 1, 16, 2); text('Input', lx + 22, ly, 12, C.muted, 'left');
-  ctx.fillStyle = C.red; ctx.fillRect(lx + 76, ly - 1.5, 16, 3); text('Output', lx + 98, ly, 12, C.muted, 'left');
+  ctx.fillStyle = C.out; ctx.fillRect(lx + 76, ly - 1.5, 16, 3); text('Output', lx + 98, ly, 12, C.muted, 'left');
   text('RMS, last 10 s', PX1 - 22, ly, 12, C.muted, 'right');
 }
 
@@ -369,7 +369,7 @@ function drawMeter(x, pk, hold, isIn) {
   const s = { x, y: MTR.y, w: MTR.w, h: MTR.h, r: MTR.r };
   glass(s, { shadowBlur: 18 });
   const cx = x + MTR.w / 2;
-  text(hold > -RANGE_DB ? fmt(hold) : '−∞', cx, MTR.y + 18, 11.5, hold > -1 ? C.red : hold > -6 ? C['accent-text'] : C.ink, 'center', 600);
+  text(hold > -RANGE_DB ? fmt(hold) : '−∞', cx, MTR.y + 18, 11.5, hold > -1 ? C.red : C.ink, 'center', 600);
   text(isIn ? 'In' : 'Out', cx, MTR.y + 35, 11, C.muted, 'center', 500);
   for (let ch = 0; ch < 2; ch++) {
     const bx = cx - 7 + ch * 9, bw = 5;
@@ -378,8 +378,8 @@ function drawMeter(x, pk, hold, isIn) {
     if (p > -RANGE_DB) {
       const top = yOf(Math.min(0, p));
       const g = ctx.createLinearGradient(0, GB, 0, GT);
-      g.addColorStop(0, C.green); g.addColorStop(1 - 6 / RANGE_DB, C.green); g.addColorStop(1 - 4 / RANGE_DB, C.accent); g.addColorStop(1 - 1 / RANGE_DB, C.accent); g.addColorStop(1, C.red);
-      ctx.save(); ctx.shadowColor = C.green; ctx.shadowBlur = dark ? 8 : 0;
+      g.addColorStop(0, C.meter); g.addColorStop(1 - 1 / RANGE_DB, C.meter); g.addColorStop(1 - 1 / RANGE_DB + .001, C.red); g.addColorStop(1, C.red);
+      ctx.save(); ctx.shadowColor = C.green; ctx.shadowBlur = 0;
       ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(bx, top, bw, GB - top, 2.5); ctx.fill(); ctx.restore();
     }
     if (hold > -RANGE_DB) { ctx.fillStyle = C.ink; ctx.fillRect(bx - 1, yOf(Math.min(0, hold)) - 1, bw + 2, 2); }
@@ -395,7 +395,7 @@ function drawKnob(k) {
   ctx.lineCap = 'round';
   arc(A0, A1, ringR); ctx.strokeStyle = dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)'; ctx.lineWidth = 6; ctx.stroke();
   if (pos > 0.003) {
-    ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = dark ? 10 : 4;
+    ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 0;
     arc(A0, ang, ringR); ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.stroke(); ctx.restore();
   }
   if (k.id === 'tgt' || k.id === 'thr') {
@@ -408,7 +408,7 @@ function drawKnob(k) {
   glass({ circle: true, x, y, r }, { tint: hot ? C['glass-strong'] : C.glass, lens: 1.12, shadowBlur: 16, shadowY: 6 });
   // pointer: a short coloured capsule set into the glass
   const p0 = r * 0.42, p1 = r * 0.78;
-  ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.lineWidth = Math.max(3, r * 0.1); ctx.shadowColor = col; ctx.shadowBlur = dark ? 6 : 0;
+  ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.lineWidth = Math.max(3, r * 0.1); ctx.shadowColor = col; ctx.shadowBlur = 0;
   ctx.beginPath(); ctx.moveTo(x + Math.sin(ang) * p0, y - Math.cos(ang) * p0); ctx.lineTo(x + Math.sin(ang) * p1, y - Math.cos(ang) * p1); ctx.stroke(); ctx.restore();
   if (focusId === k.id) { ctx.beginPath(); ctx.arc(x, y, ringR + 8, 0, 7); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke(); }
   const ly = y + ringR + 16;
@@ -432,8 +432,24 @@ function drawSegment() {
   if (focusId === 'mode') { ctx.beginPath(); ctx.roundRect(SEG.x - 4, SEG.y - 4, SEG.w + 8, SEG.h + 8, 19); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke(); }
 }
 
+const FADE_TOP = DECK.y - 44;
+function drawDeckBlend() {
+  // the blurred graph fades in band by band, then the window colour settles over it: no edge, no box
+  const bands = 16, span = H - FADE_TOP;
+  for (let i = 0; i < bands; i++) {
+    const y0 = FADE_TOP + span * i / bands;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, y0, W, span / bands + 1); ctx.clip();
+    ctx.globalAlpha = Math.min(1, Math.pow((i + 1) / bands, 0.8));
+    ctx.drawImage(blurC, 0, 0, blurC.width, blurC.height, 0, 0, W, H);
+    ctx.restore();
+  }
+  const bg = C.bg.replace('#', ''), rgb = [0, 2, 4].map(i => parseInt(bg.substr(i, 2), 16)).join(',');
+  const f = ctx.createLinearGradient(0, FADE_TOP, 0, H);
+  f.addColorStop(0, `rgba(${rgb},0)`); f.addColorStop(.4, `rgba(${rgb},.62)`); f.addColorStop(1, `rgba(${rgb},.9)`);
+  ctx.fillStyle = f; ctx.fillRect(0, FADE_TOP, W, span);
+}
 function drawDeck() {
-  glass(DECK, { tint: dark ? 'rgba(30,30,36,.32)' : 'rgba(255,255,255,.35)', lens: 1.03, shadowBlur: 30, shadowY: 12 });
+  drawDeckBlend();
   knobs.forEach(drawKnob);
   drawSegment();
   // latency, bottom-left; applied gain, a glass readout bottom-right
@@ -462,9 +478,9 @@ function themeIcon(cx, cy, col) {
 function drawHeader() {
   glass(HEADER, { shadowBlur: 20 });
   // mark: a level held between two walls
-  ctx.fillStyle = C.accent; ctx.beginPath(); ctx.roundRect(30, 22, 20, 3, 1.5); ctx.roundRect(30, 39, 20, 3, 1.5); ctx.fill();
+  ctx.fillStyle = C.ink; ctx.beginPath(); ctx.roundRect(30, 22, 20, 3, 1.5); ctx.roundRect(30, 39, 20, 3, 1.5); ctx.fill();
   ctx.beginPath(); for (let i = 0; i <= 20; i++) { const xx = 30 + i, yy = 32 - Math.sin(i / 20 * 4 * Math.PI) * 4.5 * (1 - i / 28); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
-  ctx.strokeStyle = C.accent; ctx.lineWidth = 1.8; ctx.stroke();
+  ctx.strokeStyle = C.ink; ctx.lineWidth = 1.8; ctx.stroke();
   text('Corridor', 60, 33, 16, C.ink, 'left', 700);
   text('Leveler', 60 + measure('Corridor', 16, 700) + 6, 33, 16, C.muted, 'left', 500);
   // status: a dot and a short sentence, centred
@@ -476,12 +492,12 @@ function drawHeader() {
   btn.theme = [HEADER.x + HEADER.w - 80, 18, 30, 30];
   btn.bypass = [HEADER.x + HEADER.w - 42, 18, 30, 30];
   const e = { x: btn.ease[0], y: 18, w: 140, h: 30, r: 15 };
-  glass(e, { tint: P.ease ? (dark ? 'rgba(255,214,10,.28)' : 'rgba(255,184,0,.35)') : C.glass, shadow: false, lens: 1.08 });
+  glass(e, { tint: P.ease ? C.on : C.glass, shadow: false, lens: 1.08 });
   text('Ease in silence', e.x + e.w / 2, 33.5, 13, P.ease ? C['accent-text'] : (hover === 'ease' ? C.ink : C.label), 'center', 600);
   for (const id of ['theme', 'bypass']) {
     const [bx, by, bw] = btn[id], c = { circle: true, x: bx + bw / 2, y: by + bw / 2, r: bw / 2 };
     const on = id === 'bypass' && P.bypass;
-    glass(c, { tint: on ? (dark ? 'rgba(255,69,58,.35)' : 'rgba(255,59,48,.3)') : C.glass, shadow: false, lens: 1.1 });
+    glass(c, { tint: on ? C.on : C.glass, shadow: false, lens: 1.1 });
     const col = on ? C.ink : hover === id ? C.ink : C.label;
     id === 'bypass' ? powerIcon(c.x, c.y, col) : themeIcon(c.x, c.y, col);
   }
@@ -493,8 +509,8 @@ function drawHeader() {
 function drawTags() {
   const tags = [['ceil', 'Ceiling', C.muted, C.label], ['thr', 'Threshold', C.green, C['green-text']], ['tgt', 'Target', C.accent, C['accent-text']]];
   for (const [id, name, col, colText] of tags) {
-    const lineY = yOf(P[id]), under = lineY > DECK.y - 14 && lineY < DECK.y + DECK.h;
-    const y = under ? DECK.y - 16 : lineY;
+    const lineY = yOf(P[id]), under = lineY > FADE_TOP + 24;
+    const y = under ? FADE_TOP + 22 : lineY;
     const label = name + '  ' + fmt(P[id]), w = measure(label, 12, 600) + (under ? 40 : 28);
     const s = { x: PX0 + 26, y: y - 12, w, h: 24, r: 12 };
     glass(s, { shadow: false, lens: 1.06 });
@@ -505,9 +521,9 @@ function drawTags() {
 }
 
 const STATES = {
-  on: ['On target', 'green'], boost: ['Boosting', 'accent'], cut: ['Cutting', 'accent'], ceiling: ['Held back by the ceiling', 'red'],
+  on: ['On target', 'ink'], boost: ['Boosting', 'label'], cut: ['Cutting', 'label'], ceiling: ['Held back by the ceiling', 'red'],
   range: ['At the edge of the range', 'red'], wait: ['Below the threshold, not adjusting', 'muted'], return: ['Easing back to 0 dB', 'label'],
-  held: ['Holding a fixed gain', 'accent'], analyzing: ['Analyzing', 'accent'],
+  held: ['Holding a fixed gain', 'ink'], analyzing: ['Analyzing', 'ink'],
 };
 function statusText() {
   if (P.bypass) return 'Bypassed';
@@ -523,9 +539,9 @@ function draw() {
   light.x += (lightTarget.x - light.x) * 0.08; light.y += (lightTarget.y - light.y) * 0.08;
   drawBackdrop();
   captureBackdrop();
+  drawDeck();
   drawMeter(12, inPk, inHold, true);
   drawMeter(W - 12 - MTR.w, P.bypass ? inPk : outPk, P.bypass ? inHold : outHold, false);
-  drawDeck();
   drawTags();
   drawHeader();
 }
