@@ -66,7 +66,7 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          $ver = (Select-String -Path CMakeLists.txt -Pattern 'VERSION ([0-9.]+)').Matches[0].Groups[1].Value
+          $ver = (Select-String -Path CMakeLists.txt -Pattern 'project\(CorridorLeveler VERSION ([0-9.]+)').Matches[0].Groups[1].Value
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DSrcDir=$pwd\stage" "/DAppVersion=$ver" installer\corridor.iss
       - uses: actions/upload-artifact@v4
         with:
