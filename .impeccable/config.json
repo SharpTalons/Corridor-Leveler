@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          "prototype/corridor.html"
+        ],
+        "createdAt": "2026-11-05T16:46:18.159Z",
+        "reason": "Claude: detector resolved backgrounds as #ffffff and text as #000000, but the page is a single dark theme with body background var(--ink) #0b0f14 and token text colors; real pairs (e.g. #8b9aa7 on #0b0f14, #e2b04a on #141a21) pass AA"
+      },
+      {
+        "rule": "nested-cards",
+        "value": "*",
+        "files": [
+          "prototype/corridor.html"
+        ],
+        "createdAt": "2026-11-08T03:51:16.600Z",
+        "reason": "Claude: the only bordered, shadowed box inside the plugin window is the help popover (#help), a hidden-by-default overlay positioned over the window, not a nested layout card"
+      }
+    ]
+  }
+}
