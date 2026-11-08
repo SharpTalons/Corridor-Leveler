@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one landscape plugin window. Input meter down the left edge, output meter down the right, and between them a scrolling level graph. 0 to −60 dB is open graph; the control deck sits just below it, blended over the −60 to −90 dB region. Test bench and explanation follow. */
+/* Layout: one landscape plugin window at a fixed 1120 x 630 design size, zoomed to fit. Input meter down the left edge, output meter down the right, and between them a scrolling level graph on one even 0 to −70 dB scale. The controls sit at the bottom, blended over the lower part of the graph. Test bench and explanation follow. */
 :root{
   --bg:#e9e9e4; --fg:#16181b; --muted:#5d636b; --line:#d3d4ce;
   --p-bg:#f4f4f0; --p-surface:#fcfcfa; --p-sunk:#e6e6e0; --p-graph:#eeeee9; --p-ink:#141619; --p-muted:#626870; --p-line:#d6d7d0;
@@ -36,15 +36,14 @@ button,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--p-accent);outline-offset:2px}
 
 /* ================= plugin ================= */
-.pscroll{overflow-x:auto;border-radius:16px}
-.plugin{min-width:960px;aspect-ratio:16/9;display:flex;flex-direction:column;background:var(--p-bg);color:var(--p-ink);border:1px solid var(--p-line);border-radius:16px;box-shadow:var(--p-shadow);overflow:hidden;width:100%}
+.pfit{position:relative;width:100%}
+.plugin{position:absolute;left:0;top:0;width:1120px;height:630px;transform-origin:0 0;display:flex;flex-direction:column;background:var(--p-bg);color:var(--p-ink);border:1px solid var(--p-line);border-radius:16px;box-shadow:var(--p-shadow);overflow:hidden}
 .p-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:9px 14px;border-bottom:1px solid var(--p-line);background:var(--p-surface)}
 .logo{font-family:var(--f-display);font-weight:800;font-size:16px;letter-spacing:.14em;margin-right:auto}
 .tbtn{background:transparent;border:1px solid transparent;border-radius:8px;padding:5px 9px;font-size:13px;font-weight:600;color:var(--p-ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .tbtn:hover{background:var(--p-sunk)}
 .tbtn[aria-expanded="true"],.tbtn[aria-pressed="true"]{background:var(--p-accent-soft);color:var(--p-accent)}
 .tbtn svg{width:16px;height:16px}
-.plugin{position:relative}
 .help{position:absolute;z-index:5;top:46px;left:12px;right:12px;border-radius:12px;border:1px solid var(--p-line);box-shadow:var(--p-shadow);padding:14px 18px;background:var(--p-surface);display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 24px;font-size:13.5px}
 .help b{display:block;font-family:var(--f-display);font-size:14px}
 .help p{margin:0;color:var(--p-muted)}
@@ -56,18 +55,18 @@ button,input{font:inherit;color:inherit}
 .stage{position:relative;min-height:0;min-width:0}
 .stage canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y}
 
-.deck{position:absolute;left:0;right:0;bottom:0;padding:26px 18px 12px;display:flex;flex-direction:column;gap:6px;pointer-events:none;
-  background:linear-gradient(to bottom,color-mix(in srgb,var(--p-graph) 35%,transparent),color-mix(in srgb,var(--p-graph) 80%,transparent) 40%,var(--p-graph) 85%)}
+.deck{position:absolute;left:0;right:0;bottom:0;padding:34px 22px 10px;display:flex;flex-direction:column;gap:6px;pointer-events:none;
+  background:linear-gradient(to bottom,transparent,color-mix(in srgb,var(--p-graph) 55%,transparent) 30%,color-mix(in srgb,var(--p-graph) 78%,transparent) 100%)}
 .deck > *{pointer-events:auto}
 .krow{display:flex;align-items:flex-end;justify-content:space-between;gap:10px 14px;flex-wrap:wrap}
 .kgroup{display:flex;align-items:flex-end;gap:14px}
-.knob{display:flex;flex-direction:column;align-items:center;gap:3px;width:96px}
-.knob.big{width:124px}
+.knob{display:flex;flex-direction:column;align-items:center;gap:2px;width:92px}
+.knob.big{width:118px}
 .knob.small{width:76px}
-.kdial{position:relative;width:84px;height:84px;cursor:ns-resize;touch-action:none;border-radius:50%}
-.knob.big .kdial{width:112px;height:112px}
-.knob.small .kdial{width:58px;height:58px}
-.kdial svg{width:100%;height:100%;overflow:visible;display:block}
+.kdial{position:relative;width:72px;height:72px;cursor:ns-resize;touch-action:none;border-radius:50%}
+.knob.big .kdial{width:96px;height:96px}
+.knob.small .kdial{width:54px;height:54px}
+.kdial svg{width:100%;height:100%;overflow:visible;display:block;filter:drop-shadow(0 6px 10px rgba(0,0,0,.28))}
 .kdial .trk{fill:none;stroke:var(--p-sunk);stroke-width:7;stroke-linecap:round}
 .kdial .val{fill:none;stroke:var(--p-accent);stroke-width:7;stroke-linecap:round}
 .kdial .body{fill:var(--p-surface);stroke:var(--p-line);stroke-width:1.5}
@@ -77,10 +76,10 @@ button,input{font:inherit;color:inherit}
 .kval{display:flex;align-items:baseline;gap:3px;border-radius:6px;padding:2px 8px;cursor:text}
 .kval:hover{background:var(--p-sunk)}
 .kval:focus-within{background:var(--p-sunk);box-shadow:0 0 0 2px var(--p-accent)}
-.kval input{width:5ch;border:0;background:transparent;outline:0;text-align:right;font:600 14px var(--f-mono);font-variant-numeric:tabular-nums;padding:0;color:var(--p-ink)}
+.kval input{text-shadow:0 1px 6px var(--p-graph);width:5ch;border:0;background:transparent;outline:0;text-align:right;font:600 14px var(--f-mono);font-variant-numeric:tabular-nums;padding:0;color:var(--p-ink)}
 .knob.big .kval input{font-size:17px}
 .kval span{font:11px var(--f-mono);color:var(--p-muted)}
-.klab{font-family:var(--f-display);font-weight:700;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase}
+.klab{text-shadow:0 1px 6px var(--p-graph);font-family:var(--f-display);font-weight:700;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase}
 
 .center{display:flex;flex-direction:column;align-items:center;gap:8px;padding-bottom:14px}
 .modes{display:inline-grid;grid-template-columns:1fr 1fr;background:var(--p-sunk);border-radius:999px;padding:3px;border:1px solid var(--p-line)}
@@ -143,7 +142,7 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
     <p>Set a target and Corridor keeps your audio there. Ride mode moves the gain continuously. Hold mode analyzes a section, then locks one fixed correction. The window below runs live on test audio, and you can also play your own file.</p>
   </header>
 
-  <div class="pscroll">
+  <div class="pfit" id="pfit">
   <section class="plugin" id="plugin" data-ptheme="light" aria-label="Plugin window">
     <div class="p-head">
       <div class="logo">CORRIDOR</div>
@@ -647,6 +646,17 @@ function refresh(){
   a.title = P.mode === "hold" ? "" : "Switch to Hold to analyze";
 }
 
+/* ================= window zoom: fixed 1120 x 630 design, scaled to fit ================= */
+const PW = 1120, PH = 630; let SCALE = 1;
+function fitPlugin(){
+  const box = $("#pfit"), w = box.clientWidth, s = Math.min(1, w / PW);
+  SCALE = s; const pl = $("#plugin");
+  pl.style.transform = `translateX(${Math.max(0, (w - PW * s) / 2)}px) scale(${s})`;
+  box.style.height = PH * s + "px";
+}
+try{ new ResizeObserver(fitPlugin).observe($("#pfit")); } catch(e){ addEventListener("resize", fitPlugin); }
+fitPlugin();
+
 /* ================= canvases ================= */
 function colors(){
   const cs = getComputedStyle($("#plugin")), c = {};
@@ -656,31 +666,31 @@ function colors(){
 let C = colors();
 function alpha(hex, a){ const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
 function fitCanvas(cv){
-  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  const W = cv.clientWidth, H = cv.clientHeight, dpr = (window.devicePixelRatio || 1) * Math.max(SCALE, 0.5);
+  const w = Math.round(W * dpr), h = Math.round(H * dpr);
   if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
-  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return [r.width, r.height, ctx];
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return [W, H, ctx];
 }
 const MONO = '"JetBrains Mono", ui-monospace, Consolas, monospace';
-const DB_LO = -90;
-// Shared level scale: 0 to −60 dB fills the open graph down to the top of the control deck;
-// −60 to −90 dB continues behind the blended controls.
-function makeScale(top, split, bottom){
-  const y = v => { const d = clamp(-v, 0, 90); return d <= 60 ? top + d / 60 * (split - top) : split + (d - 60) / 30 * (bottom - split); };
-  const inv = yy => yy <= split ? -clamp((yy - top) / (split - top), 0, 1) * 60 : -(60 + clamp((yy - split) / (bottom - split), 0, 1) * 30);
+const DB_LO = -70;
+// One even scale, 0 to −70 dB, shared by the graph and both meters. The controls blend over its lower part.
+function makeScale(top, bottom){
+  const y = v => top + clamp(-v, 0, 70) / 70 * (bottom - top);
+  const inv = yy => -clamp((yy - top) / (bottom - top), 0, 1) * 70;
   return { y, inv };
 }
-const TICKS = [0, -6, -12, -18, -24, -30, -36, -42, -48, -54, -60, -72, -84];
+const TICKS = [0, -6, -12, -18, -24, -30, -36, -42, -48, -54, -60, -66];
+const LANE = 48, GTOP = LANE + 22;
 
 /* ---------- main graph ---------- */
 let GL = null, gDrag = null, gHover = null;
 function drawGraph(){
   const cv = $("#graph"), [W, H, g] = fitCanvas(cv);
   g.clearRect(0, 0, W, H);
-  const lane = 66, top = lane + 26, scaleW = 34;
-  const bottom = H - $("#deck").offsetHeight;
+  const lane = LANE, top = GTOP, scaleW = 34;
+  const bottom = H - 6;
   const x0 = 0, x1 = W - scaleW, w = x1 - x0;
-  const sc = makeScale(top, bottom, H - 4), y = sc.y;
+  const sc = makeScale(top, bottom), y = sc.y;
   GL = { y, inv:sc.inv, top, bottom, x1 };
   // grid + scale
   g.font = `10.5px ${MONO}`; g.textBaseline = "middle"; g.textAlign = "right";
@@ -722,10 +732,10 @@ function drawGraph(){
     for (let k = 0; k < n; k++) if (hist[k].r < -0.2){ g.fillStyle = C.limit; g.fillRect(X(k) - sx / 2, 8 + lane - 4, Math.max(1.5, sx), 4); }
   }
   g.font = `600 10.5px ${MONO}`; g.textAlign = "left"; g.fillStyle = C.muted;
-  g.fillText(`GAIN  ±${fmt(Rg, 0)} dB range`, 10, 18);
+  g.fillText(`GAIN  ±${fmt(Rg, 0)} dB`, 10, 18);
   g.textAlign = "right"; g.fillText("+" + fmt(Rg, 0), W - 5, yG(Rg) + 1); g.fillText("−" + fmt(Rg, 0), W - 5, yG(-Rg) - 1);
   g.fillText("0", W - 5, mid);
-  g.textAlign = "left"; g.fillStyle = C.limit; g.fillText("limiter", 10, 8 + lane - 10);
+  
   // analyze shading (Hold)
   const an = engine.lev.an;
   if (an && n > 1){ const span = Math.min(n - 1, Math.round(an.t * 50)); g.fillStyle = alpha(C.accent, 0.08); g.fillRect(X(n - 1 - span), top, X(n - 1) - X(n - 1 - span), bottom - top); }
@@ -737,9 +747,9 @@ function graphHit(y){
   return best;
 }
 const gcv = $("#graph");
-const gpos = e => { const r = gcv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+const gpos = e => { const r = gcv.getBoundingClientRect(); return [(e.clientX - r.left) / SCALE, (e.clientY - r.top) / SCALE]; };
 const gVal = y => GL.inv(y);
-gcv.addEventListener("touchstart", e => { const r = gcv.getBoundingClientRect(); if (graphHit(e.touches[0].clientY - r.top)) e.preventDefault(); }, { passive:false });
+gcv.addEventListener("touchstart", e => { const r = gcv.getBoundingClientRect(); if (graphHit((e.touches[0].clientY - r.top) / SCALE)) e.preventDefault(); }, { passive:false });
 gcv.addEventListener("pointerdown", e => { const [, y] = gpos(e), h = graphHit(y); if (h){ gDrag = h; gcv.setPointerCapture(e.pointerId); } });
 gcv.addEventListener("pointermove", e => { const [, y] = gpos(e); if (gDrag){ setParam(gDrag, gVal(y)); return; } gHover = graphHit(y); gcv.style.cursor = gHover ? "ns-resize" : "default"; });
 gcv.addEventListener("pointerup", () => gDrag = null); gcv.addEventListener("pointercancel", () => gDrag = null);
@@ -749,8 +759,8 @@ gcv.addEventListener("pointerleave", () => { if (!gDrag) gHover = null; });
 function drawMeter(id, m, side){
   const cv = $(id), [W, H, g] = fitCanvas(cv);
   g.clearRect(0, 0, W, H);
-  const top = 92, bot = H - 4, narrow = W < 44;   // same 0 dB line as the graph
-  const y = makeScale(top, H - $("#deck").offsetHeight, bot).y;
+  const top = GTOP, bot = H - 6, narrow = W < 44;   // same scale as the graph
+  const y = makeScale(top, bot).y;
   const bw = narrow ? 10 : 12, bx = side === "in" ? W - bw - 6 : 6;
   g.fillStyle = C.sunk; g.fillRect(bx, top, bw, bot - top);
   const v = m.Pk;
@@ -762,11 +772,11 @@ function drawMeter(id, m, side){
   g.font = `10px ${MONO}`; g.textBaseline = "middle"; g.fillStyle = C.muted;
   if (!narrow){
     g.textAlign = side === "in" ? "right" : "left";
-    for (const t of [0, -12, -24, -36, -48, -60, -72, -84]) g.fillText(t === 0 ? "0" : fmt(t, 0), side === "in" ? bx - 4 : bx + bw + 4, y(t));
+    for (const t of [0, -12, -24, -36, -48, -60]) g.fillText(t === 0 ? "0" : fmt(t, 0), side === "in" ? bx - 4 : bx + bw + 4, y(t));
   }
   g.textAlign = "center"; g.font = `600 10.5px ${MONO}`; g.fillStyle = m.H > -0.1 ? C.limit : C.ink;
-  g.fillText(m.H > DB_LO ? fmt(m.H, 1) : "—", W / 2, 11);
-  g.font = `10px ${MONO}`; g.fillStyle = C.muted; g.fillText(side === "in" ? "IN" : "OUT", W / 2, 25);
+  g.fillText(m.H > DB_LO ? fmt(m.H, 1) : "—", W / 2, 20);
+  g.font = `10px ${MONO}`; g.fillStyle = C.muted; g.fillText(side === "in" ? "IN" : "OUT", W / 2, 36);
 }
 ["#mIn", "#mOut"].forEach(id => $(id).addEventListener("click", () => { engine.inM.H = engine.outM.H = -120; }));
 
