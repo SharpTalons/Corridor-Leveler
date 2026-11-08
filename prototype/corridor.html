@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Corridor Leveler</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -58,7 +59,7 @@ button,input{font:inherit;color:inherit}
 .deck{position:absolute;left:0;right:0;bottom:0;padding:34px 22px 10px;display:flex;flex-direction:column;gap:6px;pointer-events:none;
   background:linear-gradient(to bottom,transparent,color-mix(in srgb,var(--p-graph) 55%,transparent) 30%,color-mix(in srgb,var(--p-graph) 78%,transparent) 100%)}
 .deck > *{pointer-events:auto}
-.krow{display:flex;align-items:flex-end;justify-content:space-between;gap:10px 14px;flex-wrap:wrap}
+.krow{display:flex;align-items:flex-end;justify-content:center;gap:10px 44px;flex-wrap:wrap}
 .kgroup{display:flex;align-items:flex-end;gap:14px}
 .knob{display:flex;flex-direction:column;align-items:center;gap:2px;width:92px}
 .knob.big{width:118px}
@@ -89,7 +90,7 @@ button,input{font:inherit;color:inherit}
 .analyze:hover{border-color:var(--p-accent);color:var(--p-accent)}
 .analyze.busy{color:var(--p-accent);border-color:var(--p-accent)}
 .analyze i{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--p-accent)}
-.applied{display:flex;flex-direction:column;align-items:flex-end;padding-bottom:10px;min-width:118px}
+.applied{display:flex;flex-direction:column;align-items:center;padding-bottom:10px;min-width:110px}
 .applied .gnum{font-family:var(--f-display);font-weight:800;font-size:30px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
 .applied .gnum.up{color:var(--p-boost)} .applied .gnum.down{color:var(--p-cut)}
 .applied .glab{font-family:var(--f-display);font-weight:700;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
@@ -139,7 +140,7 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
   <header class="intro">
     <h1>Corridor Leveler</h1>
     <div class="sub">Interactive prototype · Windows VST3 plugin for OBS and DAWs</div>
-    <p>Set a target and Corridor keeps your audio there. Ride mode moves the gain continuously. Hold mode analyzes a section, then locks one fixed correction. The window below runs live on test audio, and you can also play your own file.</p>
+    <p>Set a target and Corridor keeps your audio there, whether it's a voice, a full mix or drums. Ride mode moves the gain continuously. Hold mode analyzes a section, then locks one fixed correction. The window below runs live on test audio, and you can also play your own file.</p>
   </header>
 
   <div class="pfit" id="pfit">
@@ -154,7 +155,7 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
     <div class="help" id="help" hidden>
       <div><b>Target</b><p>The RMS level you want. Also drag the TARGET line on the graph.</p></div>
       <div><b>Threshold</b><p>Below this RMS level it stops adjusting, so silence, breaths and noise never trigger a boost.</p></div>
-      <div><b>Response</b><p>Slow gives smooth, gradual changes. Fast reacts quickly to sudden jumps.</p></div>
+      <div><b>Response</b><p>Slow gives smooth, gradual changes. Fast reacts quickly to sudden jumps. On drums it follows the groove rather than single hits.</p></div>
       <div><b>Range</b><p>The most it may boost or cut, in either direction.</p></div>
       <div><b>Ceiling</b><p>The highest peak level the output may reach. A look-ahead limiter catches stray peaks.</p></div>
       <div><b>The graph</b><p>Grey is the input RMS, the coloured line is the output RMS. The lane along the top shows the gain applied.</p></div>
@@ -172,7 +173,7 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
                 <button role="radio" id="modeRide" type="button">Ride</button>
                 <button role="radio" id="modeHold" type="button">Hold</button>
               </div>
-              <button class="analyze" id="analyze" type="button" disabled><span id="anLab">Analyze</span><i id="anProg"></i></button>
+              <button class="analyze" id="analyze" type="button" hidden><span id="anLab">Analyze</span><i id="anProg"></i></button>
             </div>
             <div class="kgroup" id="kRight"></div>
             <div class="applied"><span class="gnum" id="gNum">+0.0</span><span class="glab">Gain · dB</span></div>
@@ -196,15 +197,24 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
     <div class="field">
       <div class="top"><span class="flab">Situations · click to jump</span><span class="now" id="evNow"></span></div>
       <div class="sits" id="sits"></div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn" id="scriptBtn" type="button">⏸ Pause script</button><span class="now">While paused, the speaker talks steadily.</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn" id="scriptBtn" type="button">⏸ Pause script</button><span class="now">While paused, the source plays steadily.</span></div>
+    </div>
+    <div class="field micbox" id="micBox" hidden>
+      <span class="flab">Microphone</span>
+      <p class="now" id="micMsg" style="margin:0"></p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn" id="monBtn" type="button" aria-pressed="false">Hear the result (headphones)</button>
+        <button class="btn primary" id="saveBtn" type="button" hidden>Save this page to open locally</button>
+      </div>
+      <p class="now" id="saveNote" hidden style="margin:0">The same file is in the repository at prototype/corridor.html.</p>
     </div>
     <div class="bgrid">
       <div class="field"><span class="flab">Test audio</span><div class="seg" id="segMat"></div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><label class="btn" for="file">Choose audio file…<input type="file" id="file" accept="audio/*"></label><span class="file-name" id="fileName">No file loaded</span></div></div>
       <div class="field"><span class="flab">Make something happen</span>
-        <div style="display:flex;flex-wrap:wrap;gap:6px"><button class="btn" id="evShout" type="button">Shout</button><button class="btn" id="evQuiet" type="button">Lean back</button><button class="btn" id="evSilent" type="button">Stop talking</button></div></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px"><button class="btn" id="evShout" type="button">Loud burst</button><button class="btn" id="evQuiet" type="button">Go quiet</button><button class="btn" id="evSilent" type="button">Silence</button></div></div>
       <div class="field">
-        <div class="top"><label class="flab" for="talk">Speaker level</label><span class="mono" id="talkV">0 dB</span></div><input type="range" id="talk" min="-20" max="16" step="1" value="0">
+        <div class="top"><label class="flab" for="talk">Source level</label><span class="mono" id="talkV">0 dB</span></div><input type="range" id="talk" min="-20" max="16" step="1" value="0">
         <div class="top"><label class="flab" for="noise">Background noise</label><span class="mono" id="noiseV">−58 LUFS</span></div><input type="range" id="noise" min="-75" max="-30" step="1" value="-58"></div>
       <div class="field"><div class="top"><label class="flab" for="vol">Speaker volume</label><span class="mono" id="volV">40%</span></div><input type="range" id="vol" min="0" max="100" step="1" value="40"></div>
     </div>
@@ -213,11 +223,11 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
   <section class="how">
     <h2>How it works</h2>
     <div><h3>Two modes</h3><p><b>Ride</b> moves the gain all the time, like a hand riding a fader. Use it for voices and anything whose level keeps changing. <b>Hold</b> measures a typical section when you press Analyze, works out one correction, and locks it. Use it for steady material.</p></div>
-    <div><h3>Measuring</h3><p>The level it corrects is measured as <b>RMS</b>, the average power over 300 ms. The meters on both edges show <b>peak level in dBFS</b>: input on the left, output on the right.</p></div>
+    <div><h3>Measuring</h3><p>The level it corrects is measured as <b>RMS</b>, the average power over a stretch set by Response. The meters on both edges show <b>peak level in dBFS</b>: input on the left, output on the right.</p></div>
     <div><h3>Five controls</h3><ul>
       <li><b>Target</b>: the RMS level you want.</li>
       <li><b>Threshold</b>: below this it stops adjusting.</li>
-      <li><b>Response</b>: slow and smooth, or fast and responsive.</li>
+      <li><b>Response</b>: slow and smooth, or fast and responsive. It sets how long a stretch of sound is averaged: 1.5 s at the slow end, 0.3 s at the fast end. When the material is percussive, like drums, it averages at least 0.8 s, so the gain rides the groove instead of pumping on every hit. Within 0.75 dB of the target it holds still.</li>
       <li><b>Range</b>: the most it may boost or cut.</li>
       <li><b>Ceiling</b>: the highest peak the output may reach. A look-ahead brick-wall limiter catches stray peaks.</li></ul></div>
   </section>
@@ -225,6 +235,8 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
 
 <script>
 "use strict";
+// Snapshot of the untouched page, taken before any script changes it, so it can be saved and opened locally.
+const PAGE_SRC = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>' + document.body.innerHTML + "</body></html>";
 /* ================= helpers ================= */
 const $ = s => document.querySelector(s);
 const K20 = Math.LN10 / 20;
@@ -240,7 +252,7 @@ const fmt = (v, dec = 1, signed = false) => { const t = Math.abs(v).toFixed(dec)
 // Leveling is measured as RMS (dBFS, 300 ms). Meters show peak dBFS.
 const DEFAULTS = { target:-20, threshold:-48, response:50, range:12, ceiling:-1, mode:"ride" };
 const P = Object.assign({}, DEFAULTS);
-const B = { material:"mic", script:true, talk:0, noise:-58, source:"sim", bypass:false };
+const B = { material:"mic", script:true, talk:0, noise:-58, source:"sim", bypass:false, monitor:false };
 const LIM_RELEASE = 80; // fixed internal limiter release (ms)
 const SPEC = {
   target:    { label:"Target",    min:-40, max:-6,  step:0.5, dec:1, unit:"dB RMS", big:true, live:"out" },
@@ -302,7 +314,7 @@ class Meter{
 class Leveler{
   constructor(){
     this.N = 300; this.r = new Float32Array(300); this.p = new Float32Array(300); this.act = new Uint8Array(300); this.i = 0;
-    this.g = 0; this.state = "waiting"; this.activeT = 0; this.L = null; this.sl = -120; this.pk1 = -120;
+    this.g = 0; this.state = "waiting"; this.activeT = 0; this.L = null; this.sl = -120; this.pk1 = -120; this.crest = 10; this.perc = false;
     this.holdG = null; this.holdInfo = null; this.an = null;
   }
   block(m){
@@ -310,12 +322,19 @@ class Leveler{
     this.r[i] = m.bR; this.p[i] = m.bP;
     const sl = m.R, active = sl >= P.threshold;
     this.act[i] = active ? 1 : 0; this.sl = sl;
-    // gated RMS over 300 ms: only blocks above the threshold count
-    let s = 0, c = 0;
-    for (let k = 0; k < 30; k++){ const j = (i - k + N) % N; if (this.act[j]){ c++; s += this.r[j]; } }
-    this.L = c >= 10 ? msDB(s / c) : null;
     let pk = 0; for (let k = 0; k < 100; k++){ const v = this.p[(i - k + N) % N]; if (v > pk) pk = v; }
-    this.pk1 = toDB(pk); this.i = (i + 1) % N;
+    this.pk1 = toDB(pk);
+    // Crest factor (peak over RMS, smoothed over ~1 s) tells percussive material such as drums from voice.
+    if (active) this.crest += ((this.pk1 - sl) - this.crest) * 0.01;
+    this.perc = this.crest > 14;
+    // Response sets the RMS window: slow = 1.5 s, fast = 0.3 s. Percussive material gets at least 0.8 s,
+    // so the gain follows the groove rather than each hit (no pumping on kicks and snares).
+    let win = Math.round(150 - 1.2 * P.response);
+    if (this.perc) win = Math.max(win, 80);
+    let s = 0, c = 0;
+    for (let k = 0; k < win; k++){ const j = (i - k + N) % N; if (this.act[j]){ c++; s += this.r[j]; } }
+    this.L = c >= Math.min(10, win) ? msDB(s / c) : null;
+    this.i = (i + 1) % N;
 
     if (this.an){
       this.an.t += 0.01;
@@ -335,9 +354,10 @@ class Leveler{
       if (L === null || this.activeT < 0.15) st = "waiting";
       else {
         const out = L + g, d = Math.abs(out - P.target);
-        target = P.target - L;
-        rate = clamp(1.5 + 0.8 * d, 1.5, 12) * sc;
-        st = d < 0.5 ? "on" : out < P.target ? "boosting" : "cutting";
+        // within 0.75 dB of the target it holds still, so it never fidgets
+        target = d < 0.75 ? g : P.target - L;
+        rate = clamp(1.5 + 0.8 * d, 1.5, 12) * sc * (this.perc ? 0.7 : 1);
+        st = d < 0.75 ? "on" : out < P.target ? "boosting" : "cutting";
       }
       const gC = P.ceiling - this.pk1;
       if (target > gC){ target = gC; if (st === "boosting" || st === "on" || g > gC + 0.1) st = "ceiling"; if (g > gC) rate = Math.max(rate, 30); }
@@ -430,7 +450,39 @@ class Bed{ // stands in for game audio / music
     return s;
   }
 }
+class Drums{ // a simple 100 BPM kit: kick, snare, hats
+  constructor(fs, seed){
+    this.fs = fs; this.r = rng(seed); this.step = 0; this.t = 1; this.stepLen = Math.round(fs * 60 / 100 / 4);
+    this.kE = 0; this.kP = 0; this.kF = 0; this.sE = 0; this.sT = 0; this.hE = 0; this.prev = 0;
+    this.kD = Math.exp(-1 / (0.22 * fs)); this.kFD = Math.exp(-1 / (0.04 * fs)); this.sD = Math.exp(-1 / (0.12 * fs)); this.hD = Math.exp(-1 / (0.035 * fs));
+    this.bp = new Biquad(bandpass(fs, Math.min(1800, fs * 0.4), 0.8));
+  }
+  trig(){
+    const st = this.step % 16, r = this.r;
+    if (st === 0 || st === 8 || (st === 10 && r() < 0.5)){ this.kE = 0.9 + 0.1 * r(); this.kF = 1; }
+    if (st === 4 || st === 12) this.sE = 0.8 + 0.2 * r();
+    if (st === 15 && r() < 0.35) this.sE = 0.35;
+    if (st % 2 === 0 || r() < 0.3) this.hE = (st % 4 === 2 ? 0.5 : 0.3) * (0.7 + 0.3 * r());
+    this.step++;
+  }
+  next(){
+    if (--this.t <= 0){ this.t = this.stepLen; this.trig(); }
+    const fs = this.fs, n = this.r() * 2 - 1;
+    this.kF *= this.kFD; this.kE *= this.kD; this.kP += (48 + 110 * this.kF) / fs; if (this.kP > 1) this.kP -= 1;
+    this.sE *= this.sD; this.sT += 190 / fs; if (this.sT > 1) this.sT -= 1;
+    this.hE *= this.hD; const hp = n - this.prev; this.prev = n;
+    return Math.sin(2 * Math.PI * this.kP) * this.kE * 0.9 + (this.bp.run(n) * 1.6 + 0.5 * Math.sin(2 * Math.PI * this.sT)) * this.sE * 0.7 + hp * 0.35 * this.hE;
+  }
+}
 const SCRIPTS = {
+  drums: [
+    { d:8,   v:-20, label:"Steady groove" },
+    { d:6,   v:-30, label:"Soft verse, lighter playing" },
+    { d:2,   v:-12, label:"Loud fill" },
+    { d:6,   v:-20, label:"Steady groove" },
+    { d:4,   v:null, label:"Band stops: room noise only" },
+    { d:6,   v:-25, label:"Lighter groove" }
+  ],
   mic: [
     { d:6,   v:-21, label:"Normal talking" },
     { d:2.5, v:null, label:"Pause: room noise only" },
@@ -453,13 +505,13 @@ const SCRIPTS = {
 const calCache = {};
 function calibrate(fs){
   if (calCache[fs]) return calCache[fs];
-  const v = new Voice(fs, 7), b = new Bed(fs, 11), p = new Pink(3);
-  return calCache[fs] = { v: measureLUFS(() => v.next(), fs, 8), b: measureLUFS(() => b.next(), fs, 8), n: measureLUFS(() => p.next(), fs, 4) };
+  const v = new Voice(fs, 7), b = new Bed(fs, 11), p = new Pink(3), d = new Drums(fs, 21);
+  return calCache[fs] = { v: measureLUFS(() => v.next(), fs, 8), b: measureLUFS(() => b.next(), fs, 8), n: measureLUFS(() => p.next(), fs, 4), d: measureLUFS(() => d.next(), fs, 8) };
 }
 class Sim{
   constructor(fs){
     this.fs = fs; this.cal = calibrate(fs);
-    this.voice = new Voice(fs, 7); this.bed = new Bed(fs, 11); this.pink = new Pink(3);
+    this.voice = new Voice(fs, 7); this.bed = new Bed(fs, 11); this.pink = new Pink(3); this.drums = new Drums(fs, 21);
     this.segIdx = 0; this.segT = 0; this.ev = null; this.cnt = 0;
     this.cV = -100; this.cB = -100; this.gV = 0; this.gB = 0; this.gN = 0; this.k = 1 - Math.exp(-32 / (0.05 * fs));
     this.label = "";
@@ -474,23 +526,23 @@ class Sim{
     const baseB = B.script ? s.b : -32;
     if (this.ev){ v = this.ev.v; b = this.ev.keepBed ? baseB : null; label = this.ev.label; }
     else if (B.script){ v = s.v; b = s.b; label = s.label; }
-    else { v = -22; b = -32; label = B.material === "mix" ? "Steady talking over game audio" : "Steady talking"; }
-    if (B.material === "mic") b = null;
+    else { v = -22; b = -32; label = B.material === "mix" ? "Steady talking over game audio" : B.material === "drums" ? "Steady groove" : "Steady talking"; }
+    if (B.material !== "mix") b = null;
     this.label = label;
     const tV = v == null ? -100 : v + B.talk, tB = b == null ? -100 : b;
     this.cV += (tV - this.cV) * this.k; this.cB += (tB - this.cB) * this.k;
-    this.gV = this.cV < -95 ? 0 : fromDB(this.cV - this.cal.v);
+    this.gV = this.cV < -95 ? 0 : fromDB(this.cV - (B.material === "drums" ? this.cal.d : this.cal.v));
     this.gB = this.cB < -95 ? 0 : fromDB(this.cB - this.cal.b);
     this.gN = fromDB(B.noise - this.cal.n);
   }
   next(){
     if ((this.cnt++ & 31) === 0) this.update();
-    return this.voice.next() * this.gV + this.bed.next() * this.gB + this.pink.next() * this.gN;
+    return (B.material === "drums" ? this.drums.next() : this.voice.next()) * this.gV + this.bed.next() * this.gB + this.pink.next() * this.gN;
   }
   event(type){
-    if (type === "shout") this.ev = { t:1.5, v:-11, keepBed:true, label:"Shout (your event)" };
-    if (type === "quiet") this.ev = { t:5, v:-34, keepBed:true, label:"Leaning back (your event)" };
-    if (type === "silent") this.ev = { t:6, v:null, keepBed:false, label:"Nobody talking, only noise (your event)" };
+    if (type === "shout") this.ev = { t:1.5, v:-11, keepBed:true, label:"Sudden loud burst (your event)" };
+    if (type === "quiet") this.ev = { t:5, v:-34, keepBed:true, label:"Much quieter (your event)" };
+    if (type === "silent") this.ev = { t:6, v:null, keepBed:false, label:"Silence, only room noise (your event)" };
     if (type === "talk") this.ev = { t:4, v:-21, keepBed:true, label:"Talking normally (for measuring)" };
   }
 }
@@ -508,10 +560,10 @@ class Engine{
     this.lev = new Leveler(); this.lim = new Limiter(fs); this.lim.setup();
     this.gCur = 0; this.gInc = 0; this.blocks = 0; this.inG = 1;
   }
-  render(out, n){
-    const file = B.source === "file" ? fileSrc : null;
+  render(out, n, inp){
+    const file = B.source === "file" ? fileSrc : null, mic = B.source === "mic";
     for (let s = 0; s < n; s++){
-      const x = file ? file.next(this.fs) * this.inG : this.sim.next();
+      const x = mic ? (inp ? inp[s] * this.inG : 0) : file ? file.next(this.fs) * this.inG : this.sim.next();
       if (this.inM.push(x)){
         this.lev.block(this.inM);
         this.gInc = (this.lev.g - this.gCur) / this.inM.sub;
@@ -550,8 +602,34 @@ async function startAudio(){
 function stopAudio(){
   running = false;
   try{ node && node.disconnect(); actx && actx.close(); } catch(e){}
+  if (micStream){ micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   node = null; actx = null; swapEngine(24000); setListen(false);
+  if (B.source === "mic"){ B.source = "sim"; $("#micMsg").textContent = "Microphone off."; benchSeg(); }
 }
+/* ---------- microphone: speak straight into the plugin ---------- */
+let micStream = null, dl = null;
+const inFrame = (() => { try{ return window.top !== window.self; } catch(e){ return true; } })();
+const FRAME_MSG = "This hosted page isn't allowed to use your microphone. Save the page with the button below, open the saved file in Chrome or Edge, and pick Microphone there. The browser will then ask for permission.";
+async function startMic(){
+  const msg = $("#micMsg"); $("#micBox").hidden = false;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ msg.textContent = inFrame ? FRAME_MSG : "This browser can't open a microphone. Try Chrome or Edge."; showSave(); return; }
+  msg.textContent = "Asking the browser for your microphone…";
+  let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } }); }
+  catch(e){ msg.textContent = inFrame ? FRAME_MSG : "Microphone access was blocked. Allow it from the icon in the address bar, then press Microphone again."; showSave(); return; }
+  if (running) stopAudio();
+  micStream = stream;
+  try{ actx = new (window.AudioContext || window.webkitAudioContext)(); await actx.resume(); } catch(e){ msg.textContent = "The browser couldn't start audio."; return; }
+  swapEngine(actx.sampleRate);
+  const src = actx.createMediaStreamSource(micStream);
+  node = actx.createScriptProcessor(2048, 1, 2); vol = actx.createGain(); vol.gain.value = volume();
+  node.onaudioprocess = e => { const I = e.inputBuffer.getChannelData(0), L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1); engine.render(L, L.length, I); if (!B.monitor) L.fill(0); R.set(L); };
+  src.connect(node); node.connect(vol); vol.connect(actx.destination);
+  running = true; B.source = "mic"; setListen(true); benchSeg();
+  msg.textContent = "Microphone on. Talk, pause, get loud, and watch the plugin react. Turn on Hear the result only with headphones, or you'll get feedback.";
+}
+function showSave(){ $("#saveBtn").hidden = !dl; $("#saveNote").hidden = false; }
+(async () => { try{ dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch(e){ dl = null; } })();
 function volume(){ const v = +$("#vol").value / 100; return v * v; }
 function setListen(on){ const b = $("#listen"); b.setAttribute("aria-pressed", on); b.textContent = on ? "■ Stop" : "▶ Listen"; }
 
@@ -642,8 +720,7 @@ function refresh(){
   for (const k in knobs) knobs[k].draw();
   $("#modeRide").setAttribute("aria-checked", String(P.mode === "ride"));
   $("#modeHold").setAttribute("aria-checked", String(P.mode === "hold"));
-  const a = $("#analyze"); a.disabled = P.mode !== "hold";
-  a.title = P.mode === "hold" ? "" : "Switch to Hold to analyze";
+  $("#analyze").hidden = P.mode !== "hold";
 }
 
 /* ================= window zoom: fixed 1120 x 630 design, scaled to fit ================= */
@@ -785,10 +862,12 @@ function drawMeter(id, m, side){
 /* ================= test bench ================= */
 function benchSeg(){
   const box = $("#segMat"); box.textContent = "";
-  [["mic", "Voice"], ["mix", "Stream mix"], ["file", "My file"]].forEach(([v, label]) => {
+  [["mic", "Voice"], ["drums", "Drums"], ["mix", "Stream mix"], ["file", "My file"], ["live", "Microphone"]].forEach(([v, label]) => {
     const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.id = "mat-" + v;
-    b.setAttribute("aria-pressed", String(v === "file" ? B.source === "file" : B.source === "sim" && B.material === v));
+    b.setAttribute("aria-pressed", String(v === "file" ? B.source === "file" : v === "live" ? B.source === "mic" : B.source === "sim" && B.material === v));
     b.addEventListener("click", () => {
+      if (v === "live"){ if (B.source !== "mic") startMic(); return; }
+      if (B.source === "mic") stopAudio();
       if (v === "file"){ B.source = "file"; if (!fileSrc) $("#fileName").textContent = "Choose a file. Until then you'll hear silence."; }
       else { B.source = "sim"; B.material = v; engine.sim.segIdx = 0; engine.sim.segT = 0; engine.sim.ev = null; buildSits(); }
       benchSeg();
@@ -807,6 +886,11 @@ function buildSits(){
 }
 function toggleScript(){ B.script = !B.script; $("#scriptBtn").textContent = B.script ? "⏸ Pause script" : "▶ Resume script"; }
 $("#scriptBtn").addEventListener("click", toggleScript);
+$("#monBtn").addEventListener("click", e => { B.monitor = !B.monitor; e.currentTarget.setAttribute("aria-pressed", String(B.monitor)); });
+$("#saveBtn").addEventListener("click", async () => {
+  try{ await dl.save({ filename:"corridor-leveler.html", data:PAGE_SRC }); $("#micMsg").textContent = "Saved. Open corridor-leveler.html in Chrome or Edge, pick Microphone in the test bench, and allow access."; }
+  catch(e){ if (e && e.code !== "declined") $("#micMsg").textContent = "Saving isn't available here. Use prototype/corridor.html from the repository instead."; }
+});
 $("#listen").addEventListener("click", () => running ? stopAudio() : startAudio());
 $("#bypass").addEventListener("click", e => { B.bypass = !B.bypass; e.currentTarget.setAttribute("aria-pressed", String(B.bypass)); });
 $("#evShout").addEventListener("click", () => engine.sim.event("shout"));
@@ -840,7 +924,7 @@ function sentence(){
     return `Holding ${d(lev.holdG ?? 0)} dB. Play a typical section and press Analyze.`;
   }
   switch (lev.state){
-    case "on":       return `On target: ${r(L + g)} dB RMS with ${d(g)} dB applied.`;
+    case "on":       return `On target: ${r(L + g)} dB RMS with ${d(g)} dB applied.` + (lev.perc ? " Percussive material: following the groove, not single hits." : "");
     case "boosting": return `Coming in at ${r(L)} dB RMS, below the ${r(P.target)} target. Lifting it (${d(g)} dB so far).`;
     case "cutting":  return `Coming in at ${r(L)} dB RMS, above the ${r(P.target)} target. Lowering it (${d(g)} dB so far).`;
     case "ceiling":  return `More boost would push peaks past the ${r(P.ceiling)} dBFS ceiling. Held at ${d(g)} dB.`;
@@ -860,7 +944,7 @@ function updateUI(t){
   $("#anProg").style.width = lev.an ? (Math.min(1, lev.an.t / 20) * 100).toFixed(1) + "%" : "0";
   const sim = engine.sim, onFile = B.source === "file";
   document.querySelectorAll("#sits button").forEach((b, i) => b.setAttribute("aria-current", String(!onFile && !sim.ev && B.script && i === sim.segIdx)));
-  $("#evNow").textContent = onFile ? "Playing: " + (fileSrc ? fileSrc.name : "no file loaded") : "Now: " + sim.label;
+  $("#evNow").textContent = B.source === "mic" ? "Live microphone" : onFile ? "Playing: " + (fileSrc ? fileSrc.name : "no file loaded") : "Now: " + sim.label;
 }
 
 /* ================= header tools ================= */
