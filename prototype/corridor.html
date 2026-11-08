@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one plugin window. Input meter down the left edge, output meter down the right, and between them a scrolling level graph that fills the window. The knob deck floats over the lower part of the graph. Expand adds a spectrum panel below. Test bench and explanation follow. */
+/* Layout: one plugin window. Input meter down the left edge, output meter down the right, and between them a scrolling level graph that fills the window. The knob deck floats over the lower part of the graph. Test bench and explanation follow. */
 :root{
   --bg:#e9e9e4; --fg:#16181b; --muted:#5d636b; --line:#d3d4ce;
   --p-bg:#f4f4f0; --p-surface:#fcfcfa; --p-sunk:#e6e6e0; --p-graph:#eeeee9; --p-ink:#141619; --p-muted:#626870; --p-line:#d6d7d0;
@@ -36,22 +36,24 @@ button,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--p-accent);outline-offset:2px}
 
 /* ================= plugin ================= */
-.plugin{background:var(--p-bg);color:var(--p-ink);border:1px solid var(--p-line);border-radius:16px;box-shadow:var(--p-shadow);overflow:hidden;width:100%}
+.pscroll{overflow-x:auto;border-radius:16px}
+.plugin{min-width:960px;aspect-ratio:16/9;display:flex;flex-direction:column;background:var(--p-bg);color:var(--p-ink);border:1px solid var(--p-line);border-radius:16px;box-shadow:var(--p-shadow);overflow:hidden;width:100%}
 .p-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:9px 14px;border-bottom:1px solid var(--p-line);background:var(--p-surface)}
 .logo{font-family:var(--f-display);font-weight:800;font-size:16px;letter-spacing:.14em;margin-right:auto}
 .tbtn{background:transparent;border:1px solid transparent;border-radius:8px;padding:5px 9px;font-size:13px;font-weight:600;color:var(--p-ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .tbtn:hover{background:var(--p-sunk)}
 .tbtn[aria-expanded="true"],.tbtn[aria-pressed="true"]{background:var(--p-accent-soft);color:var(--p-accent)}
 .tbtn svg{width:16px;height:16px}
-.help{padding:14px 18px;border-bottom:1px solid var(--p-line);background:var(--p-surface);display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 24px;font-size:13.5px}
+.plugin{position:relative}
+.help{position:absolute;z-index:5;top:46px;left:12px;right:12px;border-radius:12px;border:1px solid var(--p-line);box-shadow:var(--p-shadow);padding:14px 18px;background:var(--p-surface);display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 24px;font-size:13.5px}
 .help b{display:block;font-family:var(--f-display);font-size:14px}
 .help p{margin:0;color:var(--p-muted)}
 
-.body{display:grid;grid-template-columns:52px minmax(0,1fr) 52px;background:var(--p-graph)}
+.body{flex:1;min-height:0;display:grid;grid-template-columns:52px minmax(0,1fr) 52px;background:var(--p-graph)}
 .meter{position:relative;border-right:1px solid var(--p-line);background:var(--p-surface)}
 .meter.out{border-right:0;border-left:1px solid var(--p-line)}
 .meter canvas{position:absolute;inset:0;width:100%;height:100%}
-.stage{position:relative;height:500px;min-width:0}
+.stage{position:relative;min-height:0;min-width:0}
 .stage canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y}
 
 .deck{position:absolute;left:0;right:0;bottom:0;padding:40px 18px 12px;display:flex;flex-direction:column;gap:6px;pointer-events:none;
@@ -98,28 +100,7 @@ button,input{font:inherit;color:inherit}
 .say[data-s="cutting"] .dot,.say[data-s="ceiling"] .dot,.say[data-s="range"] .dot{background:var(--p-cut)}
 .say[data-s="held"] .dot,.say[data-s="analyzing"] .dot{background:var(--p-accent)}
 
-.x{border-top:1px solid var(--p-line);padding:14px;background:var(--p-bg)}
-.panel{background:var(--p-surface);border:1px solid var(--p-line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
-.panel h3{font-size:13px;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.legend{font-family:var(--f-mono);font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--p-muted);font-weight:400;display:flex;gap:12px}
-.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
-.chips{display:flex;gap:4px;margin-left:auto}
-.chips button{border:1px solid var(--p-line);background:var(--p-sunk);border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;color:var(--p-muted);letter-spacing:0;text-transform:none;font-family:var(--f-body);font-weight:500}
-.chips button[aria-pressed="true"]{background:var(--p-accent-soft);color:var(--p-accent);border-color:var(--p-accent)}
-#rta{width:100%;height:260px;display:block;border-radius:8px;background:var(--p-sunk)}
 
-@media (max-width:760px){
-  .body{grid-template-columns:34px minmax(0,1fr) 34px}
-  .stage{height:auto}
-  .stage canvas{position:relative;display:block;height:300px}
-  .deck{position:static;background:var(--p-graph);padding:10px 8px 12px;grid-column:1/-1}
-  .krow{justify-content:center}
-  .kgroup{gap:6px}
-  .knob{width:84px} .knob.big{width:104px}
-  .kdial{width:70px;height:70px} .knob.big .kdial{width:92px;height:92px}
-  .applied{align-items:center}
-  #rta{height:200px}
-}
 
 /* ================= bench & explainer ================= */
 .bench{border:1px dashed var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px}
@@ -162,13 +143,13 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
     <p>Set a target and Corridor keeps your audio there. Ride mode moves the gain continuously. Hold mode analyzes a section, then locks one fixed correction. The window below runs live on test audio, and you can also play your own file.</p>
   </header>
 
+  <div class="pscroll">
   <section class="plugin" id="plugin" data-ptheme="light" aria-label="Plugin window">
     <div class="p-head">
       <div class="logo">CORRIDOR</div>
       <button class="tbtn" id="resetBtn" type="button">Reset</button>
       <button class="tbtn" id="themeBtn" type="button" aria-pressed="false" aria-label="Dark plugin theme"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/></svg></button>
       <button class="tbtn" id="helpBtn" type="button" aria-expanded="false" aria-controls="help" aria-label="Help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.2v.1" stroke-linecap="round"/></svg></button>
-      <button class="tbtn" id="expandBtn" type="button" aria-expanded="false" aria-controls="xpanel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="expandTxt">Expand</span></button>
     </div>
 
     <div class="help" id="help" hidden>
@@ -203,14 +184,8 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
       <div class="meter out" aria-label="Output peak meter"><canvas id="mOut"></canvas></div>
     </div>
 
-    <div class="x" id="xpanel" hidden>
-      <div class="panel">
-        <h3>Spectrum <span class="legend"><span><i style="background:var(--p-muted)"></i>input</span><span><i style="background:var(--p-accent)"></i>output</span></span>
-          <span class="chips"><button type="button" id="tiltBtn" aria-pressed="true">4.5 dB/oct tilt</button><button type="button" id="freezeBtn" aria-pressed="false">Freeze</button></span></h3>
-        <canvas id="rta" aria-label="Real-time spectrum of input and output"></canvas>
-      </div>
-    </div>
   </section>
+  </div>
 
   <section class="bench" aria-label="Test bench">
     <div class="bench-head">
@@ -528,13 +503,11 @@ class FileSrc{
 
 /* ================= engine ================= */
 const HMAX = 500; let hist = [];
-const FFTN = 4096;
 class Engine{
   constructor(fs){
     this.fs = fs; this.sim = new Sim(fs); this.inM = new Meter(fs); this.outM = new Meter(fs);
     this.lev = new Leveler(); this.lim = new Limiter(fs); this.lim.setup();
     this.gCur = 0; this.gInc = 0; this.blocks = 0; this.inG = 1;
-    this.bIn = new Float32Array(FFTN); this.bOut = new Float32Array(FFTN); this.bw = 0;
   }
   render(out, n){
     const file = B.source === "file" ? fileSrc : null;
@@ -550,7 +523,6 @@ class Engine{
       let y = this.lim.process(x * fromDB(this.gCur));
       if (B.bypass) y = x;
       this.outM.push(y);
-      this.bIn[this.bw] = x; this.bOut[this.bw] = y; this.bw = (this.bw + 1) & (FFTN - 1);
       if (out) out[s] = y;
     }
   }
@@ -791,68 +763,6 @@ function drawMeter(id, m, side){
 }
 ["#mIn", "#mOut"].forEach(id => $(id).addEventListener("click", () => { engine.inM.H = engine.outM.H = -120; }));
 
-/* ================= spectrum (RTA) ================= */
-const fft = (() => {
-  const N = FFTN, re = new Float64Array(N), im = new Float64Array(N), rev = new Uint32Array(N), cos = new Float64Array(N / 2), sin = new Float64Array(N / 2), win = new Float64Array(N);
-  const bits = Math.log2(N);
-  for (let i = 0; i < N; i++){ let r = 0; for (let b = 0; b < bits; b++) r = (r << 1) | ((i >> b) & 1); rev[i] = r; win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1)); }
-  for (let i = 0; i < N / 2; i++){ cos[i] = Math.cos(-2 * Math.PI * i / N); sin[i] = Math.sin(-2 * Math.PI * i / N); }
-  return (buf, start, outDb) => {
-    for (let i = 0; i < N; i++){ re[rev[i]] = buf[(start + i) & (N - 1)] * win[i]; im[rev[i]] = 0; }
-    for (let size = 2; size <= N; size <<= 1){
-      const half = size >> 1, step = N / size;
-      for (let i = 0; i < N; i += size) for (let j = 0; j < half; j++){
-        const k = j * step, a = i + j, b = a + half;
-        const tr = re[b] * cos[k] - im[b] * sin[k], ti = re[b] * sin[k] + im[b] * cos[k];
-        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
-      }
-    }
-    const norm = 2 / (N * 0.5);
-    for (let i = 0; i < N / 2; i++){ const m = Math.hypot(re[i], im[i]) * norm; outDb[i] = m > 1e-9 ? 20 * Math.log10(m) : -180; }
-  };
-})();
-const spIn = new Float32Array(FFTN / 2).fill(-150), spOut = new Float32Array(FFTN / 2).fill(-150), tmp = new Float32Array(FFTN / 2);
-let tilt = true, frozen = false;
-function updateSpectrum(){
-  if (frozen) return;
-  const start = engine.bw;
-  fft(engine.bIn, start, tmp); for (let i = 0; i < tmp.length; i++) spIn[i] = tmp[i] > spIn[i] ? spIn[i] * 0.4 + tmp[i] * 0.6 : spIn[i] * 0.88 + tmp[i] * 0.12;
-  fft(engine.bOut, start, tmp); for (let i = 0; i < tmp.length; i++) spOut[i] = tmp[i] > spOut[i] ? spOut[i] * 0.4 + tmp[i] * 0.6 : spOut[i] * 0.88 + tmp[i] * 0.12;
-}
-function drawRTA(){
-  const cv = $("#rta"), [W, H, g] = fitCanvas(cv);
-  g.clearRect(0, 0, W, H);
-  const fs = engine.fs, ny = fs / 2, f0 = 20, f1 = 20000, padL = 34, padB = 18, w = W - padL - 6, h = H - padB - 8;
-  const fx = f => padL + Math.log(f / f0) / Math.log(f1 / f0) * w;
-  const dbMin = -96, dbMax = 0, y = db => 8 + (dbMax - clamp(db, dbMin, dbMax)) / (dbMax - dbMin) * h;
-  g.font = `10px ${MONO}`; g.textBaseline = "middle";
-  for (let db = 0; db >= dbMin; db -= 12){ g.fillStyle = alpha(C.muted, 0.18); g.fillRect(padL, Math.round(y(db)), w, 1); g.fillStyle = C.muted; g.textAlign = "right"; g.fillText(db === 0 ? "0" : fmt(db, 0), padL - 5, y(db)); }
-  [50, 100, 200, 500, 1000, 2000, 5000, 10000].forEach(f => { const x = Math.round(fx(f)); g.fillStyle = alpha(C.muted, 0.18); g.fillRect(x, 8, 1, h); g.fillStyle = C.muted; g.textAlign = "center"; g.fillText(f >= 1000 ? f / 1000 + "k" : f, x, H - 8); });
-  if (ny < f1){ const x = fx(ny); g.fillStyle = alpha(C.muted, 0.12); g.fillRect(x, 8, padL + w - x, h); g.fillStyle = C.muted; g.textAlign = "left"; g.fillText("above " + (ny / 1000).toFixed(0) + " kHz: press Listen", Math.min(x + 4, padL + w - 170), 18); }
-  const binHz = fs / FFTN;
-  const curve = (sp) => {
-    const pts = [];
-    for (let px = 0; px <= w; px += 2){
-      const fa = f0 * Math.pow(f1 / f0, px / w), fb = f0 * Math.pow(f1 / f0, (px + 2) / w);
-      if (fa > ny) break;
-      let b0 = Math.floor(fa / binHz), b1 = Math.max(b0, Math.floor(fb / binHz));
-      let m = -200; for (let b = b0; b <= b1 && b < sp.length; b++) if (sp[b] > m) m = sp[b];
-      if (b0 === b1 && b0 + 1 < sp.length){ const t = fa / binHz - b0; m = sp[b0] * (1 - t) + sp[b0 + 1] * t; }
-      const tl = tilt ? 4.5 * Math.log2(Math.max(fa, 1) / 1000) : 0;
-      pts.push([padL + px, y(m + tl)]);
-    }
-    return pts;
-  };
-  const pi = curve(spIn), po = curve(spOut);
-  if (pi.length > 1){
-    g.beginPath(); g.moveTo(pi[0][0], 8 + h); pi.forEach(p => g.lineTo(p[0], p[1])); g.lineTo(pi[pi.length - 1][0], 8 + h); g.closePath();
-    g.fillStyle = alpha(C.muted, 0.28); g.fill();
-    g.beginPath(); po.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.lineWidth = 2; g.strokeStyle = C.accent; g.lineJoin = "round"; g.stroke();
-  }
-  g.textAlign = "left"; g.fillStyle = C.muted; g.fillText(tilt ? "tilted 4.5 dB/oct around 1 kHz" : "", padL + 6, h - 4);
-}
-$("#tiltBtn").addEventListener("click", e => { tilt = !tilt; e.currentTarget.setAttribute("aria-pressed", tilt); });
-$("#freezeBtn").addEventListener("click", e => { frozen = !frozen; e.currentTarget.setAttribute("aria-pressed", frozen); });
 
 
 /* ================= test bench ================= */
@@ -946,19 +856,11 @@ function setPTheme(dark){
 }
 $("#themeBtn").addEventListener("click", () => setPTheme($("#plugin").dataset.ptheme !== "dark"));
 $("#helpBtn").addEventListener("click", e => { const h = $("#help"); h.hidden = !h.hidden; e.currentTarget.setAttribute("aria-expanded", String(!h.hidden)); });
-function setExpanded(on){
-  $("#xpanel").hidden = !on;
-  $("#expandBtn").setAttribute("aria-expanded", String(on)); $("#expandTxt").textContent = on ? "Collapse" : "Expand";
-  try{ localStorage.setItem("corridor-expanded", on ? "1" : "0"); } catch(e){}
-}
-$("#expandBtn").addEventListener("click", () => setExpanded($("#xpanel").hidden));
 
 /* ================= start ================= */
 let startDark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
 try{ const s = localStorage.getItem("corridor-ptheme"); if (s) startDark = s === "dark"; } catch(e){}
 setPTheme(startDark);
-let startX = false; try{ startX = localStorage.getItem("corridor-expanded") === "1"; } catch(e){}
-setExpanded(startX);
 benchSeg(); buildSits(); refresh();
 engine.render(null, engine.fs * 11);
 let last = performance.now();
@@ -966,7 +868,6 @@ function frame(t){
   const dt = Math.min(0.1, Math.max(0, (t - last) / 1000)); last = t;
   if (!running) engine.render(null, Math.round(dt * engine.fs));
   drawGraph(); drawMeter("#mIn", engine.inM, "in"); drawMeter("#mOut", engine.outM, "out");
-  if (!$("#xpanel").hidden){ updateSpectrum(); drawRTA(); }
   updateUI(t);
   requestAnimationFrame(frame);
 }
