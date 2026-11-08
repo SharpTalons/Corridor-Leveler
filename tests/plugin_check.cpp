@@ -115,7 +115,7 @@ static void snapshots(const File& dir) {
     runSine(proc, 48000, -24.f, 3.0, ph);
     for (bool dark : {true, false}) {
         proc.darkTheme = dark;
-        for (int w : {1120, 840}) {
+        for (int w : {1120, 960}) {
             proc.editorWidth = w;
             std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
             static_cast<CorridorEditor*>(ed.get())->refreshNow();

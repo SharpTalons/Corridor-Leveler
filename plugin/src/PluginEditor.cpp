@@ -9,6 +9,7 @@
 #include "Updates.h"
 
 #include <cmath>
+#include <map>
 #include <vector>
 
 using namespace juce;
@@ -25,19 +26,25 @@ struct Theme {
     bool dark;
     // role colours: each control keeps one colour on its knob and on its line in the graph
     Colour thr, resp, rng, inTrace, meterLo;
+    // surfaces that used to be written inline
+    Colour trackWell, graphLift, chipBg, meterTop, glassTint, floatBg, floatEdge, headTop, headBottom, pointer;
 };
 const Theme kLight{Colour(0xffffffff), Colour(0xffffffff), Colour(0xffebebeb), Colour(0xffffffff), Colour(0xff000000),
                    Colour(0xff5f6368), Colour(0xffdcdcdc), Colour(0xff17756a), Colour(0xffcfe5e1), Colour(0xff2672b5),
                    Colour(0xffc24d33), Colour(0xffc7302b), Colour(0xffb7862a), Colour(0xff2b7d47),
                    Colour(0xffffffff), Colour(0xffdfe1e4), Colour(0xffd3d5d9), Colour(0xffeef0f2), Colour(0xffffffff),
                    Colour(0xffbfc2c7), 0.28f, false,
-                   Colour(0xffa86f00), Colour(0xff2f6fd6), Colour(0xffb8407c), Colour(0xff3d6fb0), Colour(0xff2b9a4f)};
+                   Colour(0xffa86f00), Colour(0xff2f6fd6), Colour(0xffb8407c), Colour(0xff3d6fb0), Colour(0xff2b9a4f),
+                   Colour(0xffd3d5d9), Colour(0xffffffff), Colour(0xf7ffffff), Colour(0xfff6f7f8), Colour(0xbffbfcfe),
+                   Colour(0xffffffff), Colour(0xffdcdcdc), Colour(0xffffffff), Colour(0xffeceef0), Colour(0xff1a1a1a)};
 const Theme kDark{Colour(0xff000000), Colour(0xff000000), Colour(0xff1c1c1c), Colour(0xff000000), Colour(0xffffffff),
                   Colour(0xffa3a3a3), Colour(0xff2e2e2e), Colour(0xff4cc2ae), Colour(0xff1f3b37), Colour(0xff62a9e8),
                   Colour(0xffee7b5f), Colour(0xfff0605a), Colour(0xffe0b354), Colour(0xff6cc58b),
                   Colour(0xff34373c), Colour(0xff141518), Colour(0xff030303), Colour(0xff121315), Colour(0x26ffffff),
                   Colour(0xff050505), 0.7f, true,
-                  Colour(0xfff2b84b), Colour(0xff6aa8ff), Colour(0xffec7cbd), Colour(0xff7fb0ea), Colour(0xff4fd27a)};
+                  Colour(0xfff2b84b), Colour(0xff6aa8ff), Colour(0xffec7cbd), Colour(0xff7fb0ea), Colour(0xff4fd27a),
+                  Colour(0xff0b0b0c), Colour(0xff0c0d0f), Colour(0xf20a0b0d), Colour(0xff0d0e10), Colour(0xb30b0c10),
+                  Colour(0xff111214), Colour(0xff2e2e2e), Colour(0xff17181b), Colour(0xff050506), Colour(0xffffffff)};
 
 Font mono(float h, bool bold = false) {
     return Font(FontOptions(Font::getDefaultMonospacedFontName(), h, bold ? Font::bold : Font::plain));
@@ -173,62 +180,80 @@ public:
 
     // A machined knob: printed scale, recessed track with a lit value arc, knurled cap with a
     // shaded face and an engraved pointer.
+    // Static parts of a knob (scale, track, metal cap with its shadow) are rendered once per size,
+    // theme and pixel density, then drawn as images; only the arc, pointer and markers are live.
+    std::map<String, Image> cache;
+    template <typename Fn> void drawCached(Graphics& g, const String& key, Rectangle<float> area, Fn&& draw) {
+        const float sc = jlimit(1.f, 4.f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        const String k = key + "|" + String(area.getWidth(), 1) + "x" + String(area.getHeight(), 1) + "@" + String(sc, 2) + (t->dark ? "d" : "l");
+        auto it = cache.find(k);
+        if (it == cache.end()) {
+            if (cache.size() > 96) cache.clear();
+            Image img(Image::ARGB, jmax(1, roundToInt(area.getWidth() * sc)), jmax(1, roundToInt(area.getHeight() * sc)), true);
+            { Graphics gi(img); gi.addTransform(AffineTransform::scale(sc)); draw(gi); }
+            it = cache.emplace(k, img).first;
+        }
+        g.drawImage(it->second, area, RectanglePlacement::stretchToFit);
+    }
+
+    // A machined knob: printed scale, recessed track with a lit value arc, knurled cap with a
+    // shaded face and an engraved pointer.
     void drawRotarySlider(Graphics& g, int x, int y, int w, int h, float pos, float a0, float a1, Slider& s) override {
         const Theme& c = *t;
+        const auto box = Rectangle<float>(float(x), float(y), float(w), float(h));
         const float size = float(jmin(w, h)) - 4.f;
-        const float cx = float(x) + float(w) * 0.5f, cy = float(y) + float(h) * 0.5f, R = size * 0.5f;
-        const float tw = jmax(4.f, R * 0.12f), rr = R * 0.84f;
+        const float lcx = float(w) * 0.5f, lcy = float(h) * 0.5f, R = size * 0.5f;  // local to the box
+        const float cx = float(x) + lcx, cy = float(y) + lcy;
+        const float tw = jmax(4.f, R * 0.12f), rr = R * 0.84f, cr = R * 0.64f, fr = cr * 0.82f;
         const float ang = a0 + pos * (a1 - a0);
 
-        // printed scale
-        for (int k = 0; k <= 10; ++k) {
-            const float a = a0 + float(k) / 10.f * (a1 - a0), r1 = R * (k % 5 == 0 ? 0.93f : 0.96f);
-            g.setColour(c.muted.withAlpha(k % 5 == 0 ? 0.8f : 0.45f));
-            g.drawLine(cx + r1 * std::sin(a), cy - r1 * std::cos(a), cx + R * std::sin(a), cy - R * std::cos(a), 1.1f);
-        }
-        // recessed track
-        Path track; track.addCentredArc(cx, cy, rr, rr, 0.f, a0, a1, true);
-        g.setColour(c.dark ? Colour(0xff0b0b0c) : c.wellTop);
-        g.strokePath(track, PathStrokeType(tw + 2.f, PathStrokeType::curved, PathStrokeType::rounded));
-        g.setColour(c.sunk);
-        g.strokePath(track, PathStrokeType(tw - 1.f, PathStrokeType::curved, PathStrokeType::rounded));
-        // lit value arc with a soft glow
+        drawCached(g, "knob-track", box, [&](Graphics& k) {
+            for (int i = 0; i <= 10; ++i) {  // printed scale
+                const float a = a0 + float(i) / 10.f * (a1 - a0), r1 = R * (i % 5 == 0 ? 0.93f : 0.96f);
+                k.setColour(c.muted.withAlpha(i % 5 == 0 ? 0.8f : 0.45f));
+                k.drawLine(lcx + r1 * std::sin(a), lcy - r1 * std::cos(a), lcx + R * std::sin(a), lcy - R * std::cos(a), 1.1f);
+            }
+            Path track; track.addCentredArc(lcx, lcy, rr, rr, 0.f, a0, a1, true);
+            k.setColour(c.dark ? c.trackWell : c.wellTop);
+            k.strokePath(track, PathStrokeType(tw + 2.f, PathStrokeType::curved, PathStrokeType::rounded));
+            k.setColour(c.sunk);
+            k.strokePath(track, PathStrokeType(tw - 1.f, PathStrokeType::curved, PathStrokeType::rounded));
+        });
+        // lit value arc with a soft glow, in the control's role colour
+        const Colour rc = roleColour(s.getProperties().getWithDefault("role", "").toString());
         if (pos > 0.002f) {
-            const String role = s.getProperties().getWithDefault("role", "");
-            const Colour rc = role == "thr" ? c.thr : role == "tgt" ? c.accent : role == "resp" ? c.resp
-                            : role == "rng" ? c.rng : role == "ceil" ? c.limit : c.ink;
             Path val; val.addCentredArc(cx, cy, rr, rr, 0.f, a0, ang, true);
             g.setColour(rc.withAlpha(c.dark ? 0.25f : 0.18f));
             g.strokePath(val, PathStrokeType(tw * 2.4f, PathStrokeType::curved, PathStrokeType::rounded));
             g.setColour(rc);
             g.strokePath(val, PathStrokeType(tw - 1.f, PathStrokeType::curved, PathStrokeType::rounded));
         }
-        // cap
-        const float cr = R * 0.64f;
-        Path skirt; skirt.addEllipse(cx - cr, cy - cr, cr * 2.f, cr * 2.f);
-        DropShadow(Colours::black.withAlpha(c.shadow * 0.85f), int(R * 0.42f), {0, int(R * 0.16f)}).drawForPath(g, skirt);
-        g.setGradientFill(ColourGradient(c.capTop.darker(0.1f), cx, cy - cr, c.capBottom.darker(c.dark ? 0.4f : 0.15f), cx, cy + cr, false));
-        g.fillPath(skirt);
-        for (int k = 0; k < 48; ++k) {  // knurling
-            const float a = float(k) / 48.f * 2.f * kPi;
-            g.setColour((k % 2 ? Colours::black : Colours::white).withAlpha(c.dark ? 0.16f : 0.22f));
-            g.drawLine(cx + cr * 0.86f * std::sin(a), cy - cr * 0.86f * std::cos(a), cx + cr * 0.99f * std::sin(a), cy - cr * 0.99f * std::cos(a), 1.f);
-        }
-        const float fr = cr * 0.82f;
-        Path face; face.addEllipse(cx - fr, cy - fr, fr * 2.f, fr * 2.f);
-        g.setGradientFill(ColourGradient(c.capTop, cx - fr * 0.6f, cy - fr * 0.8f, c.capBottom, cx + fr * 0.6f, cy + fr * 0.9f, false));
-        g.fillPath(face);
-        ColourGradient spec(Colours::white.withAlpha(c.dark ? 0.12f : 0.75f), cx - fr * 0.35f, cy - fr * 0.45f,
-                            Colours::white.withAlpha(0.f), cx - fr * 0.35f + fr * 0.75f, cy - fr * 0.45f, true);
-        g.setGradientFill(spec); g.fillPath(face);
-        g.setColour(c.hilite); g.strokePath(face, PathStrokeType(1.f));
-        if (s.isMouseOverOrDragging()) { g.setColour(c.ink.withAlpha(0.45f)); g.strokePath(skirt, PathStrokeType(1.2f)); }
+        drawCached(g, "knob-cap", box, [&](Graphics& k) {
+            Path skirt; skirt.addEllipse(lcx - cr, lcy - cr, cr * 2.f, cr * 2.f);
+            DropShadow(Colours::black.withAlpha(c.shadow * 0.85f), int(R * 0.42f), {0, int(R * 0.16f)}).drawForPath(k, skirt);
+            k.setGradientFill(ColourGradient(c.capTop.darker(0.1f), lcx, lcy - cr, c.capBottom.darker(c.dark ? 0.4f : 0.15f), lcx, lcy + cr, false));
+            k.fillPath(skirt);
+            for (int i = 0; i < 48; ++i) {  // knurling
+                const float a = float(i) / 48.f * 2.f * kPi;
+                k.setColour((i % 2 ? Colours::black : Colours::white).withAlpha(c.dark ? 0.16f : 0.22f));
+                k.drawLine(lcx + cr * 0.86f * std::sin(a), lcy - cr * 0.86f * std::cos(a), lcx + cr * 0.99f * std::sin(a), lcy - cr * 0.99f * std::cos(a), 1.f);
+            }
+            Path face; face.addEllipse(lcx - fr, lcy - fr, fr * 2.f, fr * 2.f);
+            k.setGradientFill(ColourGradient(c.capTop, lcx - fr * 0.6f, lcy - fr * 0.8f, c.capBottom, lcx + fr * 0.6f, lcy + fr * 0.9f, false));
+            k.fillPath(face);
+            k.setGradientFill(ColourGradient(Colours::white.withAlpha(c.dark ? 0.12f : 0.75f), lcx - fr * 0.35f, lcy - fr * 0.45f,
+                                             Colours::white.withAlpha(0.f), lcx - fr * 0.35f + fr * 0.75f, lcy - fr * 0.45f, true));
+            k.fillPath(face);
+            k.setColour(c.hilite); k.strokePath(face, PathStrokeType(1.f));
+        });
+        if (s.isMouseOverOrDragging()) { g.setColour(c.ink.withAlpha(0.45f)); g.drawEllipse(cx - cr, cy - cr, cr * 2.f, cr * 2.f, 1.2f); }
+        if (s.hasKeyboardFocus(false)) { g.setColour(c.accent); g.drawEllipse(cx - cr - 4.f, cy - cr - 4.f, (cr + 4.f) * 2.f, (cr + 4.f) * 2.f, 2.f); }
         // engraved pointer
         const float p0 = fr * 0.22f, p1 = fr * 0.86f, pw = jmax(2.f, R * 0.07f);
         const float sx = std::sin(ang), sy = -std::cos(ang);
         g.setColour(Colours::black.withAlpha(c.dark ? 0.7f : 0.25f));
         g.drawLine(cx + p0 * sx + 0.8f, cy + p0 * sy + 0.8f, cx + p1 * sx + 0.8f, cy + p1 * sy + 0.8f, pw);
-        g.setColour(c.dark ? c.ink : Colour(0xff1a1a1a));
+        g.setColour(c.dark ? c.ink : c.pointer);
         g.drawLine(cx + p0 * sx, cy + p0 * sy, cx + p1 * sx, cy + p1 * sy, pw);
 
         // live level marker on the track (Target shows the output level, Threshold the input)
@@ -243,6 +268,12 @@ public:
                 g.setColour(c.ink); g.fillEllipse(lx - lr, ly - lr, lr * 2.f, lr * 2.f);
             }
         }
+    }
+
+    Colour roleColour(const String& role) const {
+        const Theme& c = *t;
+        return role == "thr" ? c.thr : role == "tgt" ? c.accent : role == "resp" ? c.resp
+             : role == "rng" ? c.rng : role == "ceil" ? c.limit : c.ink;
     }
 
     void drawLinearSlider(Graphics& g, int x, int y, int w, int h, float pos, float, float, Slider::SliderStyle style, Slider& s) override {
@@ -264,6 +295,7 @@ public:
         g.setGradientFill(ColourGradient(c.capTop, px, cy - r, c.capBottom, px, cy + r, false)); g.fillPath(cap);
         g.setColour(s.isMouseOverOrDragging() ? rc : c.edge); g.strokePath(cap, PathStrokeType(1.2f));
         g.setColour(rc); g.fillEllipse(px - 2.5f, cy - 2.5f, 5.f, 5.f);
+        if (s.hasKeyboardFocus(false)) { g.setColour(c.accent); g.drawEllipse(px - r - 4.f, cy - r - 4.f, (r + 4.f) * 2.f, (r + 4.f) * 2.f, 2.f); }
     }
 
     Label* createSliderTextBox(Slider& s) override {
@@ -284,10 +316,12 @@ public:
         const float rad = b.getProperties().getWithDefault("pill", false) ? r.getHeight() * 0.5f : 7.f;
         if (b.getProperties().getWithDefault("segment", false)) {  // sits in a recessed track drawn by its parent
             if (on) drawRaised(g, *t, r, rad, over);
+            if (b.hasKeyboardFocus(false)) { g.setColour(t->accent); g.drawRoundedRectangle(r, rad, 2.f); }
             return;
         }
         if (on || down) drawWell(g, *t, r, rad, on ? toneOf(b) : Colours::transparentBlack);
         else drawRaised(g, *t, r, rad, over);
+        if (b.hasKeyboardFocus(false)) { g.setColour(t->accent); g.drawRoundedRectangle(r.expanded(1.5f), rad + 1.5f, 2.f); }
     }
 
     void drawButtonText(Graphics& g, TextButton& b, bool, bool) override {
@@ -309,6 +343,7 @@ public:
     }
 
     void apply() {
+        cache.clear();
         setColour(Slider::textBoxTextColourId, t->ink);
         setColour(Slider::textBoxOutlineColourId, Colours::transparentBlack);
         setColour(Slider::textBoxBackgroundColourId, Colours::transparentBlack);
@@ -331,6 +366,8 @@ public:
     Knob(AudioProcessorValueTreeState& st, const char* id, String title_, String unit, int dec, float dialSize, const char* role = "")
         : title(std::move(title_)), dial(dialSize) {
         slider.getProperties().set("role", role);
+        slider.setTitle(title);                // screen readers announce the control by name
+        slider.setWantsKeyboardFocus(true);    // arrow keys adjust it once it is focused
         slider.setSliderStyle(Slider::RotaryHorizontalVerticalDrag);
         slider.setRotaryParameters(MathConstants<float>::pi * 1.25f, MathConstants<float>::pi * 2.75f, true);
         slider.setTextBoxStyle(Slider::TextBoxBelow, false, 104, 20);
@@ -344,9 +381,12 @@ public:
         setInterceptsMouseClicks(false, true);
     }
     void lookAndFeelChanged() override {
-        // the value box is rebuilt by the slider; re-apply the text so the new colours show
+        // the value box is rebuilt by the slider: give the value its control's colour and refresh
+        if (auto* lf = dynamic_cast<Look*>(&getLookAndFeel()))
+            slider.setColour(Slider::textBoxTextColourId, lf->roleColour(slider.getProperties()["role"].toString()));
         slider.updateText();
     }
+    void focusOfChildComponentChanged(FocusChangeType) override { slider.repaint(); }
     void setLive(float db) { slider.getProperties().set("live", db); slider.repaint(); }
     int preferredWidth() const { return int(dial) + 34; }
     int preferredHeight() const { return int(dial) + 44; }
@@ -377,6 +417,7 @@ public:
         slider.setSliderStyle(Slider::LinearHorizontal);
         slider.setTextBoxStyle(Slider::NoTextBox, false, 0, 0);
         slider.setTitle("Range");
+        slider.setWantsKeyboardFocus(true);
         addAndMakeVisible(slider);
         att = std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(st, ids::range, slider);
         if (auto* p = st.getParameter(ids::range)) slider.setDoubleClickReturnValue(true, p->convertFrom0to1(p->getDefaultValue()));
@@ -384,6 +425,7 @@ public:
         setInterceptsMouseClicks(false, true);
     }
     void resized() override { slider.setBounds(getLocalBounds().withTrimmedTop(16)); }
+    void focusOfChildComponentChanged(FocusChangeType) override { slider.repaint(); }
     void paint(Graphics& g) override {
         auto* lf = dynamic_cast<Look*>(&getLookAndFeel());
         const Theme& t = lf ? *lf->t : kDark;
@@ -391,7 +433,7 @@ public:
         g.setFont(sans(13.f, true)); g.setColour(t.ink);
         g.drawText("Range", top, Justification::centredLeft);
         g.setFont(mono(13.f, true)); g.setColour(t.rng);
-        g.drawText("+/-" + String(slider.getValue(), 1) + " dB", top, Justification::centredRight);
+        g.drawText(String(CharPointer_UTF8("\xc2\xb1")) + String(slider.getValue(), 1) + " dB", top, Justification::centredRight);
     }
     Slider slider;
 
@@ -416,7 +458,7 @@ public:
         const float W = float(getWidth()), H = float(getHeight()), scaleW = 34.f, x1 = W - scaleW;
         g.fillAll(c.graph);
         if (c.dark) {  // faint centre lift, like a lit screen
-            g.setGradientFill(ColourGradient(Colour(0xff0c0d0f), W * 0.5f, H * 0.4f, c.graph, 0.f, 0.f, true));
+            g.setGradientFill(ColourGradient(c.graphLift, W * 0.5f, H * 0.4f, c.graph, 0.f, 0.f, true));
             g.fillRect(getLocalBounds().toFloat());
         }
         // grid + scale
@@ -501,7 +543,7 @@ public:
             const float tw = GlyphArrangement::getStringWidth(f, txt) + (under ? 30.f : 16.f);
             Rectangle<float> box(8.f, y - 10.f, tw, 20.f);
             Path bp; bp.addRoundedRectangle(box, 5.f);
-            g.setColour(hot ? col : (c.dark ? Colour(0xf20a0b0d) : Colour(0xf7ffffff))); g.fillPath(bp);
+            g.setColour(hot ? col : c.chipBg); g.fillPath(bp);
             g.setColour(col); g.strokePath(bp, PathStrokeType(1.2f));
             g.setColour(hot ? c.graph : col);
             g.drawText(txt, box.withTrimmedLeft(8.f), Justification::centredLeft);
@@ -568,7 +610,7 @@ public:
     void paint(Graphics& g) override {
         const Theme& c = *t;
         const float W = float(getWidth()), H = float(getHeight()), top = kTop, bot = H - 6.f;
-        g.setGradientFill(ColourGradient(c.dark ? Colour(0xff0d0e10) : Colour(0xfff6f7f8), 0.f, 0.f, c.bg, 0.f, H, false));
+        g.setGradientFill(ColourGradient(c.meterTop, 0.f, 0.f, c.bg, 0.f, H, false));
         g.fillAll();
         g.setColour(c.edge); g.fillRect(input ? W - 1.f : 0.f, 0.f, 1.f, H);
         auto y = [&](float v) { return top + jlimit(0.f, kDbRange, -v) / kDbRange * (bot - top); };
@@ -586,7 +628,7 @@ public:
         g.setColour(Colours::white.withAlpha(c.dark ? 0.05f : 0.25f));
         g.fillRect(bx, top, bw * 0.4f, bot - top);  // glass
         // the same marks as the graph: every 5 dB from 0 to -80, labelled every 10, at the same heights
-        g.setFont(sans(11.f));
+        g.setFont(sans(12.f));
         for (int v = 0; v >= -80; v -= 5) {
             const float yy = std::round(y(float(v))) + 0.5f;
             const bool major = v % 10 == 0;
@@ -599,10 +641,11 @@ public:
         }
         auto hb = Rectangle<float>(5.f, 8.f, W - 10.f, 20.f);
         drawWell(g, c, hb, 4.f);
-        g.setFont(mono(11.f, true)); g.setColour(hold > -0.1f ? c.limit : c.ink);
-        g.drawText(hold > -70.f ? fmtDb(hold, 1) : "-", hb, Justification::centred);
-        g.setFont(sans(11.f, true)); g.setColour(c.muted);
-        g.drawText(input ? "In" : "Out", Rectangle<float>(0.f, 32.f, W, 14.f), Justification::centred);
+        const Colour zone = hold > -6.f ? c.limit : hold > -18.f ? c.warn : c.meterLo;
+        g.setFont(mono(12.f, true)); g.setColour(hold > -80.f ? zone : c.muted);
+        g.drawText(hold > -80.f ? fmtDb(hold, 1) : "-", hb, Justification::centred);
+        g.setFont(sans(12.f, true)); g.setColour(input ? c.inTrace : c.accent);  // same colour as its trace in the graph
+        g.drawText(input ? "In" : "Out", Rectangle<float>(0.f, 31.f, W, 15.f), Justification::centred);
     }
     void mouseDown(const MouseEvent&) override { dsp.resetPeakHolds(); }
 
@@ -620,20 +663,35 @@ public:
     int gainSign = 0;
     String latencyText;
     Rectangle<int> gainBox, modeTrack, panelRect;
+    String statusText;
+    Colour statusColour;
+    int frame = 0;  // advanced by the editor's timer
     void paint(Graphics& g) override {
         const Theme& c = *t;
         // frosted glass: the graph behind, rendered small and stretched back (a cheap blur), then tinted
         const auto panel = (panelRect.isEmpty() ? getLocalBounds().reduced(10, 6) : panelRect).toFloat();
         Path p; p.addRoundedRectangle(panel, 18.f);
-        DropShadow(Colours::black.withAlpha(c.dark ? 0.55f : 0.18f), 22, {0, 6}).drawForPath(g, p);
+        const bool resized = panel != lastPanel || c.dark != lastDark;
+        if (resized) {  // the shadow only changes with the panel's size or the theme
+            lastPanel = panel; lastDark = c.dark;
+            const auto sb = panel.expanded(40.f);
+            shadowImg = Image(Image::ARGB, int(sb.getWidth()), int(sb.getHeight()), true);
+            Graphics sg(shadowImg);
+            Path sp; sp.addRoundedRectangle(panel.translated(-sb.getX(), -sb.getY()), 18.f);
+            DropShadow(Colours::black.withAlpha(c.dark ? 0.55f : 0.18f), 22, {0, 6}).drawForPath(sg, sp);
+        }
+        g.drawImageAt(shadowImg, int(panel.getX() - 40.f), int(panel.getY() - 40.f));
+        if (resized || blurImg.isNull() || frame - blurFrame >= 4) {  // the blurred graph needs far fewer updates than the graph
+            const auto src = backdrop.getLocalArea(this, panel.toNearestInt());
+            blurImg = backdrop.createComponentSnapshot(src.getIntersection(backdrop.getLocalBounds()), false, 0.14f);
+            blurFrame = frame;
+        }
         {
             Graphics::ScopedSaveState ss(g);
             g.reduceClipRegion(p);
-            const auto src = backdrop.getLocalArea(this, panel.toNearestInt());
-            const Image blur = backdrop.createComponentSnapshot(src.getIntersection(backdrop.getLocalBounds()), false, 0.14f);
             g.setImageResamplingQuality(Graphics::highResamplingQuality);
-            g.drawImage(blur, panel, RectanglePlacement::stretchToFit);
-            g.setColour(c.dark ? Colour(0xb30b0c10) : Colour(0xbffbfcfe)); g.fillPath(p);
+            g.drawImage(blurImg, panel, RectanglePlacement::stretchToFit);
+            g.setColour(c.glassTint); g.fillPath(p);
             g.setGradientFill(ColourGradient(Colours::white.withAlpha(c.dark ? 0.07f : 0.55f), 0.f, panel.getY(),
                                              Colours::white.withAlpha(0.f), 0.f, panel.getY() + panel.getHeight() * 0.45f, false));
             g.fillPath(p);
@@ -653,11 +711,25 @@ public:
         // latency, bottom-right corner
         g.setFont(sans(12.f)); g.setColour(c.muted);
         g.drawText(latencyText, panel.toNearestInt().removeFromBottom(28).reduced(18, 0), Justification::centredRight);
+        // status line: a dot in the state's colour, then the sentence
+        if (statusText.isNotEmpty()) {
+            auto f = sans(14.f); g.setFont(f);
+            const float tw = GlyphArrangement::getStringWidth(f, statusText);
+            const auto row = Rectangle<float>(0.f, float(getHeight()) - 34.f, float(getWidth()), 22.f);
+            const float x0 = row.getCentreX() - (tw + 18.f) * 0.5f;
+            g.setColour(statusColour.withAlpha(0.3f)); g.fillEllipse(x0 - 2.f, row.getCentreY() - 7.f, 14.f, 14.f);
+            g.setColour(statusColour); g.fillEllipse(x0 + 2.f, row.getCentreY() - 3.f, 6.f, 6.f);
+            g.setColour(c.ink); g.drawText(statusText, row.withX(x0 + 18.f).withWidth(tw + 4.f), Justification::centredLeft);
+        }
     }
 
 private:
     const Theme*& t;
     Component& backdrop;
+    Image blurImg, shadowImg;
+    int blurFrame = -100;
+    Rectangle<float> lastPanel;
+    bool lastDark = false;
 };
 
 // ---------------------------------------------------------------- updates: About panel and prompt
@@ -667,6 +739,7 @@ public:
     AboutPanel(updates::Checker& c, const Theme*& th) : checker(c), t(th) {
         for (auto* b : {&action, &close}) { b->getProperties().set("fontSize", 13.0); addAndMakeVisible(*b); }
         close.getProperties().set("icon", "close");
+        close.setTitle("Close");
         close.setButtonText({});
         action.onClick = [this] {
             if (checker.known().valid()) checker.install(); else checker.check(true);
@@ -699,8 +772,8 @@ public:
         auto r = getLocalBounds().toFloat().reduced(1.f);
         Path p; p.addRoundedRectangle(r, 12.f);
         DropShadow(Colours::black.withAlpha(c.dark ? 0.7f : 0.25f), 24, {0, 8}).drawForPath(g, p);  // it floats
-        g.setColour(c.dark ? Colour(0xff111214) : c.surface); g.fillPath(p);
-        g.setColour(c.dark ? Colour(0xff2e2e2e) : c.line); g.strokePath(p, PathStrokeType(1.f));
+        g.setColour(c.floatBg); g.fillPath(p);
+        g.setColour(c.floatEdge); g.strokePath(p, PathStrokeType(1.f));
         drawIcon(g, "logo", Rectangle<float>(20.f, 20.f, 22.f, 20.f), c.accent);
         g.setColour(c.ink); g.setFont(sans(16.f, true));
         g.drawText("Corridor Leveler " + updates::currentVersion(), Rectangle<float>(52.f, 16.f, r.getWidth() - 100.f, 28.f), Justification::centredLeft);
@@ -754,8 +827,8 @@ public:
         const auto b = box().toFloat();
         Path p; p.addRoundedRectangle(b, 14.f);
         DropShadow(Colours::black.withAlpha(0.6f), 30, {0, 10}).drawForPath(g, p);
-        g.setColour(c.dark ? Colour(0xff111214) : c.surface); g.fillPath(p);
-        g.setColour(c.dark ? Colour(0xff2e2e2e) : c.line); g.strokePath(p, PathStrokeType(1.f));
+        g.setColour(c.floatBg); g.fillPath(p);
+        g.setColour(c.floatEdge); g.strokePath(p, PathStrokeType(1.f));
         const auto r = checker.known();
         const String cur = updates::currentVersion();
         g.setColour(c.ink); g.setFont(sans(20.f, true));
@@ -825,10 +898,6 @@ public:
             else proc.core().requestAnalyzeStart();
         };
         deck.addChildComponent(analyze);
-        status.setJustificationType(Justification::centred);
-        status.setFont(sans(14.f));
-        status.setInterceptsMouseClicks(false, false);
-        deck.addAndMakeVisible(status);
 
         for (auto* b : {&ease, &bypass, &themeBtn}) {
             b->setClickingTogglesState(true);
@@ -842,6 +911,11 @@ public:
         themeBtn.getProperties().set("icon", p.darkTheme ? "moon" : "sun");
         themeBtn.setButtonText({});
         themeBtn.setTooltip("Switch between dark and light");
+        themeBtn.setTitle("Dark theme");
+        graph.setTitle("Level graph");
+        graph.setDescription("Input and output level (RMS) over the last 10 seconds, with the target, threshold and ceiling lines. Drag a line to change it.");
+        meterIn.setTitle("Input peak meter");
+        meterOut.setTitle("Output peak meter");
         easeAtt = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state(), ids::ease, ease);
         bypassAtt = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state(), ids::bypass, bypass);
         ease.setTooltip("Off: the gain freezes below the threshold. On: after 2 s of silence it glides back to 0 dB.");
@@ -851,6 +925,7 @@ public:
         // updates: version in the header opens the About panel; a known update gets its own button
         versionBtn.setButtonText("v" + updates::currentVersion());
         versionBtn.getProperties().set("fontSize", 12.5);
+        versionBtn.setTitle("About Corridor Leveler and updates");
         versionBtn.onClick = [this] { about.refresh(); about.setVisible(!about.isVisible()); about.toFront(false); };
         addAndMakeVisible(versionBtn);
         updateBtn.getProperties().set("fontSize", 12.5);
@@ -899,8 +974,7 @@ public:
         const Theme& c = *theme;
         g.fillAll(c.bg);
         // header plate
-        g.setGradientFill(ColourGradient(c.dark ? Colour(0xff17181b) : Colour(0xffffffff), 0.f, 0.f,
-                                         c.dark ? Colour(0xff050506) : Colour(0xffeceef0), 0.f, 46.f, false));
+        g.setGradientFill(ColourGradient(c.headTop, 0.f, 0.f, c.headBottom, 0.f, 46.f, false));
         g.fillRect(0, 0, getWidth(), 46);
         g.setColour(c.hilite); g.fillRect(0, 0, getWidth(), 1);
         drawIcon(g, "logo", Rectangle<float>(16.f, 12.f, 24.f, 22.f), c.accent);
@@ -958,7 +1032,6 @@ public:
         place(response, response.preferredWidth());
         place(ceiling, ceiling.preferredWidth());
         deck.panelRect = Rectangle<int>((deck.getWidth() - total) / 2 - 40, 4, total + 80, deckH - 8);
-        status.setBounds(0, deckH - 34, deck.getWidth(), 22);
     }
 
     void tick() {
@@ -988,10 +1061,30 @@ public:
         const double fs = dsp.sampleRate();
         deck.latencyText = "Latency " + String(1000.0 * dsp.latencySamples() / fs, 1) + " ms  (" + String(dsp.latencySamples()) +
                            " samples @ " + String(fs / 1000.0, 1) + " kHz)";
-        status.setText(sentence(byp, holdMode), dontSendNotification);
-        status.setColour(Label::textColourId, theme->ink);
+        deck.statusText = sentence(byp, holdMode);
+        deck.statusColour = stateColour(byp, holdMode);
+        deck.setTitle("Controls");
+        deck.setDescription(deck.statusText);  // screen readers can read the current state
+        ++deck.frame;
 
         graph.repaint(); tags.repaint(); meterIn.repaint(); meterOut.repaint(); deck.repaint();
+    }
+
+    // The status dot: green on target, blue boosting, coral cutting, red when the ceiling or range
+    // holds it back, amber when bypassed, the accent while analyzing or holding, grey when waiting.
+    Colour stateColour(bool byp, bool holdMode) const {
+        const Theme& c = *theme;
+        if (byp) return c.warn;
+        if (holdMode) return c.accent;
+        switch (corridor::State(proc.core().telemetry().state.load())) {
+            case corridor::State::OnTarget: return c.ok;
+            case corridor::State::Boosting: return c.boost;
+            case corridor::State::Cutting: return c.cut;
+            case corridor::State::Ceiling:
+            case corridor::State::Range: return c.limit;
+            case corridor::State::Returning: return c.resp;
+            default: return c.muted;
+        }
     }
 
     String sentence(bool byp, bool holdMode) const {
@@ -1022,7 +1115,7 @@ public:
             case corridor::State::Boosting: return "Coming in at " + fmtDb(L, 1) + " dB RMS, below the " + fmtDb(tgt, 1) + " target. Lifting it (" + fmtDb(g, 1, true) + " dB so far).";
             case corridor::State::Cutting: return "Coming in at " + fmtDb(L, 1) + " dB RMS, above the " + fmtDb(tgt, 1) + " target. Lowering it (" + fmtDb(g, 1, true) + " dB so far).";
             case corridor::State::Ceiling: return "More boost would push peaks past the " + fmtDb(cei, 1) + " dBFS ceiling. Held at " + fmtDb(g, 1, true) + " dB.";
-            case corridor::State::Range: return "It needs more than the +/-" + String(rng, 1) + " dB range allows. Held at " + fmtDb(g, 1, true) + " dB.";
+            case corridor::State::Range: return "It needs more than the " + String(CharPointer_UTF8("\xc2\xb1")) + String(rng, 1) + " dB range allows. Held at " + fmtDb(g, 1, true) + " dB.";
             case corridor::State::Returning: return "Silence for over 2 s. Easing back to 0 dB (" + fmtDb(g, 1, true) + " dB).";
             default:
                 return t.inRms.load() < thr ? "Below the " + fmtDb(thr, 1) + " dB threshold (silence, breaths or noise). Not adjusting; gain stays at " + fmtDb(g, 1, true) + " dB."
@@ -1048,7 +1141,6 @@ private:
     AboutPanel about;
     UpdatePrompt prompt;
     std::unique_ptr<AudioProcessorValueTreeState::ButtonAttachment> easeAtt, bypassAtt;
-    Label status;
     corridor::Snapshot scratch[kHist];
 };
 
@@ -1058,9 +1150,9 @@ CorridorEditor::CorridorEditor(CorridorAudioProcessor& p) : AudioProcessorEditor
     content = std::make_unique<CorridorContent>(p);
     addAndMakeVisible(*content);
     setResizable(true, true);
-    setResizeLimits(700, 394, 2240, 1260);
+    setResizeLimits(960, 540, 2240, 1260);  // below 960 px the smallest labels fall under ~10 px
     if (auto* c = getConstrainer()) c->setFixedAspectRatio(double(designW) / double(designH));
-    const int w = jlimit(700, 2240, savedWidth);
+    const int w = jlimit(960, 2240, savedWidth);
     setSize(w, int(std::round(w * double(designH) / designW)));
     startTimerHz(30);
 }
