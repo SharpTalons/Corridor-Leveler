@@ -1,0 +1,662 @@
+<title>Corridor Leveler Glass</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: the plugin window as the hero (1120x630 design, scaled to fit), the analysis panel under it in Hold,
+   then the palette and notes. The page follows the viewer's theme; the plugin has its own dark / light switch. */
+:root {
+  --page: #f2f2f7;
+  --page-ink: #1c1c1e;
+  --page-muted: #6e6e73;
+  --page-card: #ffffff;
+  --page-edge: rgba(0, 0, 0, .08);
+  --font-ui: "SF Pro Text", -apple-system, "Inter", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #000000; --page-ink: #f5f5f7; --page-muted: #98989d; --page-card: #1c1c1e; --page-edge: rgba(255, 255, 255, .1); color-scheme: dark; } }
+:root[data-theme="dark"] { --page: #000000; --page-ink: #f5f5f7; --page-muted: #98989d; --page-card: #1c1c1e; --page-edge: rgba(255, 255, 255, .1); color-scheme: dark; }
+
+/* the plugin's own two looks; .unit carries data-ptheme */
+.unit {
+  --p-bg: #07080c; --p-ink: #f5f5f7; --p-label: #c7c7cc; --p-muted: #8e8e93;
+  --p-accent: #ffd60a; --p-accent-text: #ffd60a; --p-green: #30d158; --p-green-text: #30d158; --p-red: #ff453a;
+  --p-trace: rgba(235, 235, 245, .62); --p-grid: rgba(255, 255, 255, .06);
+  --p-glass: rgba(255, 255, 255, .07); --p-glass-strong: rgba(255, 255, 255, .16);
+  --p-rim: rgba(255, 255, 255, .55); --p-rim-soft: rgba(255, 255, 255, .14); --p-shade: rgba(0, 0, 0, .45);
+  --p-bloom-a: rgba(255, 190, 60, .20); --p-bloom-b: rgba(40, 140, 255, .18); --p-bloom-c: rgba(48, 209, 88, .10);
+  --p-meter-off: rgba(255, 255, 255, .08);
+}
+.unit[data-ptheme="light"] {
+  --p-bg: #e9ecf3; --p-ink: #1c1c1e; --p-label: #3a3a3c; --p-muted: #6e6e73;
+  --p-accent: #ffb800; --p-accent-text: #8a5d00; --p-green: #34c759; --p-green-text: #1f7a37; --p-red: #ff3b30;
+  --p-trace: rgba(60, 60, 67, .55); --p-grid: rgba(0, 0, 0, .06);
+  --p-glass: rgba(255, 255, 255, .42); --p-glass-strong: rgba(255, 255, 255, .7);
+  --p-rim: rgba(255, 255, 255, .95); --p-rim-soft: rgba(0, 0, 0, .07); --p-shade: rgba(30, 40, 80, .16);
+  --p-bloom-a: rgba(255, 196, 70, .38); --p-bloom-b: rgba(60, 150, 255, .30); --p-bloom-c: rgba(52, 199, 89, .18);
+  --p-meter-off: rgba(0, 0, 0, .08);
+}
+
+html, body { background: var(--page); color: var(--page-ink); }
+body { font-family: var(--font-ui); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 24px; }
+header.page { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+header.page h1 { margin: 0; font-size: 22px; font-weight: 600; text-wrap: balance; }
+header.page p { margin: 0; color: var(--page-muted); max-width: 62ch; line-height: 1.5; }
+.narrow-note { display: none; margin: 0; color: var(--page-muted); font-size: 13px; }
+.stage { min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; }
+.unit { display: grid; min-width: 0; }
+@media (max-width: 760px) { .unit { min-width: 760px; } .narrow-note { display: block; } }
+.plugin { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 22px; overflow: hidden; background: var(--p-bg); box-shadow: 0 24px 70px var(--p-shade); z-index: 1; }
+.plugin canvas { display: block; width: 100%; height: 100%; touch-action: manipulation; }
+
+/* analysis panel: a glass sheet that slides out under the window in Hold */
+.drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .36s cubic-bezier(.2, .8, .2, 1); }
+.drawer.open { grid-template-rows: 1fr; }
+.drawer > div { overflow: hidden; min-height: 0; }
+.drawer-body { margin: -22px 18px 0; padding: 36px 18px 18px; display: grid; grid-template-columns: minmax(170px, 200px) 1fr; gap: 18px;
+  background: var(--p-glass-strong); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid var(--p-rim-soft); border-top: 0; border-radius: 0 0 26px 26px;
+  box-shadow: inset 0 -1px 0 var(--p-rim), 0 18px 40px var(--p-shade); color: var(--p-ink); }
+.unit[data-ptheme="dark"] .drawer-body { background: rgba(28, 28, 32, .78); }
+.drawer-side { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.drawer-side .cap { font-size: 15px; font-weight: 600; }
+.readout { font-size: 13px; color: var(--p-muted); line-height: 1.6; font-variant-numeric: tabular-nums; }
+.readout b { color: var(--p-ink); font-weight: 600; }
+.readout .hot { color: var(--p-accent-text); font-weight: 600; }
+.wave { min-width: 0; height: 124px; border-radius: 18px; background: rgba(0, 0, 0, .28); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .35), 0 1px 0 var(--p-rim-soft); }
+.unit[data-ptheme="light"] .wave { background: rgba(255, 255, 255, .5); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .1), 0 1px 0 #fff; }
+.wave canvas { display: block; width: 100%; height: 100%; }
+.key { font: 600 14px var(--font-ui); color: var(--p-ink); padding: 11px 18px; border-radius: 999px; cursor: pointer; border: 0;
+  background: var(--p-glass-strong); box-shadow: inset 0 1px 0 var(--p-rim), inset 0 0 0 1px var(--p-rim-soft), 0 6px 16px var(--p-shade);
+  transition: transform .15s, background-color .15s; }
+.key:hover { transform: scale(1.02); }
+.key:active { transform: scale(.97); }
+.key[aria-pressed="true"] { background: var(--p-accent); color: #1c1c1e; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 6px 18px rgba(255, 190, 0, .35); }
+.key:focus-visible, .chip:focus-visible, .sr:focus-visible { outline: 2px solid var(--p-accent, #ffb800); outline-offset: 3px; }
+@media (max-width: 640px) { .drawer-body { grid-template-columns: 1fr; } }
+
+.sim { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; color: var(--page-muted); font-size: 14px; }
+.sim .group { display: flex; gap: 6px; }
+.chip { font: 500 14px var(--font-ui); color: var(--page-ink); background: var(--page-card); border: 1px solid var(--page-edge); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--page-ink); color: var(--page); border-color: transparent; }
+.status { min-height: 1.4em; }
+.status::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--dot, #8e8e93); margin-right: 8px; vertical-align: 1px; }
+h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
+.sheet { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 28px; }
+.sheet section { min-width: 0; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.sw { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; font-size: 13px; }
+.sw i { width: 34px; height: 34px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--page-edge); }
+.sw b { display: block; font-weight: 600; }
+.sw span { color: var(--page-muted); font-variant-numeric: tabular-nums; }
+.notes { margin: 0; padding-left: 18px; line-height: 1.6; font-size: 15px; }
+.notes li + li { margin-top: 6px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .drawer, .key { transition: none; } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+
+<div class="wrap">
+  <header class="page">
+    <h1>Corridor Leveler in Liquid Glass</h1>
+    <p>A working preview for approval. Drag a dial up or down (Shift for fine steps, double-click to reset), drag the Target, Threshold and Ceiling lines, and try the sun / moon switch in the header.</p>
+  </header>
+
+  <p class="narrow-note">Corridor is a desktop plugin. Scroll the window sideways to see all of it.</p>
+  <div class="stage">
+  <div class="unit" id="unit" data-ptheme="dark">
+    <div class="plugin" id="plugin">
+      <canvas id="cv" width="1120" height="630" aria-label="Corridor Leveler plugin window preview" role="img"></canvas>
+      <!-- keyboard and screen-reader access to the dials and buttons drawn on the canvas -->
+      <input class="sr" type="range" id="k-thr" aria-label="Threshold" min="-70" max="-20" step="0.5">
+      <input class="sr" type="range" id="k-resp" aria-label="Response" min="0" max="100" step="1">
+      <input class="sr" type="range" id="k-tgt" aria-label="Target" min="-40" max="-6" step="0.5">
+      <input class="sr" type="range" id="k-rng" aria-label="Range" min="0" max="24" step="0.5">
+      <input class="sr" type="range" id="k-ceil" aria-label="Ceiling" min="-12" max="0" step="0.1">
+      <button class="sr" id="b-mode">Switch between Ride and Hold</button>
+      <button class="sr" id="b-ease">Ease in silence</button>
+      <button class="sr" id="b-theme">Switch the plugin between dark and light</button>
+      <button class="sr" id="b-bypass">Bypass</button>
+    </div>
+    <div class="drawer" id="drawer" aria-hidden="true">
+      <div>
+        <div class="drawer-body">
+          <div class="drawer-side">
+            <span class="cap">Analyze &amp; hold</span>
+            <button class="key" id="an-btn" aria-pressed="false" tabindex="-1">Analyze</button>
+            <div class="readout" id="an-read"></div>
+          </div>
+          <div class="wave"><canvas id="wave" aria-label="Live input waveform"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div class="sim">
+    <span>Preview signal</span>
+    <div class="group" role="group" aria-label="Preview signal">
+      <button class="chip" id="s-voice" aria-pressed="true">Voice</button>
+      <button class="chip" id="s-drums" aria-pressed="false">Drums</button>
+      <button class="chip" id="s-mix" aria-pressed="false">Mix</button>
+    </div>
+    <button class="chip" id="s-pause" aria-pressed="false">Pause</button>
+    <div class="status" id="status"></div>
+    <div class="sr" id="announce" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="sheet">
+    <section>
+      <h2>Palette</h2>
+      <div class="swatches" id="swatches"></div>
+    </section>
+    <section>
+      <h2>What changes</h2>
+      <ul class="notes">
+        <li>Every control is glass: it blurs and slightly magnifies the graph behind it, with a bright rim where the light catches the edge. The rim follows your pointer.</li>
+        <li>The header, the two meters and the control deck float over a full-bleed graph instead of sitting in fixed strips. The graph runs under the controls and stays visible through them.</li>
+        <li>Dials are clear glass discs with a coloured value ring and pointer. Ride / Hold is a glass capsule whose selected side is a droplet that slides across.</li>
+        <li>Labels are in sentence case, set like iOS: bold names, lighter values. Accents are the system yellow, green and red.</li>
+        <li>Dark by default; the sun / moon switch turns the plugin light. Hold slides a glass sheet out under the window with the live waveform.</li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+const W = 1120, H = 630;
+const root = document.documentElement, unit = document.getElementById('unit');
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const css = (n, el = unit) => getComputedStyle(el).getPropertyValue(n).trim();
+const FONT = css('--font-ui', root);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const C = {};
+const TOKENS = ['p-bg','p-ink','p-label','p-muted','p-accent','p-accent-text','p-green','p-green-text','p-red','p-trace','p-grid','p-glass','p-glass-strong','p-rim','p-rim-soft','p-shade','p-bloom-a','p-bloom-b','p-bloom-c','p-meter-off'];
+let dark = true;
+function readTokens() {
+  TOKENS.forEach(k => C[k.slice(2)] = css('--' + k));
+  const roles = [['bg','Window'],['ink','Values'],['label','Names'],['muted','Scale, hints'],['accent','Target, accent'],['green','Threshold'],['red','Output'],['trace','Input'],['glass','Glass tint'],['rim','Glass rim']];
+  document.getElementById('swatches').innerHTML = roles.map(([k, n]) => `<div class="sw"><i style="background:${C[k]}"></i><div><b>${n}</b><span>${C[k]}</span></div></div>`).join('');
+}
+readTokens();
+
+// ---------------- parameters
+const P = { thr: -48, tgt: -20, resp: 50, rng: 12, ceil: -1, hold: false, ease: false, bypass: false };
+const DEF = { ...P };
+const fmt = (v, d = 1) => { const s = Math.abs(v).toFixed(d); return (v < 0 && +s !== 0 ? '−' : '') + s; };
+const sgn = (v, d = 1) => (v > 0.05 ? '+' : '') + fmt(v, d);
+const PM = '±';
+const knobs = [
+  { id: 'thr', label: 'Threshold', min: -70, max: -20, x: 290, y: 496, r: 30, val: v => fmt(v) + ' dB', col: 'green' },
+  { id: 'resp', label: 'Response', min: 0, max: 100, x: 400, y: 496, r: 30, val: v => (v < 34 ? 'Slow ' : v > 66 ? 'Fast ' : 'Medium ') + Math.round(v) },
+  { id: 'tgt', label: 'Target', min: -40, max: -6, x: 560, y: 478, r: 44, val: v => fmt(v) + ' dB RMS' },
+  { id: 'rng', label: 'Range', min: 0, max: 24, x: 720, y: 496, r: 30, val: v => PM + fmt(v) + ' dB' },
+  { id: 'ceil', label: 'Ceiling', min: -12, max: 0, x: 830, y: 496, r: 30, val: v => fmt(v) + ' dBFS' },
+];
+const A0 = -0.75 * Math.PI, A1 = 0.75 * Math.PI;
+
+// ---------------- geometry: a full-bleed graph; header, meters and deck float over it
+const PX0 = 76, PX1 = 1044, GT = 118, GB = 596, RANGE_DB = 80;
+const DECK = { x: 226, y: 408, w: 668, h: 206, r: 30 };
+const HEADER = { x: 12, y: 12, w: W - 24, h: 42, r: 21 };
+const MTR = { y: 64, h: 554, w: 50, r: 25 };
+const yOf = v => GT + Math.min(RANGE_DB, Math.max(0, -v)) / RANGE_DB * (GB - GT);
+const vOf = y => -Math.min(RANGE_DB, Math.max(0, (y - GT) / (GB - GT) * RANGE_DB));
+
+// ---------------- simulated signal and engine (20 ms steps)
+const HIST = 500, dt = 0.02, WAVE = 1200;
+const hist = [], wave = [];
+let src = 'voice', paused = false, t = 0;
+let section = -24, sectionLeft = 0, gapLeft = 0, syl = 0;
+let pw = Math.pow(10, -24 / 10), gain = 0, silent = 0;
+let inPk = -120, outPk = -120, inHold = -120, outHold = -120, holdT1 = 0, holdT2 = 0;
+let analyzing = false, anSum = 0, anN = 0, anT = 0, holdGain = 0, holdValid = false, state = 'wait';
+const rnd = (a, b) => a + Math.random() * (b - a);
+function inputLevel() {
+  if ((sectionLeft -= dt) <= 0) {
+    sectionLeft = rnd(3, 7);
+    section = src === 'drums' ? [-30, -24, -18, -14][Math.floor(Math.random() * 4)] : [-38, -32, -26, -20, -14, -11][Math.floor(Math.random() * 6)];
+  }
+  const noise = -66 + rnd(-2, 2);
+  if (src === 'voice') {
+    if (gapLeft > 0) { gapLeft -= dt; return noise; }
+    if (Math.random() < 0.012) { gapLeft = rnd(0.4, 1.6); return noise; }
+    syl += dt * rnd(3, 6) * 2 * Math.PI;
+    return section + 5 * Math.sin(syl) + rnd(-2, 2) - 2;
+  }
+  if (src === 'drums') {
+    const env = Math.exp(-(t % 0.6) / 0.09), accent = Math.floor(t / 0.6) % 2 ? 0 : -2;
+    return Math.max(noise, section + accent - 14 + 16 * env + rnd(-1, 1));
+  }
+  syl += dt * 1.3;
+  return section + 3 * Math.sin(syl) + rnd(-1.5, 1.5);
+}
+function step() {
+  t += dt;
+  const inDb = inputLevel();
+  const win = 1.5 - 1.2 * P.resp / 100 * (src === 'drums' ? 0.6 : 1);
+  const active = inDb >= P.thr;
+  if (active) { pw += (Math.pow(10, inDb / 10) - pw) * dt / Math.max(0.3, win); silent = 0; } else silent += dt;
+  const lvl = 10 * Math.log10(Math.max(pw, 1e-12)), crest = src === 'drums' ? 14 : 10;
+  if (P.hold) {
+    if (analyzing) { anT += dt; if (active) { anSum += Math.pow(10, inDb / 10); anN++; } if (anT >= 20) lockAnalyze(); }
+    gain += ((holdValid ? holdGain : gain) - gain) * 0.1;
+    state = analyzing ? 'analyzing' : 'held';
+  } else if (active) {
+    let want = P.tgt - lvl, lim = '';
+    if (want > P.rng) { want = P.rng; lim = 'range'; }
+    if (want < -P.rng) { want = -P.rng; lim = 'range'; }
+    const room = P.ceil - (lvl + crest);
+    if (want > room) { want = Math.max(-P.rng, room); lim = 'ceiling'; }
+    if (Math.abs(want - gain) > 0.75 || lim) gain += (want - gain) * dt / (win * 0.8);
+    state = lim || (Math.abs(P.tgt - (lvl + gain)) < 1 ? 'on' : want > gain ? 'boost' : 'cut');
+  } else if (P.ease && silent > 2) { gain *= 0.97; state = 'return'; } else state = 'wait';
+  const g = P.bypass ? 0 : gain;
+  let outDb = inDb + g;
+  const ip = Math.min(-0.1, inDb + crest * 0.8 + rnd(0, 3));  // digital input never passes 0 dBFS
+  let op = ip + g;
+  if (!P.bypass && op > P.ceil) { outDb -= op - P.ceil; op = P.ceil; }
+  inPk = Math.max(ip, inPk - 0.9); outPk = Math.max(op, outPk - 0.9);
+  if (ip >= inHold) { inHold = ip; holdT1 = 1.5; } else if ((holdT1 -= dt) < 0) inHold -= 0.3;
+  if (op >= outHold) { outHold = op; holdT2 = 1.5; } else if ((holdT2 -= dt) < 0) outHold -= 0.3;
+  const amp = Math.max(0, (inDb + 66) / 60);
+  for (let s = 0; s < 4; s++) wave.push({ a: Math.min(1, amp * (0.55 + Math.random() * 0.45)), up: Math.random() * .25 + .75, an: analyzing, act: active });
+  while (wave.length > WAVE) wave.shift();
+  hist.push({ i: inDb, o: outDb });
+  if (hist.length > HIST) hist.shift();
+}
+function lockAnalyze() {
+  analyzing = false;
+  if (anN < 25) { holdValid = false; return; }
+  const m = 10 * Math.log10(anSum / anN);
+  holdGain = Math.max(-P.rng, Math.min(P.rng, P.tgt - m, P.ceil - (m + 10)));
+  holdValid = true;
+}
+
+// ---------------- glass
+// The backdrop (background and graph) is drawn first, then captured small and blurred. Every glass
+// shape draws that capture, slightly magnified around its own centre (the lens), under a tint, then a
+// rim lit from the light direction, which follows the pointer.
+const blurC = document.createElement('canvas'), bctx = blurC.getContext('2d');
+const hasFilter = 'filter' in bctx;
+let light = { x: -0.5, y: -1 }, lightTarget = { x: -0.5, y: -1 };
+function captureBackdrop() {
+  const bw = Math.round(W / 6), bh = Math.round(H / 6);
+  if (blurC.width !== bw) { blurC.width = bw; blurC.height = bh; }
+  bctx.filter = hasFilter ? 'blur(3px) saturate(1.5)' : 'none';
+  bctx.clearRect(0, 0, bw, bh);
+  bctx.drawImage(cv, 0, 0, cv.width, cv.height, 0, 0, bw, bh);
+}
+function shape(s) {
+  ctx.beginPath();
+  if (s.circle) ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+  else ctx.roundRect(s.x, s.y, s.w, s.h, s.r);
+}
+function bounds(s) { return s.circle ? { x: s.x - s.r, y: s.y - s.r, w: s.r * 2, h: s.r * 2 } : s; }
+function glass(s, o = {}) {
+  const b = bounds(s), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+  const tint = o.tint || C.glass, lens = o.lens ?? 1.05;
+  // shadow under the glass
+  if (o.shadow !== false) {
+    ctx.save(); shape(s); ctx.shadowColor = C.shade; ctx.shadowBlur = o.shadowBlur ?? 22; ctx.shadowOffsetY = o.shadowY ?? 8;
+    ctx.fillStyle = dark ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.2)'; ctx.fill(); ctx.restore();
+  }
+  ctx.save(); shape(s); ctx.clip();
+  // the blurred backdrop, magnified a little around the shape's centre
+  ctx.translate(cx, cy); ctx.scale(lens, lens); ctx.translate(-cx, -cy);
+  ctx.drawImage(blurC, 0, 0, blurC.width, blurC.height, 0, 0, W, H);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.fillStyle = tint; ctx.fillRect(b.x, b.y, b.w, b.h);
+  // light pooling on the lit side, the far edge darker: the glass has thickness
+  const lx = cx + light.x * b.w * 0.5, ly = cy + light.y * b.h * 0.5;
+  const pool = ctx.createRadialGradient(lx, ly, 0, lx, ly, Math.max(b.w, b.h) * 0.9);
+  pool.addColorStop(0, dark ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.45)'); pool.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = pool; ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.restore();
+  // rim: bright where the light hits, a second softer catch on the opposite edge
+  const rx0 = cx + light.x * b.w * 0.5, ry0 = cy + light.y * b.h * 0.5, rx1 = cx - light.x * b.w * 0.5, ry1 = cy - light.y * b.h * 0.5;
+  const rim = ctx.createLinearGradient(rx0, ry0, rx1, ry1);
+  rim.addColorStop(0, C.rim); rim.addColorStop(0.35, 'rgba(255,255,255,0.04)'); rim.addColorStop(0.7, 'rgba(255,255,255,0.02)'); rim.addColorStop(1, dark ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.8)');
+  ctx.save(); shape(s); ctx.strokeStyle = rim; ctx.lineWidth = o.rimWidth ?? 1.4; ctx.stroke();
+  if (!dark) { shape(s); ctx.strokeStyle = C['rim-soft']; ctx.lineWidth = 0.6; ctx.stroke(); }
+  ctx.restore();
+}
+
+// ---------------- drawing helpers
+function text(s, x, y, size, col, align = 'center', weight = 500) {
+  ctx.font = `${weight} ${size}px ${FONT}`; ctx.fillStyle = col; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
+}
+function measure(s, size, weight = 500) { ctx.font = `${weight} ${size}px ${FONT}`; return ctx.measureText(s).width; }
+
+function drawBackdrop() {
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+  const bloom = (x, y, r, c) => { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); };
+  bloom(160, 40, 520, C['bloom-a']); bloom(1000, 600, 560, C['bloom-b']); bloom(560, 700, 420, C['bloom-c']);
+  // grid, labelled every 10 dB at both edges of the plot
+  for (let v = 0; v >= -80; v -= 5) {
+    const y = Math.round(yOf(v)) + .5;
+    ctx.fillStyle = C.grid; ctx.globalAlpha = v % 10 === 0 ? 1 : 0.5; ctx.fillRect(PX0 + 22, y, PX1 - PX0 - 44, 1); ctx.globalAlpha = 1;
+    if (v % 10 === 0) { text(fmt(v, 0), PX0 + 16, y, 11, C.muted, 'right'); text(fmt(v, 0), PX1 - 16, y, 11, C.muted, 'left'); }
+  }
+  const x0 = PX0 + 22, x1 = PX1 - 22, n = hist.length, sx = (x1 - x0) / (HIST - 1), X = k => x1 - (n - 1 - k) * sx;
+  if (n > 1) {
+    ctx.beginPath(); ctx.moveTo(X(0), GB);
+    for (let k = 0; k < n; k++) ctx.lineTo(X(k), yOf(hist[k].i));
+    ctx.lineTo(X(n - 1), GB); ctx.closePath();
+    const f = ctx.createLinearGradient(0, GT, 0, GB); f.addColorStop(0, C.trace.replace(/[\d.]+\)$/, '.22)')); f.addColorStop(1, C.trace.replace(/[\d.]+\)$/, '0)'));
+    ctx.fillStyle = f; ctx.fill();
+    ctx.beginPath(); for (let k = 0; k < n; k++) { const y = yOf(hist[k].i); k ? ctx.lineTo(X(k), y) : ctx.moveTo(X(k), y); }
+    ctx.strokeStyle = C.trace; ctx.lineWidth = 1.3; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.save();
+    ctx.beginPath(); for (let k = 0; k < n; k++) { const y = yOf(hist[k].o); k ? ctx.lineTo(X(k), y) : ctx.moveTo(X(k), y); }
+    ctx.shadowColor = C.red; ctx.shadowBlur = dark ? 10 : 4; ctx.strokeStyle = C.red; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.restore();
+  }
+  if (analyzing) { const span = Math.min(n - 1, anT / dt); ctx.fillStyle = C.accent; ctx.globalAlpha = .08; ctx.fillRect(X(n - 1 - span), GT, span * sx, GB - GT); ctx.globalAlpha = 1; }
+  const line = (id, col, dash, w) => {
+    const y = Math.round(yOf(P[id])) + .5, hot = hover === 'line-' + id || drag?.id === 'line-' + id;
+    ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = hot ? 2.6 : w;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]);
+  };
+  line('ceil', C.muted, [5, 5], 1.2); line('thr', C.green, [7, 5], 1.4); line('tgt', C.accent, [], 2);
+  // legend
+  const lx = PX1 - 330, ly = 80;
+  ctx.fillStyle = C.trace; ctx.fillRect(lx, ly - 1, 16, 2); text('Input', lx + 22, ly, 12, C.muted, 'left');
+  ctx.fillStyle = C.red; ctx.fillRect(lx + 76, ly - 1.5, 16, 3); text('Output', lx + 98, ly, 12, C.muted, 'left');
+  text('RMS, last 10 s', PX1 - 22, ly, 12, C.muted, 'right');
+}
+
+function drawMeter(x, pk, hold, isIn) {
+  const s = { x, y: MTR.y, w: MTR.w, h: MTR.h, r: MTR.r };
+  glass(s, { shadowBlur: 18 });
+  const cx = x + MTR.w / 2;
+  text(hold > -RANGE_DB ? fmt(hold) : '−∞', cx, MTR.y + 18, 11.5, hold > -1 ? C.red : hold > -6 ? C['accent-text'] : C.ink, 'center', 600);
+  text(isIn ? 'In' : 'Out', cx, MTR.y + 35, 11, C.muted, 'center', 500);
+  for (let ch = 0; ch < 2; ch++) {
+    const bx = cx - 7 + ch * 9, bw = 5;
+    ctx.fillStyle = C['meter-off']; ctx.beginPath(); ctx.roundRect(bx, GT, bw, GB - GT, 2.5); ctx.fill();
+    const p = pk - ch * (0.6 + 0.5 * Math.sin(t * 1.3 + (isIn ? 0 : 2)));
+    if (p > -RANGE_DB) {
+      const top = yOf(Math.min(0, p));
+      const g = ctx.createLinearGradient(0, GB, 0, GT);
+      g.addColorStop(0, C.green); g.addColorStop(1 - 6 / RANGE_DB, C.green); g.addColorStop(1 - 4 / RANGE_DB, C.accent); g.addColorStop(1 - 1 / RANGE_DB, C.accent); g.addColorStop(1, C.red);
+      ctx.save(); ctx.shadowColor = C.green; ctx.shadowBlur = dark ? 8 : 0;
+      ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(bx, top, bw, GB - top, 2.5); ctx.fill(); ctx.restore();
+    }
+    if (hold > -RANGE_DB) { ctx.fillStyle = C.ink; ctx.fillRect(bx - 1, yOf(Math.min(0, hold)) - 1, bw + 2, 2); }
+  }
+  for (let v = 0; v >= -80; v -= 10) { ctx.fillStyle = C.muted; ctx.globalAlpha = .6; ctx.fillRect(isIn ? cx + 9 : cx - 13, Math.round(yOf(v)), 4, 1); ctx.globalAlpha = 1; }
+}
+
+function drawKnob(k) {
+  const v = P[k.id], pos = (v - k.min) / (k.max - k.min), ang = A0 + pos * (A1 - A0);
+  const { x, y, r } = k, ringR = r + 9, hot = hover === k.id || drag?.id === k.id;
+  const col = k.col ? C[k.col] : C.accent, colText = k.col ? C[k.col + '-text'] : C['accent-text'];
+  const arc = (a0, a1, rad) => { ctx.beginPath(); ctx.arc(x, y, rad, a0 - Math.PI / 2, a1 - Math.PI / 2); };
+  ctx.lineCap = 'round';
+  arc(A0, A1, ringR); ctx.strokeStyle = dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)'; ctx.lineWidth = 6; ctx.stroke();
+  if (pos > 0.003) {
+    ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = dark ? 10 : 4;
+    arc(A0, ang, ringR); ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.stroke(); ctx.restore();
+  }
+  if (k.id === 'tgt' || k.id === 'thr') {
+    const lv = k.id === 'tgt' ? avg('o') : avg('i');
+    if (lv >= k.min && lv <= k.max) {
+      const la = A0 + (lv - k.min) / (k.max - k.min) * (A1 - A0);
+      ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(x + Math.sin(la) * ringR, y - Math.cos(la) * ringR, 2.2, 0, 7); ctx.fill();
+    }
+  }
+  glass({ circle: true, x, y, r }, { tint: hot ? C['glass-strong'] : C.glass, lens: 1.12, shadowBlur: 16, shadowY: 6 });
+  // pointer: a short coloured capsule set into the glass
+  const p0 = r * 0.42, p1 = r * 0.78;
+  ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.lineWidth = Math.max(3, r * 0.1); ctx.shadowColor = col; ctx.shadowBlur = dark ? 6 : 0;
+  ctx.beginPath(); ctx.moveTo(x + Math.sin(ang) * p0, y - Math.cos(ang) * p0); ctx.lineTo(x + Math.sin(ang) * p1, y - Math.cos(ang) * p1); ctx.stroke(); ctx.restore();
+  if (focusId === k.id) { ctx.beginPath(); ctx.arc(x, y, ringR + 8, 0, 7); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke(); }
+  const ly = y + ringR + 16;
+  text(k.label, x, ly, k.id === 'tgt' ? 15 : 13.5, C.ink, 'center', 600);
+  text(k.val(v), x, ly + 17, 12.5, hot ? colText : C.muted, 'center', 500);
+}
+function avg(f) { const n = Math.min(40, hist.length); let s = 0, c = 0; for (let i = hist.length - n; i < hist.length; i++) if (hist[i].i >= P.thr) { s += Math.pow(10, hist[i][f] / 10); c++; } return c ? 10 * Math.log10(s / c) : -90; }
+
+// Ride / Hold: a glass capsule whose selected side is a brighter droplet that slides across
+const SEG = { x: 560 - 76, y: 578, w: 152, h: 30, r: 15 };
+let thumbX = SEG.x + 2;
+const btn = {};
+function drawSegment() {
+  btn.ride = [SEG.x, SEG.y, SEG.w / 2, SEG.h]; btn.hold = [SEG.x + SEG.w / 2, SEG.y, SEG.w / 2, SEG.h];
+  glass(SEG, { tint: dark ? 'rgba(0,0,0,.18)' : 'rgba(0,0,0,.05)', shadow: false, lens: 1 });
+  const tx = SEG.x + 2 + (P.hold ? SEG.w / 2 - 2 : 0);
+  thumbX = reduced ? tx : thumbX + (tx - thumbX) * 0.25;
+  glass({ x: thumbX, y: SEG.y + 2, w: SEG.w / 2 - 2, h: SEG.h - 4, r: 13 }, { tint: C['glass-strong'], lens: 1.2, shadowBlur: 8, shadowY: 2 });
+  text('Ride', SEG.x + SEG.w / 4, SEG.y + SEG.h / 2 + .5, 13.5, !P.hold ? C.ink : (hover === 'ride' ? C.label : C.muted), 'center', 600);
+  text('Hold', SEG.x + SEG.w * 3 / 4, SEG.y + SEG.h / 2 + .5, 13.5, P.hold ? C.ink : (hover === 'hold' ? C.label : C.muted), 'center', 600);
+  if (focusId === 'mode') { ctx.beginPath(); ctx.roundRect(SEG.x - 4, SEG.y - 4, SEG.w + 8, SEG.h + 8, 19); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke(); }
+}
+
+function drawDeck() {
+  glass(DECK, { tint: dark ? 'rgba(30,30,36,.32)' : 'rgba(255,255,255,.35)', lens: 1.03, shadowBlur: 30, shadowY: 12 });
+  knobs.forEach(drawKnob);
+  drawSegment();
+  // latency, bottom-left; applied gain, a glass readout bottom-right
+  text('Latency 5.0 ms', PX0 + 22, GB + 4, 12, C.muted, 'left');
+  const g = P.bypass ? 0 : gain, gb = { x: DECK.x + DECK.w + 12, y: 548, w: 124, h: 58, r: 22 };
+  glass(gb, { shadowBlur: 18 });
+  text('Applied gain', gb.x + 16, gb.y + 17, 12, C.muted, 'left', 500);
+  text(sgn(g) + ' dB', gb.x + gb.w - 16, gb.y + 39, 22, Math.abs(g) < .05 ? C.ink : C['accent-text'], 'right', 700);
+}
+
+function powerIcon(cx, cy, col) {
+  ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx, cy + 1, 7, -Math.PI / 2 + .7, 1.5 * Math.PI - .7); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx, cy); ctx.stroke(); ctx.restore();
+}
+function themeIcon(cx, cy, col) {
+  ctx.save(); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  if (dark) {  // moon
+    ctx.beginPath(); ctx.arc(cx, cy, 7, 0, 7); ctx.fill();
+    ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(cx + 4, cy - 3, 6, 0, 7); ctx.fill();
+  } else {     // sun
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, 7); ctx.fill();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 6.5, cy + Math.sin(a) * 6.5); ctx.lineTo(cx + Math.cos(a) * 9, cy + Math.sin(a) * 9); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function drawHeader() {
+  glass(HEADER, { shadowBlur: 20 });
+  // mark: a level held between two walls
+  ctx.fillStyle = C.accent; ctx.beginPath(); ctx.roundRect(30, 22, 20, 3, 1.5); ctx.roundRect(30, 39, 20, 3, 1.5); ctx.fill();
+  ctx.beginPath(); for (let i = 0; i <= 20; i++) { const xx = 30 + i, yy = 32 - Math.sin(i / 20 * 4 * Math.PI) * 4.5 * (1 - i / 28); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
+  ctx.strokeStyle = C.accent; ctx.lineWidth = 1.8; ctx.stroke();
+  text('Corridor', 60, 33, 16, C.ink, 'left', 700);
+  text('Leveler', 60 + measure('Corridor', 16, 700) + 6, 33, 16, C.muted, 'left', 500);
+  // status: a dot and a short sentence, centred
+  const st = statusText(), sw = measure(st, 13.5);
+  ctx.fillStyle = statusColour(); ctx.beginPath(); ctx.arc(W / 2 - sw / 2 - 9, 33, 4, 0, 7); ctx.fill();
+  text(st, W / 2 + 4, 33.5, 13.5, C.ink, 'center', 500);
+  // right: ease (capsule), theme and bypass (round glass buttons)
+  btn.ease = [HEADER.x + HEADER.w - 230, 18, 140, 30];
+  btn.theme = [HEADER.x + HEADER.w - 80, 18, 30, 30];
+  btn.bypass = [HEADER.x + HEADER.w - 42, 18, 30, 30];
+  const e = { x: btn.ease[0], y: 18, w: 140, h: 30, r: 15 };
+  glass(e, { tint: P.ease ? (dark ? 'rgba(255,214,10,.28)' : 'rgba(255,184,0,.35)') : C.glass, shadow: false, lens: 1.08 });
+  text('Ease in silence', e.x + e.w / 2, 33.5, 13, P.ease ? C['accent-text'] : (hover === 'ease' ? C.ink : C.label), 'center', 600);
+  for (const id of ['theme', 'bypass']) {
+    const [bx, by, bw] = btn[id], c = { circle: true, x: bx + bw / 2, y: by + bw / 2, r: bw / 2 };
+    const on = id === 'bypass' && P.bypass;
+    glass(c, { tint: on ? (dark ? 'rgba(255,69,58,.35)' : 'rgba(255,59,48,.3)') : C.glass, shadow: false, lens: 1.1 });
+    const col = on ? C.ink : hover === id ? C.ink : C.label;
+    id === 'bypass' ? powerIcon(c.x, c.y, col) : themeIcon(c.x, c.y, col);
+  }
+  if (focusId === 'ease' || focusId === 'bypass' || focusId === 'theme') {
+    const [bx, by, bw, bh] = btn[focusId]; ctx.beginPath(); ctx.roundRect(bx - 3, by - 3, bw + 6, bh + 6, (bh + 6) / 2); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+
+function drawTags() {
+  const tags = [['ceil', 'Ceiling', C.muted, C.label], ['thr', 'Threshold', C.green, C['green-text']], ['tgt', 'Target', C.accent, C['accent-text']]];
+  for (const [id, name, col, colText] of tags) {
+    const lineY = yOf(P[id]), under = lineY > DECK.y - 14 && lineY < DECK.y + DECK.h;
+    const y = under ? DECK.y - 16 : lineY;
+    const label = name + '  ' + fmt(P[id]), w = measure(label, 12, 600) + (under ? 40 : 28);
+    const s = { x: PX0 + 26, y: y - 12, w, h: 24, r: 12 };
+    glass(s, { shadow: false, lens: 1.06 });
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(s.x + 11, y, 3.5, 0, 7); ctx.fill();
+    text(label, s.x + 20, y + .5, 12, colText, 'left', 600);
+    if (under) { ctx.fillStyle = colText; ctx.beginPath(); const ax = s.x + w - 12; ctx.moveTo(ax - 4, y - 2); ctx.lineTo(ax + 4, y - 2); ctx.lineTo(ax, y + 3); ctx.fill(); }
+  }
+}
+
+const STATES = {
+  on: ['On target', 'green'], boost: ['Boosting', 'accent'], cut: ['Cutting', 'accent'], ceiling: ['Held back by the ceiling', 'red'],
+  range: ['At the edge of the range', 'red'], wait: ['Below the threshold, not adjusting', 'muted'], return: ['Easing back to 0 dB', 'label'],
+  held: ['Holding a fixed gain', 'accent'], analyzing: ['Analyzing', 'accent'],
+};
+function statusText() {
+  if (P.bypass) return 'Bypassed';
+  if (state === 'held') return holdValid ? 'Holding ' + sgn(holdGain) + ' dB' : 'Hold: play a typical section, then press Analyze';
+  if (state === 'analyzing') return 'Analyzing ' + anT.toFixed(1) + ' s. Press Lock after a typical section';
+  return STATES[state][0] + (state === 'boost' || state === 'cut' ? ' (' + sgn(gain) + ' dB)' : '');
+}
+const statusColour = () => P.bypass ? C.muted : C[(STATES[state] || STATES.wait)[1]];
+
+function draw() {
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  light.x += (lightTarget.x - light.x) * 0.08; light.y += (lightTarget.y - light.y) * 0.08;
+  drawBackdrop();
+  captureBackdrop();
+  drawMeter(12, inPk, inHold, true);
+  drawMeter(W - 12 - MTR.w, P.bypass ? inPk : outPk, P.bypass ? inHold : outHold, false);
+  drawDeck();
+  drawTags();
+  drawHeader();
+}
+
+// ---------------- size
+let scale = 1;
+function fit() { const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1; scale = r.width / W * d; cv.width = Math.round(r.width * d); cv.height = Math.round(r.width * d * H / W); }
+new ResizeObserver(fit).observe(cv); fit();
+
+// ---------------- interaction
+let hover = null, drag = null, focusId = null;
+const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; };
+const inR = ([x, y], r) => r && x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
+function hitTest(p) {
+  for (const k of knobs) if (Math.hypot(p[0] - k.x, p[1] - k.y) < k.r + 14) return k.id;
+  for (const id of ['ride', 'hold', 'ease', 'theme', 'bypass']) if (inR(p, btn[id])) return id;
+  const overDeck = inR(p, [DECK.x, DECK.y, DECK.w, DECK.h]);
+  if (!overDeck && p[0] > PX0 + 22 && p[0] < PX1 - 22 && p[1] > GT - 8 && p[1] < GB + 8) {
+    let best = null, bd = 8;
+    for (const id of ['tgt', 'thr', 'ceil']) { const d = Math.abs(yOf(P[id]) - p[1]); if (d < bd) { bd = d; best = 'line-' + id; } }
+    return best;
+  }
+  return null;
+}
+const lim = (id, v) => { const k = knobs.find(k => k.id === id); return Math.min(k.max, Math.max(k.min, v)); };
+function syncInput(k) { const el = document.getElementById('k-' + k.id); el.value = P[k.id]; el.setAttribute('aria-valuetext', k.val(P[k.id])); }
+function set(id, v) { P[id] = lim(id, v); syncInput(knobs.find(k => k.id === id)); }
+function setTheme(isDark) { dark = isDark; unit.dataset.ptheme = isDark ? 'dark' : 'light'; readTokens(); }
+function click(id) {
+  if (id === 'ride') { P.hold = false; analyzing = false; }
+  else if (id === 'hold') { if (!P.hold) { P.hold = true; holdGain = gain; holdValid = true; } }
+  else if (id === 'analyze') { if (analyzing) lockAnalyze(); else { analyzing = true; anSum = 0; anN = 0; anT = 0; } }
+  else if (id === 'ease') P.ease = !P.ease;
+  else if (id === 'bypass') P.bypass = !P.bypass;
+  else if (id === 'theme') setTheme(!dark);
+}
+cv.addEventListener('pointermove', e => {
+  const p = pt(e);
+  if (!reduced) lightTarget = { x: Math.max(-1, Math.min(1, (p[0] / W - 0.5) * 2)) * 0.8, y: -0.9 + (p[1] / H) * 0.6 };
+  if (drag) {
+    if (drag.id.startsWith('line-')) set(drag.id.slice(5), vOf(p[1]));
+    else { const k = knobs.find(k => k.id === drag.id); set(k.id, drag.v0 + (drag.y0 - p[1]) / (e.shiftKey ? 900 : 220) * (k.max - k.min)); }
+    return;
+  }
+  hover = hitTest(p);
+  cv.style.cursor = !hover ? 'default' : hover.startsWith('line-') || knobs.some(k => k.id === hover) ? 'ns-resize' : 'pointer';
+});
+cv.addEventListener('pointerleave', () => { if (!drag) hover = null; lightTarget = { x: -0.5, y: -1 }; });
+cv.addEventListener('pointerdown', e => {
+  const p = pt(e), id = hitTest(p); if (!id) return;
+  if (knobs.some(k => k.id === id) || id.startsWith('line-')) { drag = { id, y0: p[1], v0: P[id.replace('line-', '')] }; cv.setPointerCapture(e.pointerId); }
+  else click(id);
+});
+const endDrag = () => { drag = null; };
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => cv.addEventListener(ev, endDrag));
+window.addEventListener('blur', endDrag);
+cv.addEventListener('touchstart', e => { const tp = e.touches[0]; if (tp && hitTest(pt(tp))) e.preventDefault(); }, { passive: false });
+cv.addEventListener('dblclick', e => { const id = hitTest(pt(e)); if (id && knobs.some(k => k.id === id)) set(id, DEF[id]); });
+cv.addEventListener('wheel', e => { const k = knobs.find(k => k.id === hitTest(pt(e))); if (!k) return; e.preventDefault(); set(k.id, P[k.id] - Math.sign(e.deltaY) * (k.max - k.min) / 60); }, { passive: false });
+knobs.forEach(k => {
+  const el = document.getElementById('k-' + k.id); syncInput(k);
+  el.addEventListener('input', () => { P[k.id] = +el.value; el.setAttribute('aria-valuetext', k.val(P[k.id])); });
+  el.addEventListener('focus', () => focusId = k.id); el.addEventListener('blur', () => focusId = null);
+});
+[['b-mode', 'mode'], ['b-ease', 'ease'], ['b-theme', 'theme'], ['b-bypass', 'bypass']].forEach(([elId, id]) => {
+  const el = document.getElementById(elId);
+  el.addEventListener('click', () => click(id === 'mode' ? (P.hold ? 'ride' : 'hold') : id));
+  el.addEventListener('focus', () => focusId = id); el.addEventListener('blur', () => focusId = null);
+});
+const srcBtns = { voice: 's-voice', drums: 's-drums', mix: 's-mix' };
+Object.entries(srcBtns).forEach(([s, elId]) => document.getElementById(elId).addEventListener('click', () => {
+  src = s; sectionLeft = 0; Object.values(srcBtns).forEach(i => document.getElementById(i).setAttribute('aria-pressed', i === elId));
+}));
+const pauseBtn = document.getElementById('s-pause');
+pauseBtn.addEventListener('click', () => { paused = !paused; pauseBtn.setAttribute('aria-pressed', paused); pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
+
+// ---------------- analysis panel
+const drawer = document.getElementById('drawer'), anBtn = document.getElementById('an-btn'), anRead = document.getElementById('an-read');
+const wcv = document.getElementById('wave'), wctx = wcv.getContext('2d');
+anBtn.addEventListener('click', () => click('analyze'));
+function fitWave() { const r = wcv.getBoundingClientRect(), d = window.devicePixelRatio || 1; wcv.width = Math.max(1, Math.round(r.width * d)); wcv.height = Math.max(1, Math.round(r.height * d)); }
+new ResizeObserver(fitWave).observe(wcv);
+function drawDrawer() {
+  const open = P.hold;
+  if (drawer.classList.contains('open') !== open) { drawer.classList.toggle('open', open); drawer.setAttribute('aria-hidden', !open); anBtn.tabIndex = open ? 0 : -1; }
+  if (!open) return;
+  anBtn.textContent = analyzing ? 'Lock' : holdValid ? 'Analyze again' : 'Analyze';
+  anBtn.setAttribute('aria-pressed', analyzing);
+  const m = anN ? 10 * Math.log10(anSum / anN) : null;
+  const read = analyzing
+    ? `<span class="hot">Analyzing</span> <b>${anT.toFixed(1)} s</b><br>Above threshold <b>${(anN * dt).toFixed(1)} s</b><br>Measured <b>${m === null ? '–' : fmt(m) + ' dB RMS'}</b><br>Locks by itself at 20 s`
+    : holdValid ? `Holding <span class="hot">${sgn(holdGain)} dB</span><br>Play a typical section and press Analyze again to re-measure.`
+    : 'Press Analyze, then play a typical section.';
+  if (anRead.innerHTML !== read) anRead.innerHTML = read;
+  const w = wcv.width, h = wcv.height, d = window.devicePixelRatio || 1, mid = h / 2;
+  wctx.clearRect(0, 0, w, h);
+  wctx.fillStyle = C.grid; wctx.fillRect(0, Math.round(mid), w, d);
+  const thrA = Math.min(1, Math.max(0, (P.thr + 66) / 60)) * (mid - 8 * d);
+  wctx.setLineDash([4 * d, 4 * d]); wctx.strokeStyle = C.green; wctx.globalAlpha = .7; wctx.lineWidth = d;
+  [mid - thrA, mid + thrA].forEach(y => { wctx.beginPath(); wctx.moveTo(0, y); wctx.lineTo(w, y); wctx.stroke(); });
+  wctx.setLineDash([]); wctx.globalAlpha = 1;
+  const n = wave.length, stp = w / WAVE;
+  for (let i = 0; i < n; i++) {
+    const s = wave[i], x = w - (n - i) * stp, a = s.a * (mid - 8 * d);
+    wctx.fillStyle = s.an ? C.accent : C.trace; wctx.globalAlpha = s.act ? 1 : .35;
+    wctx.fillRect(x, mid - a * s.up, Math.max(d, stp * .9), a * s.up + a);
+  }
+  wctx.globalAlpha = 1;
+  wctx.font = `500 ${12 * d}px ${FONT}`; wctx.fillStyle = C.muted; wctx.textBaseline = 'top';
+  wctx.fillText('Input, last 6 s. Dashed: threshold', 12 * d, 9 * d);
+}
+
+// ---------------- loop
+for (let i = 0; i < HIST; i++) step();
+const status = document.getElementById('status'), announce = document.getElementById('announce');
+let acc = 0, last = performance.now(), lastStatus = '', lastSpoken = '', cand = '', candSince = 0;
+function spoken() {
+  if (P.bypass) return 'Bypassed';
+  if (P.hold) return analyzing ? 'Analyzing. Press Lock after a typical section.' : holdValid ? 'Holding ' + sgn(holdGain) + ' dB' : 'Not enough sound above the threshold. Analyze again.';
+  return (STATES[state] || STATES.wait)[0];
+}
+function loop(now) {
+  acc += Math.min(0.25, (now - last) / 1000); last = now;
+  if (!paused) while (acc >= dt) { step(); acc -= dt; } else acc = 0;
+  draw(); drawDrawer();
+  const sp = spoken();
+  if (sp !== cand) { cand = sp; candSince = now; } else if (sp !== lastSpoken && now - candSince > 1500) { lastSpoken = sp; announce.textContent = sp; }
+  const s = statusText();
+  if (s !== lastStatus) { lastStatus = s; status.textContent = s; status.style.setProperty('--dot', statusColour()); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>

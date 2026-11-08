@@ -29,6 +29,24 @@
         ],
         "createdAt": "2026-11-08T15:40:00.760Z",
         "reason": "Claude: static scan assumes a white background; the page ground is #121214 and the grey text measures 5.2:1 or better on it"
+      },
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          "prototype/corridor-glass.html"
+        ],
+        "createdAt": "2026-11-08T18:08:01.805Z",
+        "reason": "Claude: static scan pairs the dark theme's #98989d with a white page; in dark mode the page is #000 (6.9:1) and the light theme uses #6e6e73 (5.1:1)"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "prototype/corridor-glass.html"
+        ],
+        "createdAt": "2026-11-08T18:08:01.820Z",
+        "reason": "Claude: the .plugin box only holds a full-bleed canvas; text inside the canvas has its own margins"
       }
     ]
   }
