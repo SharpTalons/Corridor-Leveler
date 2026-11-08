@@ -13,7 +13,7 @@
   --grid: #34343a;
   --ink: #e8e8ea;
   --label: #c9c9cd;
-  --muted: #8b8b91;
+  --muted: #9d9da3;  /* 5.2:1 on the graph's lightest charcoal */
   --yellow: #f5c41c;
   --yellow-deep: #c99a0e;
   --green: #8cc63f;
@@ -26,6 +26,25 @@
   --btn-top: #4a4a50;
   --btn-bottom: #35353a;
   --btn-edge: #5d5d64;
+  --btn-hover: #58585e;
+  --btn-under: #1d1d20;      /* the key's lower edge */
+  --btn-pressed: #232326;
+  --skirt-top: #45454b;      /* dial bevel, lit from above */
+  --skirt-mid: #222226;
+  --skirt-bottom: #0b0b0c;
+  --well: #141416;           /* recessed slots and displays */
+  --well-deep: #0e0e10;
+  --frame: #2e2e33;
+  --meter-bg-top: #202023;
+  --meter-bg-bottom: #151517;
+  --meter-low: #2f8a1d;
+  --meter-warn: #d8c425;
+  --chrome-top: #26262a;
+  --seam: #0c0c0e;
+  --thr-mid: #c6c62a;
+  --tag-bg: rgba(20, 20, 22, .85);
+  --drawer-top: #1a1a1d;
+  --drawer-bottom: #232326;
   --font-ui: "Inter Tight", "Segoe UI", system-ui, sans-serif;
   --font-num: "JetBrains Mono", ui-monospace, Consolas, monospace;
 }
@@ -35,35 +54,38 @@ body { font-family: var(--font-ui); padding-left: max(16px, env(safe-area-inset-
 header.page { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
 header.page h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: 0.01em; text-wrap: balance; }
 header.page p { margin: 0; color: var(--muted); max-width: 62ch; line-height: 1.5; }
-.plugin { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.55), 0 0 0 1px #2e2e33; background: var(--graph-bottom); }
-.plugin canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
-.unit { display: grid; }
+.plugin { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.55), 0 0 0 1px var(--frame); background: var(--graph-bottom); }
+.plugin canvas { display: block; width: 100%; height: 100%; touch-action: manipulation; cursor: default; }
+.stage { min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; }
+.unit { display: grid; min-width: 0; }
+.narrow-note { display: none; margin: 0; color: var(--muted); font-size: 13px; }
+@media (max-width: 760px) { .unit { min-width: 760px; } .narrow-note { display: block; } }
 .unit .plugin { position: relative; z-index: 1; }
 .drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .32s cubic-bezier(.2,.7,.2,1); }
 .drawer.open { grid-template-rows: 1fr; }
 .drawer > div { overflow: hidden; min-height: 0; }
 .drawer-body { margin: 0 14px; padding: 14px 16px 16px; display: grid; grid-template-columns: minmax(150px, 190px) 1fr; gap: 16px; align-items: stretch;
-  background: linear-gradient(#1a1a1d, #232326); border: 1px solid #2e2e33; border-top: 0; border-radius: 0 0 10px 10px;
+  background: linear-gradient(var(--drawer-top), var(--drawer-bottom)); border: 1px solid var(--frame); border-top: 0; border-radius: 0 0 10px 10px;
   box-shadow: inset 0 10px 14px -8px rgba(0,0,0,.8), 0 14px 30px rgba(0,0,0,.45); }
 .drawer-side { display: grid; gap: 10px; align-content: start; min-width: 0; }
 .drawer-side .cap { font-size: 11px; font-weight: 600; letter-spacing: .14em; color: var(--label); text-transform: uppercase; }
 .drawer-side .readout { font-family: var(--font-num); font-size: 12.5px; color: var(--muted); line-height: 1.55; }
 .drawer-side .readout b { color: var(--ink); font-weight: 500; }
 .drawer-side .readout .hot { color: var(--yellow); }
-.wave { min-width: 0; height: 120px; border-radius: 6px; background: #111113; box-shadow: inset 0 3px 8px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.06); }
+.wave { min-width: 0; height: 120px; border-radius: 6px; background: var(--well-deep); box-shadow: inset 0 3px 8px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.06); }
 .wave canvas { display: block; width: 100%; height: 100%; }
 .key { font: 600 12.5px var(--font-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--label); padding: 9px 14px; border-radius: 7px; cursor: pointer;
   background: linear-gradient(var(--btn-top), var(--btn-bottom)); border: 1px solid var(--btn-edge);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 3px 0 #1d1d20, 0 5px 10px rgba(0,0,0,.5); }
-.key:hover { background: linear-gradient(#58585e, var(--btn-bottom)); }
-.key[aria-pressed="true"] { color: var(--yellow); background: #232326; border-color: #111; box-shadow: inset 0 3px 6px rgba(0,0,0,.7); transform: translateY(2px); }
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 3px 0 var(--btn-under), 0 5px 10px rgba(0,0,0,.5); }
+.key:hover { background: linear-gradient(var(--btn-hover), var(--btn-bottom)); }
+.key[aria-pressed="true"] { color: var(--yellow); background: var(--btn-pressed); border-color: var(--seam); box-shadow: inset 0 3px 6px rgba(0,0,0,.7); transform: translateY(2px); }
 .key:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
 @media (max-width: 640px) { .drawer-body { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
 .sim { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; color: var(--muted); font-size: 13px; }
 .sim .group { display: flex; gap: 6px; }
 .pill { font: 600 12px var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--label); background: linear-gradient(var(--btn-top), var(--btn-bottom)); border: 1px solid var(--btn-edge); border-radius: 7px; padding: 7px 14px; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.4); }
-.pill[aria-pressed="true"] { color: var(--yellow); background: linear-gradient(#3a3a3f, #2b2b2f); box-shadow: inset 0 2px 4px rgba(0,0,0,.5); }
+.pill[aria-pressed="true"] { color: var(--yellow); background: var(--btn-pressed); box-shadow: inset 0 2px 4px rgba(0,0,0,.5); }
 .pill:focus-visible, .sr:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
 h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--label); }
 .sheet { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 24px; }
@@ -88,6 +110,8 @@ h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .12em;
     <p>A working preview for approval. Drag a dial up or down (Shift for fine steps, double-click to reset), or drag the Target, Threshold and Ceiling lines in the graph.</p>
   </header>
 
+  <p class="narrow-note">Corridor is a desktop plugin. Scroll the window sideways to see all of it.</p>
+  <div class="stage">
   <div class="unit">
   <div class="plugin" id="plugin">
     <canvas id="cv" width="1120" height="630" aria-label="Corridor Leveler plugin window preview" role="img"></canvas>
@@ -108,11 +132,12 @@ h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .12em;
         <div class="drawer-side">
           <span class="cap">Analyze &amp; hold</span>
           <button class="key" id="an-btn" aria-pressed="false" tabindex="-1">Analyze</button>
-          <div class="readout" id="an-read" aria-live="polite"></div>
+          <div class="readout" id="an-read"></div>
         </div>
         <div class="wave"><canvas id="wave" aria-label="Live input waveform"></canvas></div>
       </div>
     </div>
+  </div>
   </div>
   </div>
 
@@ -124,7 +149,8 @@ h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .12em;
       <button class="pill" id="s-mix" aria-pressed="false">Mix</button>
     </div>
     <button class="pill" id="s-pause" aria-pressed="false">Pause</button>
-    <div class="status" id="status" aria-live="polite"></div>
+    <div class="status" id="status"></div>
+    <div class="sr" id="announce" role="status" aria-live="polite"></div>
   </div>
 
   <div class="sheet">
@@ -153,7 +179,10 @@ const W = 1120, H = 630;
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const C = {};
-['page','chrome','panel-top','panel-bottom','graph-top','graph-bottom','grid','ink','label','muted','yellow','yellow-deep','green','red','trace','meter-lit','meter-off','knob-hi','knob-lo','btn-top','btn-bottom','btn-edge'].forEach(k => C[k] = css('--' + k));
+['page','chrome','panel-top','panel-bottom','graph-top','graph-bottom','grid','ink','label','muted','yellow','yellow-deep','green','red','trace','meter-lit','meter-off','knob-hi','knob-lo','btn-top','btn-bottom','btn-edge',
+ 'btn-hover','btn-under','btn-pressed','skirt-top','skirt-mid','skirt-bottom','well','well-deep','meter-bg-top','meter-bg-bottom','meter-low','meter-warn','chrome-top','seam','thr-mid','tag-bg'].forEach(k => C[k] = css('--' + k));
+const FONT_UI = css('--font-ui'), FONT_NUM = css('--font-num');  // read once, not per piece of text
+const fadeRGB = (() => { const h = C['graph-bottom'].replace('#', ''); return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)).join(','); })();
 
 // palette sheet
 const roles = [['page','Window edge'],['chrome','Header'],['graph-top','Graph top'],['graph-bottom','Graph bottom'],['grid','Grid lines'],['knob-hi','Dial face'],['knob-lo','Dial edge'],['btn-top','Button top'],['btn-bottom','Button bottom'],['ink','Values'],['label','Labels'],['muted','Scale, hints'],['yellow','Accent, Target'],['green','Threshold'],['red','Output trace'],['trace','Input trace'],['meter-lit','Meter'],['meter-off','Meter unlit']];
@@ -270,14 +299,14 @@ function lockAnalyze() {
 // ---------------- drawing helpers
 function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
 function text(s, x, y, size, col, align = 'center', weight = 500, font = 'ui', spacing = 0) {
-  ctx.font = `${weight} ${size}px ${font === 'num' ? css('--font-num') : css('--font-ui')}`;
+  ctx.font = `${weight} ${size}px ${font === 'num' ? FONT_NUM : FONT_UI}`;
   ctx.fillStyle = col; ctx.textAlign = align; ctx.textBaseline = 'middle';
   if (spacing && 'letterSpacing' in ctx) ctx.letterSpacing = spacing + 'px';
   ctx.fillText(s, x, y);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 // a recessed well: dark fill, shadow falling in from the top edge, a faint lit lip at the bottom
-function well(x, y, w, h, r, fill = '#141416') {
+function well(x, y, w, h, r, fill = C.well) {
   ctx.save();
   roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill();
   ctx.clip();
@@ -292,16 +321,16 @@ function well(x, y, w, h, r, fill = '#141416') {
 function button(x, y, w, h, label, on, hot) {
   ctx.save();
   if (on) {
-    well(x, y, w, h, 7, '#232326');
+    well(x, y, w, h, 7, C['btn-pressed']);
     const glow = ctx.createRadialGradient(x + w / 2, y + h / 2, 2, x + w / 2, y + h / 2, w * .6);
     glow.addColorStop(0, 'rgba(245,196,28,.10)'); glow.addColorStop(1, 'rgba(245,196,28,0)');
     roundRect(x, y, w, h, 7); ctx.fillStyle = glow; ctx.fill();
   } else {
     // lower edge, seen below the key face
-    roundRect(x, y + 2, w, h, 7); ctx.fillStyle = '#1d1d20';
+    roundRect(x, y + 2, w, h, 7); ctx.fillStyle = C['btn-under'];
     ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3; ctx.fill(); ctx.shadowColor = 'transparent';
     roundRect(x, y, w, h, 7);
-    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, hot ? '#58585e' : C['btn-top']); g.addColorStop(1, C['btn-bottom']);
+    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, hot ? C['btn-hover'] : C['btn-top']); g.addColorStop(1, C['btn-bottom']);
     ctx.fillStyle = g; ctx.fill();
     const sheen = ctx.createLinearGradient(0, y, 0, y + h * .5); sheen.addColorStop(0, 'rgba(255,255,255,.10)'); sheen.addColorStop(1, 'rgba(255,255,255,0)');
     roundRect(x + 1, y + 1, w - 2, h * .5, 6); ctx.fillStyle = sheen; ctx.fill();
@@ -326,7 +355,7 @@ function drawKnob(k) {
     let col = C.yellow;
     if (k.grad) {
       const [sx, sy] = toXY(A0, ringR), [ex, ey] = toXY(A1, ringR);
-      col = ctx.createLinearGradient(sx, sy, ex, ey); col.addColorStop(0, C.green); col.addColorStop(0.55, '#c6c62a'); col.addColorStop(1, C.yellow);
+      col = ctx.createLinearGradient(sx, sy, ex, ey); col.addColorStop(0, C.green); col.addColorStop(0.55, C['thr-mid']); col.addColorStop(1, C.yellow);
     }
     arc(A0, ang, ringR); ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.stroke();
     ctx.save(); ctx.globalAlpha = .18; ctx.lineWidth = 10; ctx.stroke(); ctx.restore();
@@ -345,7 +374,7 @@ function drawKnob(k) {
   ctx.shadowColor = 'rgba(0,0,0,.8)'; ctx.shadowBlur = r * .6; ctx.shadowOffsetY = r * .22;
   ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
   const skirt = ctx.createLinearGradient(0, y - r, 0, y + r);
-  skirt.addColorStop(0, '#45454b'); skirt.addColorStop(.5, '#222226'); skirt.addColorStop(1, '#0b0b0c');
+  skirt.addColorStop(0, C['skirt-top']); skirt.addColorStop(.5, C['skirt-mid']); skirt.addColorStop(1, C['skirt-bottom']);
   ctx.fillStyle = skirt; ctx.fill();
   ctx.restore();
   const fr = r * .86;
@@ -375,18 +404,18 @@ function avg(f) { const n = Math.min(40, hist.length); let s = 0, c = 0; for (le
 const avgIn = () => avg('i'), avgOut = () => avg('o');
 
 function drawMeter(x0, w, pk, hold, isIn) {
-  const bg = ctx.createLinearGradient(0, HEAD, 0, H); bg.addColorStop(0, '#202023'); bg.addColorStop(1, '#151517');
+  const bg = ctx.createLinearGradient(0, HEAD, 0, H); bg.addColorStop(0, C['meter-bg-top']); bg.addColorStop(1, C['meter-bg-bottom']);
   ctx.fillStyle = bg; ctx.fillRect(x0, HEAD, w, H - HEAD);
-  ctx.fillStyle = '#0d0d0f'; ctx.fillRect(isIn ? x0 + w - 1 : x0, HEAD, 1, H - HEAD);
+  ctx.fillStyle = C.seam; ctx.fillRect(isIn ? x0 + w - 1 : x0, HEAD, 1, H - HEAD);
   const bw = 7, gap = 3, bx = isIn ? x0 + w - 12 - bw * 2 - gap : x0 + 12;
-  well(bx - 3, GT - 3, bw * 2 + gap + 6, GB - GT + 6, 3, '#0e0e10');  // the bars sit in a recessed slot
+  well(bx - 3, GT - 3, bw * 2 + gap + 6, GB - GT + 6, 3, C['well-deep']);  // the bars sit in a recessed slot
   for (let ch = 0; ch < 2; ch++) {
-    const cx = bx + ch * (bw + gap), p = pk - ch * rnd(0, 1.2);
+    const cx = bx + ch * (bw + gap), p = pk - ch * (0.6 + 0.5 * Math.sin(t * 1.3 + (isIn ? 0 : 2)));
     ctx.fillStyle = C['meter-off']; ctx.fillRect(cx, GT, bw, GB - GT);
     const top = yOf(Math.min(0, p));
     if (p > -RANGE_DB) {
       const g = ctx.createLinearGradient(0, GB, 0, GT);
-      g.addColorStop(0, '#2f8a1d'); g.addColorStop(1 - 6 / RANGE_DB - .001, C['meter-lit']); g.addColorStop(1 - 6 / RANGE_DB, '#d8c425'); g.addColorStop(1 - 1 / RANGE_DB, '#d8c425'); g.addColorStop(1 - 1 / RANGE_DB + .001, C.red); g.addColorStop(1, C.red);
+      g.addColorStop(0, C['meter-low']); g.addColorStop(1 - 6 / RANGE_DB - .001, C['meter-lit']); g.addColorStop(1 - 6 / RANGE_DB, C['meter-warn']); g.addColorStop(1 - 1 / RANGE_DB, C['meter-warn']); g.addColorStop(1 - 1 / RANGE_DB + .001, C.red); g.addColorStop(1, C.red);
       ctx.fillStyle = g; ctx.fillRect(cx, top, bw, GB - top);
     }
     if (hold > -RANGE_DB) { ctx.fillStyle = C.yellow; ctx.fillRect(cx, yOf(Math.min(0, hold)) - 1, bw, 2); }
@@ -404,7 +433,7 @@ function drawMeter(x0, w, pk, hold, isIn) {
     if (major) text(String(v), isIn ? bx - 10 : bx + bw * 2 + gap + 9, y, 10.5, C.muted, isIn ? 'right' : 'left', 500, 'num');
   }
   // peak readout and name
-  well(x0 + 8, HEAD + 3, w - 16, 18, 4, '#101012');
+  well(x0 + 8, HEAD + 3, w - 16, 18, 4, C['well-deep']);
   text(hold > -RANGE_DB ? fmt(hold) : '-inf', x0 + w / 2, HEAD + 12.5, 11.5, hold > -1 ? C.red : hold > -6 ? C.yellow : C.label, 'center', 500, 'num');
   text(isIn ? 'IN' : 'OUT', x0 + w / 2, HEAD + 33, 10.5, C.muted, 'center', 600, 'ui', 1.4);
 }
@@ -447,13 +476,13 @@ function drawGraph() {
   // the controls sit on the graph: fade the graph out behind them
   const fadeTop = 382;
   const fade = ctx.createLinearGradient(0, fadeTop, 0, H);
-  fade.addColorStop(0, 'rgba(26,26,29,0)'); fade.addColorStop(.45, 'rgba(26,26,29,.82)'); fade.addColorStop(1, 'rgba(24,24,27,.96)');
+  fade.addColorStop(0, `rgba(${fadeRGB},0)`); fade.addColorStop(.45, `rgba(${fadeRGB},.82)`); fade.addColorStop(1, `rgba(${fadeRGB},.96)`);
   ctx.fillStyle = fade; ctx.fillRect(GX0, fadeTop, GX1 - GX0, H - fadeTop);
   // line tags (pinned above the controls when the line is under them)
   for (const tg of tags) {
     const y = Math.min(tg.y, fadeTop + 6), under = tg.y > fadeTop + 6;
-    ctx.font = `600 11px ${css('--font-ui')}`; const w = ctx.measureText(tg.label).width + tg.label.length * .8 + (under ? 30 : 20);
-    roundRect(GX0 + 10, y - 10, w, 20, 5); ctx.fillStyle = 'rgba(20,20,22,.85)'; ctx.fill();
+    ctx.font = `600 11px ${FONT_UI}`; const w = ctx.measureText(tg.label).width + tg.label.length * .8 + (under ? 30 : 20);
+    roundRect(GX0 + 10, y - 10, w, 20, 5); ctx.fillStyle = C['tag-bg']; ctx.fill();
     ctx.strokeStyle = tg.col; ctx.lineWidth = 1; ctx.stroke();
     text(tg.label, GX0 + 19, y + .5, 11, tg.col, 'left', 600, 'ui', .8);
     if (under) { ctx.fillStyle = tg.col; ctx.beginPath(); const ax = GX0 + 10 + w - 12; ctx.moveTo(ax - 4, y - 2); ctx.lineTo(ax + 4, y - 2); ctx.lineTo(ax, y + 3); ctx.fill(); }
@@ -477,22 +506,22 @@ function drawDeck() {
   // Ride / Hold under the Target dial
   const t = knobs[2], bw = 64, bh = 26, by = t.y + t.r + 7 + 44;
   btn.ride = [t.x - bw, by, bw, bh]; btn.hold = [t.x, by, bw, bh];
-  well(t.x - bw - 4, by - 4, bw * 2 + 8, bh + 8, 10, '#151517');  // the switch sits in a recessed slot
+  well(t.x - bw - 4, by - 4, bw * 2 + 8, bh + 8, 10, C.well);  // the switch sits in a recessed slot
   button(...btn.ride, 'RIDE', !P.hold, hover === 'ride');
   button(...btn.hold, 'HOLD', P.hold, hover === 'hold');
   // readouts: latency bottom-left, applied gain bottom-right
   text('LATENCY 5.0 ms', GX0 + 14, H - 22, 11, C.muted, 'left', 600, 'ui', 1);
   const g = P.bypass ? 0 : gain;
-  well(GX1 - 128, H - 38, 114, 28, 6, '#111113');  // an inset display
+  well(GX1 - 128, H - 38, 114, 28, 6, C['well-deep']);  // an inset display
   text('GAIN', GX1 - 118, H - 23.5, 10.5, C.muted, 'left', 600, 'ui', 1.2);
   text(sgn(g) + ' dB', GX1 - 22, H - 23.5, 13, Math.abs(g) < .05 ? C.ink : C.yellow, 'right', 500, 'num');
 }
 
 function drawHeader() {
-  const g = ctx.createLinearGradient(0, 0, 0, HEAD); g.addColorStop(0, '#26262a'); g.addColorStop(1, C.chrome);
+  const g = ctx.createLinearGradient(0, 0, 0, HEAD); g.addColorStop(0, C['chrome-top']); g.addColorStop(1, C.chrome);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, HEAD);
   ctx.fillStyle = 'rgba(255,255,255,.10)'; ctx.fillRect(0, 0, W, 1);  // lit top bevel
-  ctx.fillStyle = '#0c0c0e'; ctx.fillRect(0, HEAD - 1, W, 1);
+  ctx.fillStyle = C.seam; ctx.fillRect(0, HEAD - 1, W, 1);
   const drop = ctx.createLinearGradient(0, HEAD, 0, HEAD + 8); drop.addColorStop(0, 'rgba(0,0,0,.45)'); drop.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = drop; ctx.fillRect(0, HEAD, W, 8);  // the header casts a shadow on the graph
   // logo: a level held between two walls
@@ -561,7 +590,8 @@ function hitTest(p) {
   return null;
 }
 const lim = (id, v) => { const k = knobs.find(k => k.id === id); return Math.min(k.max, Math.max(k.min, v)); };
-function set(id, v) { P[id] = lim(id, v); const el = document.getElementById('k-' + id); if (el) el.value = P[id]; }
+function syncInput(k) { const el = document.getElementById('k-' + k.id); el.value = P[k.id]; el.setAttribute('aria-valuetext', k.val(P[k.id])); }
+function set(id, v) { P[id] = lim(id, v); syncInput(knobs.find(k => k.id === id)); }
 function click(id) {
   if (id === 'ride') { P.hold = false; analyzing = false; }
   else if (id === 'hold') { if (!P.hold) { P.hold = true; holdGain = gain; holdValid = true; } }
@@ -585,12 +615,15 @@ cv.addEventListener('pointerdown', e => {
   if (knobs.some(k => k.id === id) || id.startsWith('line-')) { drag = { id, y0: p[1], v0: P[id.replace('line-', '')] }; cv.setPointerCapture(e.pointerId); }
   else click(id);
 });
-cv.addEventListener('pointerup', () => { drag = null; });
+const endDrag = () => { drag = null; };
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => cv.addEventListener(ev, endDrag));
+window.addEventListener('blur', endDrag);
+cv.addEventListener('touchstart', e => { const tp = e.touches[0]; if (tp && hitTest(pt(tp))) e.preventDefault(); }, { passive: false });
 cv.addEventListener('dblclick', e => { const id = hitTest(pt(e)); if (id && knobs.some(k => k.id === id)) set(id, DEF[id]); });
 cv.addEventListener('wheel', e => { const id = hitTest(pt(e)); const k = knobs.find(k => k.id === id); if (!k) return; e.preventDefault(); set(k.id, P[k.id] - Math.sign(e.deltaY) * (k.max - k.min) / 60); }, { passive: false });
 knobs.forEach(k => {
-  const el = document.getElementById('k-' + k.id); el.value = P[k.id];
-  el.addEventListener('input', () => { P[k.id] = +el.value; });
+  const el = document.getElementById('k-' + k.id); syncInput(k);
+  el.addEventListener('input', () => { P[k.id] = +el.value; el.setAttribute('aria-valuetext', k.val(P[k.id])); });
   el.addEventListener('focus', () => focusId = k.id); el.addEventListener('blur', () => focusId = null);
 });
 [['b-mode', 'mode'], ['b-ease', 'ease'], ['b-bypass', 'bypass']].forEach(([elId, id]) => {
@@ -638,13 +671,20 @@ function drawDrawer() {
     wctx.fillStyle = s.an ? (s.act ? C.yellow : 'rgba(245,196,28,.35)') : (s.act ? 'rgba(178,178,183,.8)' : 'rgba(178,178,183,.3)');
     wctx.fillRect(x, mid - a * s.up, Math.max(d, step * .9), a * s.up + a);
   }
-  wctx.font = `600 ${10.5 * d}px ${css('--font-ui')}`; wctx.fillStyle = C.muted; wctx.textBaseline = 'top';
+  wctx.font = `600 ${10.5 * d}px ${FONT_UI}`; wctx.fillStyle = C.muted; wctx.textBaseline = 'top';
   wctx.fillText('INPUT, LAST 6 S  (DASHED: THRESHOLD)', 8 * d, 7 * d);
 }
 
 // ---------------- loop: warm up so the first frame shows a full graph
 for (let i = 0; i < HIST; i++) step();
 const status = document.getElementById('status');
+const announce = document.getElementById('announce');
+let lastSpoken = '', cand = '', candSince = 0;
+function spoken() {  // what a screen reader hears: changes of state, no ticking numbers
+  if (P.bypass) return 'Bypassed';
+  if (P.hold) return analyzing ? 'Analyzing. Press Lock after a typical section.' : holdValid ? 'Holding ' + sgn(holdGain) + ' dB' : 'Not enough sound above the threshold. Analyze again.';
+  return (STATES[state] || STATES.wait)[0];
+}
 let acc = 0, last = performance.now(), lastStatus = '';
 function loop(now) {
   acc += Math.min(0.25, (now - last) / 1000); last = now;
@@ -652,6 +692,9 @@ function loop(now) {
   draw();
   drawDrawer();
   const s = statusText();
+  const sp = spoken();  // speak a state only once it has held for 1.5 s, so riding doesn't chatter
+  if (sp !== cand) { cand = sp; candSince = now; }
+  else if (sp !== lastSpoken && now - candSince > 1500) { lastSpoken = sp; announce.textContent = sp; }
   if (s !== lastStatus) { lastStatus = s; status.textContent = s; status.style.setProperty('--dot', css(P.bypass ? '--muted' : (STATES[state] || STATES.wait)[1])); }
   requestAnimationFrame(loop);
 }
