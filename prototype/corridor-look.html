@@ -68,7 +68,7 @@ header.page p { margin: 0; color: var(--muted); max-width: 62ch; line-height: 1.
   background: linear-gradient(var(--drawer-top), var(--drawer-bottom)); border: 1px solid var(--frame); border-top: 0; border-radius: 0 0 10px 10px;
   box-shadow: inset 0 10px 14px -8px rgba(0,0,0,.8), 0 14px 30px rgba(0,0,0,.45); }
 .drawer-side { display: grid; gap: 10px; align-content: start; min-width: 0; }
-.drawer-side .cap { font-size: 11px; font-weight: 600; letter-spacing: .14em; color: var(--label); text-transform: uppercase; }
+.drawer-side .cap { font-size: 13px; font-weight: 600; color: var(--label); }
 .drawer-side .readout { font-family: var(--font-num); font-size: 12.5px; color: var(--muted); line-height: 1.55; }
 .drawer-side .readout b { color: var(--ink); font-weight: 500; }
 .drawer-side .readout .hot { color: var(--yellow); }
@@ -84,10 +84,11 @@ header.page p { margin: 0; color: var(--muted); max-width: 62ch; line-height: 1.
 @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
 .sim { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; color: var(--muted); font-size: 13px; }
 .sim .group { display: flex; gap: 6px; }
-.pill { font: 600 12px var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--label); background: linear-gradient(var(--btn-top), var(--btn-bottom)); border: 1px solid var(--btn-edge); border-radius: 7px; padding: 7px 14px; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.4); }
-.pill[aria-pressed="true"] { color: var(--yellow); background: var(--btn-pressed); box-shadow: inset 0 2px 4px rgba(0,0,0,.5); }
+.pill { font: 600 13px var(--font-ui); color: var(--label); background: var(--btn-bottom); border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; transition: background-color .12s; }
+.pill:hover { background: var(--btn-top); }
+.pill[aria-pressed="true"] { color: var(--page); background: var(--yellow); }
 .pill:focus-visible, .sr:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
-h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--label); }
+h2 { margin: 0 0 12px; font-size: 16px; font-weight: 600; color: var(--ink); }
 .sheet { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 24px; }
 .sheet section { min-width: 0; }
 .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
@@ -318,7 +319,7 @@ function well(x, y, w, h, r, fill = C.well) {
   ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.beginPath(); ctx.moveTo(x + r, y + h + .5); ctx.lineTo(x + w - r, y + h + .5); ctx.stroke();
 }
 // a raised key: drop shadow, lit top bevel, darker lower edge; pressed keys sink into a well
-function button(x, y, w, h, label, on, hot) {
+function button(x, y, w, h, label, on, hot, lit = false) {
   ctx.save();
   if (on) {
     well(x, y, w, h, 7, C['btn-pressed']);
@@ -337,7 +338,7 @@ function button(x, y, w, h, label, on, hot) {
     roundRect(x + .5, y + .5, w - 1, h - 1, 7); ctx.strokeStyle = C['btn-edge']; ctx.lineWidth = 1; ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.beginPath(); ctx.moveTo(x + 7, y + 1.5); ctx.lineTo(x + w - 7, y + 1.5); ctx.stroke();
   }
-  text(label, x + w / 2, y + h / 2 + (on ? 1.5 : .5), 12.5, on ? C.yellow : C.label, 'center', 600, 'ui', 0.6);
+  text(label, x + w / 2, y + h / 2 + (on ? 1.5 : .5), 12.5, on || lit ? C.yellow : C.label, 'center', 600, 'ui', 0.6);
   ctx.restore();
 }
 
@@ -430,12 +431,12 @@ function drawMeter(x0, w, pk, hold, isIn) {
     ctx.fillStyle = major ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.16)';
     const tx = isIn ? bx - 7 : bx + bw * 2 + gap + 3;
     ctx.fillRect(tx, y, major ? 4 : 3, 1);
-    if (major) text(String(v), isIn ? bx - 10 : bx + bw * 2 + gap + 9, y, 10.5, C.muted, isIn ? 'right' : 'left', 500, 'num');
+    if (major) text(String(v), isIn ? bx - 10 : bx + bw * 2 + gap + 9, y, 11, C.muted, isIn ? 'right' : 'left', 500, 'num');
   }
   // peak readout and name
   well(x0 + 8, HEAD + 3, w - 16, 18, 4, C['well-deep']);
   text(hold > -RANGE_DB ? fmt(hold) : '-inf', x0 + w / 2, HEAD + 12.5, 11.5, hold > -1 ? C.red : hold > -6 ? C.yellow : C.label, 'center', 500, 'num');
-  text(isIn ? 'IN' : 'OUT', x0 + w / 2, HEAD + 33, 10.5, C.muted, 'center', 600, 'ui', 1.4);
+  text(isIn ? 'IN' : 'OUT', x0 + w / 2, HEAD + 33, 11, C.muted, 'center', 600, 'ui', 1.4);
 }
 
 function drawGraph() {
@@ -489,10 +490,10 @@ function drawGraph() {
   }
   // legend
   ctx.fillStyle = 'rgba(178,178,183,.8)'; ctx.fillRect(GX1 - 344, HEAD + 15, 16, 2);
-  text('INPUT', GX1 - 322, HEAD + 16, 10.5, C.muted, 'left', 600, 'ui', 1.2);
+  text('INPUT', GX1 - 322, HEAD + 16, 11, C.muted, 'left', 600, 'ui', 1.2);
   ctx.fillStyle = C.red; ctx.fillRect(GX1 - 262, HEAD + 14.5, 16, 3);
-  text('OUTPUT', GX1 - 240, HEAD + 16, 10.5, C.muted, 'left', 600, 'ui', 1.2);
-  text('RMS, LAST 10 S', GX1 - 40, HEAD + 16, 10.5, C.muted, 'right', 600, 'ui', 1.2);
+  text('OUTPUT', GX1 - 240, HEAD + 16, 11, C.muted, 'left', 600, 'ui', 1.2);
+  text('RMS, LAST 10 S', GX1 - 40, HEAD + 16, 11, C.muted, 'right', 600, 'ui', 1.2);
   // the graph is a screen set into the panel: shadow falls in from the top and both sides
   const inset = (x0, y0, x1, y1, a) => { const s = ctx.createLinearGradient(x0, y0, x1, y1); s.addColorStop(0, `rgba(0,0,0,${a})`); s.addColorStop(1, 'rgba(0,0,0,0)'); return s; };
   ctx.fillStyle = inset(0, HEAD, 0, HEAD + 18, .6); ctx.fillRect(GX0, HEAD, GX1 - GX0, 18);
@@ -507,14 +508,17 @@ function drawDeck() {
   const t = knobs[2], bw = 64, bh = 26, by = t.y + t.r + 7 + 44;
   btn.ride = [t.x - bw, by, bw, bh]; btn.hold = [t.x, by, bw, bh];
   well(t.x - bw - 4, by - 4, bw * 2 + 8, bh + 8, 10, C.well);  // the switch sits in a recessed slot
-  button(...btn.ride, 'RIDE', !P.hold, hover === 'ride');
-  button(...btn.hold, 'HOLD', P.hold, hover === 'hold');
+  // selected side: a raised key with yellow text; the other side: plain text in the slot
+  const seg = (r, label, sel, hot) => sel ? button(...r, label, false, hot, true)
+    : text(label, r[0] + r[2] / 2, r[1] + r[3] / 2 + .5, 12.5, hot ? C.ink : C.muted, 'center', 600, 'ui', 0.6);
+  seg(btn.ride, 'RIDE', !P.hold, hover === 'ride');
+  seg(btn.hold, 'HOLD', P.hold, hover === 'hold');
   // readouts: latency bottom-left, applied gain bottom-right
   text('LATENCY 5.0 ms', GX0 + 14, H - 22, 11, C.muted, 'left', 600, 'ui', 1);
   const g = P.bypass ? 0 : gain;
-  well(GX1 - 128, H - 38, 114, 28, 6, C['well-deep']);  // an inset display
-  text('GAIN', GX1 - 118, H - 23.5, 10.5, C.muted, 'left', 600, 'ui', 1.2);
-  text(sgn(g) + ' dB', GX1 - 22, H - 23.5, 13, Math.abs(g) < .05 ? C.ink : C.yellow, 'right', 500, 'num');
+  well(GX1 - 176, H - 64, 162, 52, 7, C['well-deep']);  // an inset display, the screen's key number
+  text('APPLIED GAIN', GX1 - 164, H - 51, 11, C.muted, 'left', 600, 'ui', 1);
+  text(sgn(g) + ' dB', GX1 - 24, H - 29, 21, Math.abs(g) < .05 ? C.ink : C.yellow, 'right', 500, 'num');
 }
 
 function drawHeader() {
@@ -531,7 +535,11 @@ function drawHeader() {
   text('CORRIDOR', 48, 20.5, 14, C.ink, 'left', 600, 'ui', 3);
   text('LEVELER', 150, 20.5, 12, C.muted, 'left', 500, 'ui', 2);
   // status, centred
-  text(statusText(), W / 2, 20.5, 12, C.label, 'center', 500);
+  const st = statusText();
+  ctx.font = `500 13.5px ${FONT_UI}`; const sw = ctx.measureText(st).width;
+  ctx.fillStyle = P.bypass ? C.muted : C[(STATES[state] || STATES.wait)[1].slice(2)];  // tokens already read
+  ctx.beginPath(); ctx.arc(W / 2 - sw / 2 - 10, 20.5, 3.5, 0, 7); ctx.fill();
+  text(st, W / 2 + 4, 20.5, 13.5, C.ink, 'center', 500);
   // ease and bypass, right side: text lights yellow when on, like the reference's AUTO labels
   btn.ease = [W - 236, 7, 150, 26]; btn.bypass = [W - 78, 7, 62, 26];
   const eh = hover === 'ease';
@@ -671,7 +679,7 @@ function drawDrawer() {
     wctx.fillStyle = s.an ? (s.act ? C.yellow : 'rgba(245,196,28,.35)') : (s.act ? 'rgba(178,178,183,.8)' : 'rgba(178,178,183,.3)');
     wctx.fillRect(x, mid - a * s.up, Math.max(d, step * .9), a * s.up + a);
   }
-  wctx.font = `600 ${10.5 * d}px ${FONT_UI}`; wctx.fillStyle = C.muted; wctx.textBaseline = 'top';
+  wctx.font = `600 ${11 * d}px ${FONT_UI}`; wctx.fillStyle = C.muted; wctx.textBaseline = 'top';
   wctx.fillText('INPUT, LAST 6 S  (DASHED: THRESHOLD)', 8 * d, 7 * d);
 }
 
