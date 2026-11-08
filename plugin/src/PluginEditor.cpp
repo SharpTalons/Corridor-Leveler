@@ -23,17 +23,21 @@ struct Theme {
     Colour capTop, capBottom, wellTop, wellBottom, hilite, edge;
     float shadow;  // drop-shadow strength
     bool dark;
+    // role colours: each control keeps one colour on its knob and on its line in the graph
+    Colour thr, resp, rng, inTrace, meterLo;
 };
 const Theme kLight{Colour(0xffffffff), Colour(0xffffffff), Colour(0xffebebeb), Colour(0xffffffff), Colour(0xff000000),
                    Colour(0xff5f6368), Colour(0xffdcdcdc), Colour(0xff17756a), Colour(0xffcfe5e1), Colour(0xff2672b5),
                    Colour(0xffc24d33), Colour(0xffc7302b), Colour(0xffb7862a), Colour(0xff2b7d47),
                    Colour(0xffffffff), Colour(0xffdfe1e4), Colour(0xffd3d5d9), Colour(0xffeef0f2), Colour(0xffffffff),
-                   Colour(0xffbfc2c7), 0.28f, false};
+                   Colour(0xffbfc2c7), 0.28f, false,
+                   Colour(0xffa86f00), Colour(0xff2f6fd6), Colour(0xffb8407c), Colour(0xff3d6fb0), Colour(0xff2b9a4f)};
 const Theme kDark{Colour(0xff000000), Colour(0xff000000), Colour(0xff1c1c1c), Colour(0xff000000), Colour(0xffffffff),
                   Colour(0xffa3a3a3), Colour(0xff2e2e2e), Colour(0xff4cc2ae), Colour(0xff1f3b37), Colour(0xff62a9e8),
                   Colour(0xffee7b5f), Colour(0xfff0605a), Colour(0xffe0b354), Colour(0xff6cc58b),
                   Colour(0xff34373c), Colour(0xff141518), Colour(0xff030303), Colour(0xff121315), Colour(0x26ffffff),
-                  Colour(0xff050505), 0.7f, true};
+                  Colour(0xff050505), 0.7f, true,
+                  Colour(0xfff2b84b), Colour(0xff6aa8ff), Colour(0xffec7cbd), Colour(0xff7fb0ea), Colour(0xff4fd27a)};
 
 Font mono(float h, bool bold = false) {
     return Font(FontOptions(Font::getDefaultMonospacedFontName(), h, bold ? Font::bold : Font::plain));
@@ -190,8 +194,13 @@ public:
         g.strokePath(track, PathStrokeType(tw - 1.f, PathStrokeType::curved, PathStrokeType::rounded));
         // lit value arc with a soft glow
         if (pos > 0.002f) {
+            const String role = s.getProperties().getWithDefault("role", "");
+            const Colour rc = role == "thr" ? c.thr : role == "tgt" ? c.accent : role == "resp" ? c.resp
+                            : role == "rng" ? c.rng : role == "ceil" ? c.limit : c.ink;
             Path val; val.addCentredArc(cx, cy, rr, rr, 0.f, a0, ang, true);
-            g.setColour(c.ink.withAlpha(c.dark ? 0.85f : 0.8f));
+            g.setColour(rc.withAlpha(c.dark ? 0.25f : 0.18f));
+            g.strokePath(val, PathStrokeType(tw * 2.4f, PathStrokeType::curved, PathStrokeType::rounded));
+            g.setColour(rc);
             g.strokePath(val, PathStrokeType(tw - 1.f, PathStrokeType::curved, PathStrokeType::rounded));
         }
         // cap
@@ -238,7 +247,7 @@ public:
 
     Label* createSliderTextBox(Slider& s) override {
         auto* l = LookAndFeel_V4::createSliderTextBox(s);
-        l->setFont(mono(14.f, true));
+        l->setFont(mono(15.f, true));
         l->setJustificationType(Justification::centred);
         return l;
     }
@@ -298,8 +307,9 @@ public:
 // ---------------------------------------------------------------- knob
 class Knob : public Component {
 public:
-    Knob(AudioProcessorValueTreeState& st, const char* id, String title_, String unit, int dec, float dialSize)
+    Knob(AudioProcessorValueTreeState& st, const char* id, String title_, String unit, int dec, float dialSize, const char* role = "")
         : title(std::move(title_)), dial(dialSize) {
+        slider.getProperties().set("role", role);
         slider.setSliderStyle(Slider::RotaryHorizontalVerticalDrag);
         slider.setRotaryParameters(MathConstants<float>::pi * 1.25f, MathConstants<float>::pi * 2.75f, true);
         slider.setTextBoxStyle(Slider::TextBoxBelow, false, 104, 20);
@@ -327,7 +337,7 @@ public:
     void paint(Graphics& g) override {
         auto* lf = dynamic_cast<Look*>(&getLookAndFeel());
         const Theme& t = lf ? *lf->t : kDark;
-        g.setFont(sans(13.5f, true));
+        g.setFont(sans(14.5f, true));
         g.setColour(t.ink);
         g.drawText(title, getLocalBounds().removeFromBottom(18), Justification::centred);
     }
@@ -360,7 +370,7 @@ public:
             g.fillRect(getLocalBounds().toFloat());
         }
         // grid + scale
-        g.setFont(sans(11.5f));
+        g.setFont(sans(12.f));
         for (int v = 0; v >= -66; v -= 6) {
             const float y = std::round(yOf(float(v))) + 0.5f;
             g.setColour(c.muted.withAlpha(v % 12 == 0 ? 0.22f : 0.11f)); g.fillRect(0.f, y, x1, 1.f);
@@ -380,8 +390,8 @@ public:
                 else { inP.lineTo(X(k), yi); outP.lineTo(X(k), yo); }
             }
             fillP.lineTo(X(n - 1), H); fillP.closeSubPath();
-            g.setColour(c.muted.withAlpha(0.1f)); g.fillPath(fillP);
-            g.setColour(c.muted.withAlpha(0.9f)); g.strokePath(inP, PathStrokeType(1.2f, PathStrokeType::curved));
+            g.setColour(c.inTrace.withAlpha(c.dark ? 0.14f : 0.12f)); g.fillPath(fillP);
+            g.setColour(c.inTrace.withAlpha(0.9f)); g.strokePath(inP, PathStrokeType(1.4f, PathStrokeType::curved));
             g.setColour(c.accent); g.strokePath(outP, PathStrokeType(2.f, PathStrokeType::mitered, PathStrokeType::rounded));
         }
         // analyze shading
@@ -392,34 +402,23 @@ public:
         }
         // reference lines
         auto& st = proc.state();
-        auto tag = [&](const char* id, const String& label, Colour col, float d1, float d2) {
-            const float v = st.getRawParameterValue(id)->load();
-            const float y = std::round(yOf(v)) + 0.5f;
+        auto line = [&](const char* id, Colour col, float d1, float d2) {
+            const float y = std::round(yOf(st.getRawParameterValue(id)->load())) + 0.5f;
             const bool hot = hover == id || dragId == id;
             if (d1 <= 0.f) { g.setColour(col); g.fillRect(0.f, y - (hot ? 1.f : 0.6f), x1, hot ? 2.2f : 1.3f); }
-            else {
-                const float dashes[] = {d1, d2};
-                g.setColour(col); g.drawDashedLine(Line<float>(0.f, y, x1, y), dashes, 2, hot ? 2.2f : 1.3f);
-            }
-            const String txt = label + "  " + fmtDb(v, 1);
-            auto f = sans(12.f, true); g.setFont(f);
-            const float tw = GlyphArrangement::getStringWidth(f, txt) + 14.f;
-            Rectangle<float> box(8.f, y - 10.f, tw, 20.f);
-            Path bp; bp.addRoundedRectangle(box, 4.f);
-            g.setColour(hot ? col : c.graph.withAlpha(0.94f)); g.fillPath(bp);
-            g.setColour(col); g.strokePath(bp, PathStrokeType(1.f));
-            g.setColour(hot ? c.graph : col); g.drawText(txt, box.withTrimmedLeft(6.f), Justification::centredLeft);
+            else { const float dashes[] = {d1, d2}; g.setColour(col); g.drawDashedLine(Line<float>(0.f, y, x1, y), dashes, 2, hot ? 2.2f : 1.3f); }
         };
-        tag(ids::ceiling, "Ceiling", c.limit, 2.f, 3.f);
-        tag(ids::threshold, "Threshold", c.muted, 6.f, 4.f);
-        tag(ids::target, "Target", c.accent, 0.f, 0.f);
+        line(ids::ceiling, c.limit, 2.f, 3.f);
+        line(ids::threshold, c.thr, 6.f, 4.f);
+        line(ids::target, c.accent, 0.f, 0.f);
 
         // legend for the two traces, in the band above 0 dB
-        g.setFont(sans(12.f));
-        g.setColour(c.muted.withAlpha(0.9f)); g.fillRect(14.f, 25.f, 16.f, 2.f);
-        g.setColour(c.muted); g.drawText("Input", Rectangle<float>(36.f, 18.f, 60.f, 16.f), Justification::centredLeft);
-        g.setColour(c.accent); g.fillRect(96.f, 25.f, 16.f, 2.f);
-        g.setColour(c.muted); g.drawText("Output (RMS, last 10 s)", Rectangle<float>(118.f, 18.f, 220.f, 16.f), Justification::centredLeft);
+        g.setFont(sans(13.f));
+        g.setColour(c.inTrace); g.fillRoundedRectangle(14.f, 24.f, 18.f, 3.f, 1.5f);
+        g.setColour(c.ink); g.drawText("Input", Rectangle<float>(38.f, 17.f, 60.f, 17.f), Justification::centredLeft);
+        g.setColour(c.accent); g.fillRoundedRectangle(100.f, 24.f, 18.f, 3.f, 1.5f);
+        g.setColour(c.ink); g.drawText("Output", Rectangle<float>(124.f, 17.f, 70.f, 17.f), Justification::centredLeft);
+        g.setColour(c.muted); g.drawText("RMS, last 10 s", Rectangle<float>(190.f, 17.f, 160.f, 17.f), Justification::centredLeft);
 
         // inner shadow: the graph sits recessed in the panel like a screen
         const float sh = c.dark ? 0.75f : 0.14f;
@@ -429,6 +428,38 @@ public:
         g.fillRect(0.f, 0.f, 10.f, H);
         g.setGradientFill(ColourGradient(Colours::black.withAlpha(sh * 0.7f), W, 0.f, Colours::transparentBlack, W - 10.f, 0.f, false));
         g.fillRect(W - 10.f, 0.f, 10.f, H);
+    }
+
+    // Line labels, drawn above the glass panel. A label whose line runs under the panel rests on
+    // the panel's top edge with a small arrow, so it is always readable.
+    float chipLimit = 1.0e6f;  // graph-local y of the glass panel's top
+    void paintTags(Graphics& g) {
+        const Theme& c = *t;
+        auto& st = proc.state();
+        auto chip = [&](const char* id, const String& label, Colour col) {
+            const float v = st.getRawParameterValue(id)->load();
+            float y = std::round(yOf(v)) + 0.5f;
+            const bool under = y > chipLimit - 12.f;
+            if (under) y = chipLimit - 14.f;
+            const bool hot = hover == id || dragId == id;
+            const String txt = label + "  " + fmtDb(v, 1);
+            auto f = sans(13.f, true); g.setFont(f);
+            const float tw = GlyphArrangement::getStringWidth(f, txt) + (under ? 30.f : 16.f);
+            Rectangle<float> box(8.f, y - 10.f, tw, 20.f);
+            Path bp; bp.addRoundedRectangle(box, 5.f);
+            g.setColour(hot ? col : (c.dark ? Colour(0xf20a0b0d) : Colour(0xf7ffffff))); g.fillPath(bp);
+            g.setColour(col); g.strokePath(bp, PathStrokeType(1.2f));
+            g.setColour(hot ? c.graph : col);
+            g.drawText(txt, box.withTrimmedLeft(8.f), Justification::centredLeft);
+            if (under) {  // the line is below: point at it
+                Path a; const float ax = box.getRight() - 13.f, ay = box.getCentreY();
+                a.addTriangle(ax - 4.f, ay - 2.f, ax + 4.f, ay - 2.f, ax, ay + 3.f);
+                g.fillPath(a);
+            }
+        };
+        chip(ids::ceiling, "Ceiling", c.limit);
+        chip(ids::threshold, "Threshold", c.thr);
+        chip(ids::target, "Target", c.accent);
     }
 
     const char* hit(float y) const {
@@ -466,6 +497,15 @@ private:
     const char* dragId = nullptr;
 };
 
+class TagLayer : public Component {
+public:
+    explicit TagLayer(Graph& gr) : graph(gr) { setInterceptsMouseClicks(false, false); }
+    void paint(Graphics& g) override { graph.paintTags(g); }
+
+private:
+    Graph& graph;
+};
+
 // ---------------------------------------------------------------- peak meter (dBFS)
 class Meter : public Component {
 public:
@@ -484,17 +524,24 @@ public:
         const float segH = 3.f, gap = 1.6f;
         for (float yy = bot - segH; yy >= top - 0.5f; yy -= segH + gap) {
             const float v = -(yy + segH * 0.5f - top) / (bot - top) * kDbRange;
-            const Colour col = v > -6.f ? c.limit : v > -18.f ? c.warn : c.accent;
+            const Colour col = v > -6.f ? c.limit : v > -18.f ? c.warn : c.meterLo;
             const bool lit = v <= peak, isHold = hold > -70.f && std::abs(v - hold) < kDbRange / (bot - top) * (segH + gap) * 0.5f;
             g.setColour(lit || isHold ? col : col.withAlpha(c.dark ? 0.1f : 0.13f));
             g.fillRoundedRectangle(bx, yy, bw, segH, 1.f);
         }
         g.setColour(Colours::white.withAlpha(c.dark ? 0.05f : 0.25f));
         g.fillRect(bx, top, bw * 0.4f, bot - top);  // glass
-        g.setFont(sans(11.f)); g.setColour(c.muted);
-        for (int v = 0; v >= -60; v -= 12)
-            g.drawText(v == 0 ? "0" : String(v), Rectangle<float>(input ? 0.f : bx + bw + 4.f, y(float(v)) - 6.f, input ? bx - 6.f : W - bx - bw - 4.f, 12.f),
+        // the same marks as the graph: every 6 dB from 0 to -66, at the same heights
+        g.setFont(sans(11.f));
+        for (int v = 0; v >= -66; v -= 6) {
+            const float yy = std::round(y(float(v))) + 0.5f;
+            const bool major = v % 12 == 0;
+            g.setColour(c.muted.withAlpha(major ? 0.9f : 0.5f));
+            g.fillRect(input ? bx - 6.f : bx + bw + 3.f, yy, major ? 4.f : 3.f, 1.f);
+            g.setColour(major ? c.ink.withAlpha(0.85f) : c.muted);
+            g.drawText(v == 0 ? "0" : String(v), Rectangle<float>(input ? 0.f : bx + bw + 8.f, yy - 6.f, input ? bx - 9.f : W - bx - bw - 8.f, 12.f),
                        input ? Justification::centredRight : Justification::centredLeft);
+        }
         auto hb = Rectangle<float>(5.f, 8.f, W - 10.f, 20.f);
         drawWell(g, c, hb, 4.f);
         g.setFont(mono(11.f, true)); g.setColour(hold > -0.1f ? c.limit : c.ink);
@@ -513,32 +560,48 @@ private:
 // ---------------------------------------------------------------- deck (controls blended over the graph)
 class Deck : public Component {
 public:
-    explicit Deck(const Theme*& th) : t(th) { setInterceptsMouseClicks(false, true); }
+    Deck(const Theme*& th, Component& behind) : t(th), backdrop(behind) { setInterceptsMouseClicks(false, true); }
     String gainText = "+0.0";
     int gainSign = 0;
     String latencyText;
     Rectangle<int> gainBox, modeTrack;
     void paint(Graphics& g) override {
         const Theme& c = *t;
-        const float H = float(getHeight());
-        ColourGradient grad(c.graph.withAlpha(0.f), 0.f, 0.f, c.graph.withAlpha(0.78f), 0.f, H, false);
-        grad.addColour(0.3, c.graph.withAlpha(0.55f));
-        g.setGradientFill(grad); g.fillRect(getLocalBounds());
+        // frosted glass: the graph behind, rendered small and stretched back (a cheap blur), then tinted
+        const auto panel = getLocalBounds().toFloat().reduced(10.f, 6.f);
+        Path p; p.addRoundedRectangle(panel, 18.f);
+        DropShadow(Colours::black.withAlpha(c.dark ? 0.55f : 0.18f), 22, {0, 6}).drawForPath(g, p);
+        {
+            Graphics::ScopedSaveState ss(g);
+            g.reduceClipRegion(p);
+            const auto src = backdrop.getLocalArea(this, panel.toNearestInt());
+            const Image blur = backdrop.createComponentSnapshot(src.getIntersection(backdrop.getLocalBounds()), false, 0.14f);
+            g.setImageResamplingQuality(Graphics::highResamplingQuality);
+            g.drawImage(blur, panel, RectanglePlacement::stretchToFit);
+            g.setColour(c.dark ? Colour(0xb30b0c10) : Colour(0xbffbfcfe)); g.fillPath(p);
+            g.setGradientFill(ColourGradient(Colours::white.withAlpha(c.dark ? 0.07f : 0.55f), 0.f, panel.getY(),
+                                             Colours::white.withAlpha(0.f), 0.f, panel.getY() + panel.getHeight() * 0.45f, false));
+            g.fillPath(p);
+        }
+        g.setColour(Colours::white.withAlpha(c.dark ? 0.12f : 0.9f)); g.strokePath(p, PathStrokeType(1.f));
+        g.setColour(Colours::white.withAlpha(c.dark ? 0.22f : 1.f));
+        g.drawLine(panel.getX() + 18.f, panel.getY() + 0.5f, panel.getRight() - 18.f, panel.getY() + 0.5f, 1.f);
         if (!modeTrack.isEmpty()) drawWell(g, c, modeTrack.toFloat(), float(modeTrack.getHeight()) * 0.5f);
         // applied gain, in an inset display
         const auto disp = gainBox.withHeight(42).toFloat();
         drawWell(g, c, disp, 8.f);
         g.setFont(mono(24.f, true));
-        g.setColour(c.ink); g.drawText(gainText + " dB", disp, Justification::centred);
-        g.setFont(sans(13.f, true)); g.setColour(c.ink);
+        g.setColour(gainSign > 0 ? c.boost : gainSign < 0 ? c.cut : c.ink); g.drawText(gainText + " dB", disp, Justification::centred);
+        g.setFont(sans(13.5f, true)); g.setColour(c.ink);
         g.drawText("Applied gain", gainBox.withTrimmedTop(46).withHeight(16), Justification::centred);
         // latency, bottom-right corner
-        g.setFont(sans(11.5f)); g.setColour(c.muted);
-        g.drawText(latencyText, getLocalBounds().removeFromBottom(22).reduced(12, 0), Justification::centredRight);
+        g.setFont(sans(12.f)); g.setColour(c.muted);
+        g.drawText(latencyText, getLocalBounds().removeFromBottom(30).reduced(28, 0), Justification::centredRight);
     }
 
 private:
     const Theme*& t;
+    Component& backdrop;
 };
 
 // ---------------------------------------------------------------- updates: About panel and prompt
@@ -672,13 +735,13 @@ class CorridorContent : public Component, private ChangeListener {
 public:
     explicit CorridorContent(CorridorAudioProcessor& p)
         : proc(p),
-          graph(p, theme), meterIn(true, theme, p.core()), meterOut(false, theme, p.core()), deck(theme),
-          threshold(p.state(), ids::threshold, "Threshold", "dB", 1, 72.f),
-          target(p.state(), ids::target, "Target", "dB RMS", 1, 96.f),
-          response(p.state(), ids::response, "Response", "", 0, 72.f),
-          range(p.state(), ids::range, "Range", "dB", 1, 72.f),
-          ceiling(p.state(), ids::ceiling, "Ceiling", "dBFS", 1, 54.f),
-          about(*checker, theme), prompt(*checker, theme) {
+          graph(p, theme), meterIn(true, theme, p.core()), meterOut(false, theme, p.core()), deck(theme, graph),
+          threshold(p.state(), ids::threshold, "Threshold", "dB", 1, 72.f, "thr"),
+          target(p.state(), ids::target, "Target", "dB RMS", 1, 96.f, "tgt"),
+          response(p.state(), ids::response, "Response", "", 0, 72.f, "resp"),
+          range(p.state(), ids::range, "Range", "dB", 1, 72.f, "rng"),
+          ceiling(p.state(), ids::ceiling, "Ceiling", "dBFS", 1, 54.f, "ceil"),
+          tags(graph), about(*checker, theme), prompt(*checker, theme) {
         theme = p.darkTheme ? &kDark : &kLight;
         look.t = theme; look.apply();
         setLookAndFeel(&look);
@@ -686,6 +749,7 @@ public:
         addAndMakeVisible(meterIn); addAndMakeVisible(meterOut);
         addAndMakeVisible(graph);
         addAndMakeVisible(deck);
+        addAndMakeVisible(tags);
         for (auto* k : {&threshold, &target, &response, &range, &ceiling}) deck.addAndMakeVisible(*k);
 
         for (auto* b : {&ride, &hold}) {
@@ -706,7 +770,7 @@ public:
         };
         deck.addChildComponent(analyze);
         status.setJustificationType(Justification::centred);
-        status.setFont(sans(13.5f));
+        status.setFont(sans(14.f));
         status.setInterceptsMouseClicks(false, false);
         deck.addAndMakeVisible(status);
 
@@ -716,6 +780,7 @@ public:
             addAndMakeVisible(*b);
         }
         ease.getProperties().set("icon", "glide");
+        ease.getProperties().set("tone", "accent");
         bypass.getProperties().set("icon", "power");
         bypass.getProperties().set("tone", "warn");
         themeBtn.getProperties().set("icon", p.darkTheme ? "moon" : "sun");
@@ -809,8 +874,10 @@ public:
         meterIn.setBounds(body.removeFromLeft(52));
         meterOut.setBounds(body.removeFromRight(52));
         graph.setBounds(body);
-        const int deckH = 186;
+        const int deckH = 198;
         deck.setBounds(body.getX(), body.getBottom() - deckH, body.getWidth(), deckH);
+        tags.setBounds(graph.getBounds());
+        graph.chipLimit = float(deck.getY() - graph.getY() + 6);
 
         // deck: knobs and mode controls centred as one row
         const int gap = 28, centerW = 160, gainW = 110;
@@ -820,7 +887,7 @@ public:
         for (auto* k : left) total += k->preferredWidth();
         for (auto* k : right) total += k->preferredWidth();
         int x = (deck.getWidth() - total) / 2;
-        const int rowBottom = deckH - 30;
+        const int rowBottom = deckH - 40;
         auto place = [&](Knob* k) { k->setBounds(x, rowBottom - k->preferredHeight(), k->preferredWidth(), k->preferredHeight()); x += k->preferredWidth() + gap; };
         for (auto* k : left) place(k);
         ride.setBounds(x, rowBottom - 92, centerW / 2, 34);
@@ -830,7 +897,7 @@ public:
         x += centerW + gap;
         for (auto* k : right) place(k);
         deck.gainBox = Rectangle<int>(x, rowBottom - 80, gainW, 64);
-        status.setBounds(0, deckH - 26, deck.getWidth(), 22);
+        status.setBounds(0, deckH - 36, deck.getWidth(), 22);
     }
 
     void tick() {
@@ -863,7 +930,7 @@ public:
         status.setText(sentence(byp, holdMode), dontSendNotification);
         status.setColour(Label::textColourId, theme->ink);
 
-        graph.repaint(); meterIn.repaint(); meterOut.repaint(); deck.repaint();
+        graph.repaint(); tags.repaint(); meterIn.repaint(); meterOut.repaint(); deck.repaint();
     }
 
     String sentence(bool byp, bool holdMode) const {
@@ -913,6 +980,7 @@ private:
     TextButton ride{"Ride"}, hold{"Hold"}, analyze{"Analyze"};
     TextButton ease{"Ease in silence"}, bypass{"Bypass"}, themeBtn{"Dark theme"};
     TextButton versionBtn{"v0"}, updateBtn{"Update"};
+    TagLayer tags;
     SharedResourcePointer<updates::Checker> checker;  // declared before the panels that use it
     AboutPanel about;
     UpdatePrompt prompt;
