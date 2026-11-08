@@ -4,6 +4,8 @@ project(CorridorLeveler VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# Static MSVC runtime: the plugins and OBS filter need no Visual C++ redistributable.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 option(CORRIDOR_BUILD_TESTS  "Build the DSP core tests" ON)
 option(CORRIDOR_BUILD_PLUGIN "Build the VST3 / VST2 / Standalone plugin (JUCE)" ON)
