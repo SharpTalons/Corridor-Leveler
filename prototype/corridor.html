@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: the plugin window is the page's centre of gravity. Header strip with in/out meters, a big target dial that doubles as a live meter, three tactile control strips beside it, a mode/measure row, and a full-width action bar. "Expand" opens spectrum, history and fine settings underneath. A test bench and plain explanation follow. */
+/* Layout: the plugin window is the page's centre of gravity. Header strip with in/out meters, a big target dial that doubles as a live meter, three tactile control strips beside it, a mode/measure row, and a full-width action bar. "Expand" opens the spectrum and history underneath. A test bench and plain explanation follow. */
 :root{
   /* page */
   --bg:#e9e9e4; --fg:#16181b; --muted:#5d636b; --line:#d3d4ce;
@@ -50,8 +50,6 @@ button,input,select{font:inherit;color:inherit}
 .io .bar u{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--p-accent)}
 .io .num{min-width:5ch;text-align:right;color:var(--p-ink);font-variant-numeric:tabular-nums}
 .tools{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap}
-.grp{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--p-muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
-.grp select{background:var(--p-sunk);border:1px solid var(--p-line);border-radius:8px;padding:4px 8px;font-size:13px;color:var(--p-ink);text-transform:none;letter-spacing:0;font-weight:500}
 .tbtn{background:transparent;border:1px solid transparent;border-radius:8px;padding:5px 9px;font-size:13px;font-weight:600;color:var(--p-ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .tbtn:hover{background:var(--p-sunk)}
 .tbtn[aria-expanded="true"],.tbtn[aria-pressed="true"]{background:var(--p-accent-soft);color:var(--p-accent)}
@@ -120,8 +118,8 @@ button,input,select{font:inherit;color:inherit}
 .analyze .prog i{display:block;height:100%;width:0;background:var(--p-accent)}
 .say{margin:0;padding:15px 20px;font-size:15px;text-align:center;min-height:56px;display:flex;align-items:center;justify-content:center}
 .say .dot{width:9px;height:9px;border-radius:50%;background:var(--p-muted);margin-right:10px;flex:none}
-.say[data-s="inside"] .dot{background:var(--p-ok)} .say[data-s="boosting"] .dot{background:var(--p-boost)}
-.say[data-s="cutting"] .dot,.say[data-s="catching"] .dot,.say[data-s="ceiling"] .dot{background:var(--p-cut)}
+.say[data-s="on"] .dot{background:var(--p-ok)} .say[data-s="boosting"] .dot{background:var(--p-boost)}
+.say[data-s="cutting"] .dot,.say[data-s="ceiling"] .dot{background:var(--p-cut)}
 
 /* expanded */
 .x{border-top:1px solid var(--p-line);padding:16px;display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px}
@@ -131,16 +129,10 @@ button,input,select{font:inherit;color:inherit}
 .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
 .panel canvas{width:100%;display:block;border-radius:8px;background:var(--p-sunk)}
 #rta{height:280px} #hist{height:180px}
-.span2{grid-column:1/-1}
-.adv{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
-.adv .strip{padding:10px 12px 8px}
-.adv .strip .st-lab{font-size:13px}
-.adv .track{height:24px}
 .chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .chips button{border:1px solid var(--p-line);background:var(--p-sunk);border-radius:999px;padding:4px 11px;font-size:12.5px;cursor:pointer;color:var(--p-muted)}
 .chips button[aria-pressed="true"]{background:var(--p-accent-soft);color:var(--p-accent);border-color:var(--p-accent)}
 .mini{font-size:12.5px;color:var(--p-muted);margin:0}
-.peers{font-size:12px;color:var(--p-muted)}
 
 @media (max-width:720px){
   .p-main{grid-template-columns:1fr;padding:18px 14px 8px}
@@ -200,12 +192,6 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
         <span>OUT</span><div class="bar out"><i id="ioOutBar"></i><u id="ioOutT"></u></div><span class="num" id="ioOut">—</span>
       </div>
       <div class="tools">
-        <label class="grp" for="group">Group
-          <select id="group">
-            <option value="none">Independent</option>
-            <option value="A">Group A</option><option value="B">Group B</option><option value="C">Group C</option><option value="D">Group D</option>
-          </select>
-        </label>
         <button class="tbtn" id="resetBtn" type="button">Reset</button>
         <button class="tbtn" id="themeBtn" type="button" aria-pressed="false" aria-label="Dark plugin theme"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/></svg></button>
         <button class="tbtn" id="helpBtn" type="button" aria-expanded="false" aria-controls="help" aria-label="Help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.2v.1" stroke-linecap="round"/></svg></button>
@@ -214,10 +200,10 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
     </div>
 
     <div class="help" id="help" hidden>
-      <div><b>Target</b><p>The level you want. Drag the ring, scroll, or click the number to type. The shaded arc around the target is the window: inside it nothing changes.</p></div>
-      <div><b>Threshold</b><p>Below this, the plugin stops adjusting. Breaths, room noise and fades are never pulled up.</p></div>
+      <div><b>Target</b><p>The level you want, in the chosen measurement. Drag the ring, scroll, or click the number to type.</p></div>
+      <div><b>Threshold</b><p>Below this, the plugin stops adjusting. Breaths, room noise and fades never trigger a boost.</p></div>
       <div><b>Response</b><p>Slow gives smooth, near-invisible changes. Fast catches sudden jumps sooner.</p></div>
-      <div><b>Ceiling</b><p>The loudest the output may ever get. Boosts stop short of it, and the limiter catches stray peaks.</p></div>
+      <div><b>Ceiling</b><p>The loudest the output may ever get. Boosts stop short of it, and a look-ahead limiter catches stray peaks.</p></div>
       <div><b>Ride or Hold</b><p>Ride adjusts all the time. Hold applies one fixed correction, measured when you press Analyze.</p></div>
       <div><b>On the dial</b><p>The hollow dot is the incoming level and the solid dot is the result. The coloured arc between them is the gain being applied.</p></div>
     </div>
@@ -265,24 +251,7 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
       <div class="panel">
         <h3>Last 15 seconds <span class="legend"><span><i style="background:var(--p-muted)"></i>in</span><span><i style="background:var(--p-ink)"></i>out</span></span></h3>
         <canvas id="hist" aria-label="Level and gain history"></canvas>
-        <p class="mini">Top: level against the target and window. Bottom: gain applied, blue for boost, red for cut, with limiter activity along the base.</p>
-      </div>
-      <div class="panel span2">
-        <h3>Fine settings</h3>
-        <div class="adv" id="advStrips"></div>
-        <div class="adv">
-          <div class="strip"><div class="st-top"><span class="st-lab">During silence</span></div>
-            <div class="chips" id="silenceChips"></div>
-            <p class="mini" id="silenceNote"></p></div>
-          <div class="strip"><div class="st-top"><span class="st-lab">Headroom protection</span></div>
-            <div class="chips" id="protectChips"></div>
-            <p class="mini">Brick-wall limiter with 5 ms look-ahead at the ceiling. Catches stray peaks only.</p></div>
-          <div class="strip"><div class="st-top"><span class="st-lab">Integrated loudness</span><span class="mono" id="intVal">—</span></div>
-            <div class="chips"><button type="button" id="resetI">Reset measurement</button></div>
-            <p class="mini">LUFS-I runs since the last reset. Reset it when you start a new take.</p></div>
-          <div class="strip"><div class="st-top"><span class="st-lab">Group link</span></div>
-            <p class="mini" id="peers">Independent. Pick a group in the header to link instances.</p></div>
-        </div>
+        <p class="mini">Top: level against the target. Bottom: gain applied, blue for boost, red for cut, with limiter activity along the base.</p>
       </div>
     </div>
   </section>
@@ -318,17 +287,16 @@ label.btn input{position:absolute;opacity:0;width:1px;height:1px}
       <li><b>dBFS</b>: peak level, the loudest instant.</li>
       <li><b>VU</b>: classic average meter, where 0 VU equals −18 dBFS.</li>
       <li><b>RMS</b>: average power over 300 ms.</li>
-      <li><b>LUFS</b>: perceived loudness. M is 400 ms, S is 3 s, and I is everything since the last reset.</li></ul>
+      <li><b>LUFS</b>: perceived loudness. M is 400 ms, S is 3 s, and I is everything since playback started or Reset was pressed.</li></ul>
       <p style="margin-top:6px">When you switch, the target and threshold are converted so they keep roughly the same meaning.</p></div>
     <div><h3>Four controls</h3><ul>
       <li><b>Target</b>: where you want the level, in the chosen measurement.</li>
-      <li><b>Response</b>: slow and invisible, or fast and responsive. Big jumps are always handled faster than small drifts, and sudden shouts are caught quickly.</li>
-      <li><b>Threshold</b>: below this it stops adjusting, so silence and noise are never boosted.</li>
+      <li><b>Response</b>: slow gives smooth, gradual changes that are nearly invisible. Fast reacts quickly to sudden jumps in volume.</li>
+      <li><b>Threshold</b>: below this it stops adjusting, so silence and noise never trigger a boost.</li>
       <li><b>Ceiling</b>: the output never goes past it. Boosts stop short of it, and the limiter catches the rest.</li></ul></div>
-    <div><h3>Extras</h3><ul>
-      <li><b>Window</b>: the shaded arc on the dial. Inside it Ride leaves the sound alone. Set both sides to 0 to always aim for the exact target.</li>
-      <li><b>Groups</b>: instances in the same group share their settings. To try it, open this page in a second tab and choose the same group in both.</li>
-      <li><b>Expanded view</b>: live spectrum of input against output, level history, and fine settings.</li></ul></div>
+    <div><h3>Safety and views</h3><ul>
+      <li><b>Headroom protection</b>: a look-ahead brick-wall limiter at the ceiling catches stray peaks after the gain correction.</li>
+      <li><b>Expanded view</b>: live spectrum of input against output, plus level and gain history.</li></ul></div>
   </section>
 </div>
 
@@ -355,25 +323,20 @@ const U = {
 const unitLabel = () => P.unit === "lufs" ? "LUFS-" + P.sub : P.unit === "rms" ? "dBFS RMS" : U[P.unit].name;
 const shortUnit = () => P.unit === "lufs" ? "LUFS" : P.unit === "rms" ? "dB" : U[P.unit].name;
 
-const DEFAULTS = { unit:"lufs", sub:"S", target:-18, winUp:2, winDown:2, threshold:-42, response:50, ceiling:-1,
-  mode:"ride", maxBoost:18, maxCut:18, hold:1.0, release:80, silence:"freeze", protect:true, group:"none" };
+const DEFAULTS = { unit:"lufs", sub:"S", target:-18, threshold:-42, response:50, ceiling:-1, mode:"ride" };
+// fixed internals (not user controls): limiter release, a sanity limit on gain
+const LIM_RELEASE = 80, GAIN_LIMIT = 30;
 const P = Object.assign({}, DEFAULTS);
 const B = { material:"mic", script:true, talk:0, noise:-58, source:"sim", bypass:false };
 
 const SPEC = {
   target:    { label:"Target", min:() => U[P.unit].tMin, max:() => U[P.unit].tMax, step:0.5, dec:1, unit:() => shortUnit() },
   threshold: { label:"Threshold", min:() => U[P.unit].thMin, max:() => U[P.unit].thMax, step:0.5, dec:1, unit:() => shortUnit(),
-               help:"Below this it stops adjusting. Silence and noise are never boosted.", ends:["quieter", "louder"], mark:"in" },
+               help:"Below this it stops adjusting, so silence and noise never trigger a boost.", ends:["quieter", "louder"], mark:"in" },
   response:  { label:"Response", min:0, max:100, step:1, dec:0, unit:() => "",
-               help:"How quickly it corrects. Big jumps are always handled faster than small drifts.", ends:["slow · invisible", "fast · responsive"] },
+               help:"Slow: smooth, gradual changes. Fast: reacts quickly to sudden jumps.", ends:["slow · invisible", "fast · responsive"] },
   ceiling:   { label:"Ceiling", min:-12, max:0, step:0.1, dec:1, unit:() => "dBFS",
-               help:"The loudest the output may get. The hairline shows the current output peak.", ends:["−12", "0 dBFS"], mark:"out" },
-  winUp:     { label:"Window above target", min:0, max:12, step:0.5, dec:1, unit:() => "dB" },
-  winDown:   { label:"Window below target", min:0, max:12, step:0.5, dec:1, unit:() => "dB" },
-  maxBoost:  { label:"Max boost", min:0, max:24, step:0.5, dec:1, unit:() => "dB" },
-  maxCut:    { label:"Max cut", min:0, max:24, step:0.5, dec:1, unit:() => "dB" },
-  hold:      { label:"Pause hold", min:0, max:5, step:0.1, dec:1, unit:() => "s" },
-  release:   { label:"Limiter release", min:10, max:500, step:5, dec:0, unit:() => "ms" }
+               help:"The loudest the output may get. The hairline shows the current output peak.", ends:["−12", "0 dBFS"], mark:"out" }
 };
 const val = (s, k) => typeof s[k] === "function" ? s[k]() : s[k];
 /* ================= DSP building blocks ================= */
@@ -445,7 +408,7 @@ class Leveler{
   constructor(){
     this.N = 300; this.e = new Float32Array(300); this.r = new Float32Array(300); this.p = new Float32Array(300);
     this.act = new Uint8Array(300); this.i = 0;
-    this.g = 0; this.state = "waiting"; this.activeT = 0; this.silentT = 10; this.L = null; this.sl = -120; this.pk1 = -120;
+    this.g = 0; this.state = "waiting"; this.activeT = 0; this.L = null; this.sl = -120; this.pk1 = -120;
     this.sI = 0; this.cI = 0; this.holdG = null; this.holdInfo = null; this.an = null;
   }
   resetI(){ this.sI = 0; this.cI = 0; }
@@ -485,30 +448,23 @@ class Leveler{
       target = this.holdG == null ? g : this.holdG; rate = 12;
       st = this.an ? "analyzing" : this.holdG == null ? "unset" : "held";
     } else if (!active){
-      this.silentT += dt; this.activeT = 0;
-      if (P.silence === "ease" && this.silentT > P.hold && Math.abs(g) > 0.01){ target = 0; rate = 3 * Math.max(0.5, sc); st = "returning"; }
-      else st = "waiting";
+      this.activeT = 0; st = "waiting";            // below the threshold: stop adjusting
     } else {
-      this.activeT += dt; this.silentT = 0;
+      this.activeT += dt;
       if (L === null || this.activeT < 0.15) st = "waiting";
       else {
-        const hi = P.target + P.winUp, lo = P.target - P.winDown, out = L + g;
-        if (out > hi + 0.05){ target = hi - L; st = "cutting"; rate = clamp(3 + 2.5 * (out - hi), 3, 24) * sc; }
-        else if (out < lo - 0.05){ target = lo - L; st = "boosting"; rate = clamp(1 + 0.6 * (lo - out), 1, 6) * sc; }
-        else st = "inside";
-        if (sl + g > hi + 6){ const t2 = hi + 3 - sl; if (t2 < target){ target = t2; rate = Math.max(rate, 45 * Math.max(0.5, sc)); st = "catching"; } }
+        const out = L + g, d = Math.abs(out - P.target);
+        target = P.target - L;
+        rate = clamp(1.5 + 0.8 * d, 1.5, 12) * sc;  // further from target = faster, scaled by Response
+        st = d < 0.5 ? "on" : out < P.target ? "boosting" : "cutting";
       }
       // ceiling: never boost peaks past it
       const gC = P.ceiling - this.pk1;
-      if (target > gC){ target = gC; if (st === "boosting" || g > gC + 0.1) st = "ceiling"; if (g > gC) rate = Math.max(rate, 30); }
+      if (target > gC){ target = gC; if (st === "boosting" || st === "on" || g > gC + 0.1) st = "ceiling"; if (g > gC) rate = Math.max(rate, 30); }
     }
-    target = clamp(target, -P.maxCut, P.maxBoost);
+    target = clamp(target, -GAIN_LIMIT, GAIN_LIMIT);
     const step = rate * dt;
     this.g = target > g ? Math.min(target, g + step) : Math.max(target, g - step);
-    if (this.g > P.maxBoost) this.g = Math.max(P.maxBoost, g - 6 * dt);
-    if (this.g < -P.maxCut) this.g = Math.min(-P.maxCut, g + 6 * dt);
-    if (st === "boosting" && this.g >= P.maxBoost - 0.01) st = "maxed";
-    if ((st === "cutting" || st === "catching") && this.g <= -P.maxCut + 0.01) st = "maxed";
     this.state = st;
   }
 }
@@ -519,9 +475,9 @@ class Limiter{
     this.qv = new Float32Array(this.cap); this.qi = new Float64Array(this.cap); this.h = 0; this.t = 0; this.sz = 0; this.n = 0;
     this.env = 1; this.att = 1 - Math.exp(-1 / (L * 0.25)); this.rel = 0.001; this.c = fromDB(-1); this.minEnv = 1;
   }
-  setup(){ this.rel = 1 - Math.exp(-1 / (P.release * 0.001 * this.fs)); this.c = fromDB(P.ceiling); }
+  setup(){ this.rel = 1 - Math.exp(-1 / (LIM_RELEASE * 0.001 * this.fs)); this.c = fromDB(P.ceiling); }
   process(x){
-    const c = this.c, a = x < 0 ? -x : x, req = (P.protect && a > c) ? c / a : 1;
+    const c = this.c, a = x < 0 ? -x : x, req = (a > c) ? c / a : 1;
     while (this.sz > 0){ const b = (this.t - 1 + this.cap) % this.cap; if (this.qv[b] >= req){ this.t = b; this.sz--; } else break; }
     this.qv[this.t] = req; this.qi[this.t] = this.n; this.t = (this.t + 1) % this.cap; this.sz++;
     while (this.qi[this.h] < this.n - (this.L + 1)){ this.h = (this.h + 1) % this.cap; this.sz--; }
@@ -530,7 +486,7 @@ class Limiter{
     this.env += (tg - this.env) * (tg < this.env ? this.att : this.rel);
     const d = this.buf[this.w]; this.buf[this.w] = x; this.w = (this.w + 1) % (this.L + 1);
     let y = d * this.env;
-    if (P.protect){ if (y > c) y = c; else if (y < -c) y = -c; }
+    if (y > c) y = c; else if (y < -c) y = -c;
     if (this.env < this.minEnv) this.minEnv = this.env;
     return y;
   }
@@ -729,18 +685,16 @@ function lockAnalysis(){
   let g = P.target - measured, ceil = false;
   const room = P.ceiling - toDB(an.pk);
   if (g > room){ g = room; ceil = true; }
-  g = clamp(g, -P.maxCut, P.maxBoost);
+  g = clamp(g, -GAIN_LIMIT, GAIN_LIMIT);
   lev.holdG = g; lev.holdInfo = { measured, unit:unitLabel(), ceil, secs:an.c / 100 };
   anMsg = "";
 }
 
 /* ================= parameter changes ================= */
-const SYNC = ["target", "winUp", "winDown", "threshold", "response", "ceiling", "unit", "sub"];
 function setParam(k, v, quiet){
   const s = SPEC[k];
   v = Math.round(clamp(v, val(s, "min"), val(s, "max")) / s.step) * s.step;
   P[k] = +v.toFixed(3);
-  if (!quiet && SYNC.includes(k)) broadcast();
   refresh();
 }
 function setUnit(u, sub){
@@ -752,7 +706,7 @@ function setUnit(u, sub){
   }
   if (sub) P.sub = sub;
   engine.lev.resetI();
-  broadcast(); refresh();
+  refresh();
 }
 function setMode(m){
   if (m === P.mode) return;
@@ -799,16 +753,7 @@ function makeStrip(parent, key){
   });
 }
 ["threshold", "response", "ceiling"].forEach(k => makeStrip($("#mainStrips"), k));
-["winUp", "winDown", "maxBoost", "maxCut", "hold", "release"].forEach(k => makeStrip($("#advStrips"), k));
 
-function chips(id, key, opts, after){
-  const box = $(id);
-  const bs = opts.map(([v, label]) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.addEventListener("click", () => { P[key] = v; refresh(); after && after(); }); box.appendChild(b); return [v, b]; });
-  chipSync.push(() => bs.forEach(([v, b]) => b.setAttribute("aria-pressed", String(P[key] === v))));
-}
-const chipSync = [];
-chips("#silenceChips", "silence", [["freeze", "Freeze gain"], ["ease", "Ease back to 0 dB"]]);
-chips("#protectChips", "protect", [[true, "On"], [false, "Off"]]);
 
 /* unit + mode selectors */
 const unitBtns = [["dbfs", "dBFS"], ["vu", "VU"], ["rms", "RMS"], ["lufs", "LUFS"]].map(([u, label]) => {
@@ -845,11 +790,6 @@ function refresh(){
   $("#say").hidden = P.mode === "hold";
   const d = $("#dial"); d.setAttribute("aria-valuenow", P.target); d.setAttribute("aria-valuetext", fmt(P.target, 1) + " " + unitLabel());
   d.setAttribute("aria-valuemin", U[P.unit].tMin); d.setAttribute("aria-valuemax", U[P.unit].tMax);
-  chipSync.forEach(f => f());
-  $("#silenceNote").textContent = P.silence === "freeze"
-    ? "Below the threshold the gain stays exactly where it was, so the level is right the moment sound returns."
-    : "After the pause hold time, the gain glides back to 0 dB, so nothing stays boosted during long silences.";
-  $("#group").value = P.group;
 }
 
 /* ================= dial ================= */
@@ -886,9 +826,7 @@ function drawDial(){
   arc(A0, A1, R, lw, C.sunk);
   // ignored zone (below threshold)
   arc(A0, v2a(P.threshold), R, lw, alpha(C.muted, 0.18), "butt");
-  // window
-  const aT = v2a(P.target), aU = v2a(P.target + P.winUp), aD = v2a(P.target - P.winDown);
-  if (aU - aD > 0.5) arc(aD, aU, R, lw, alpha(C.accent, 0.38), "butt");
+  const aT = v2a(P.target);
   // ticks + labels
   const u = U[P.unit], stepT = P.unit === "vu" ? 5 : 10;
   g.font = `10.5px ${MONO}`; g.textAlign = "center"; g.textBaseline = "middle";
@@ -915,16 +853,10 @@ function drawDial(){
   const at = rad(aT);
   g.beginPath(); g.moveTo(cx + Math.cos(at) * (R - lw / 2 - 2), cy + Math.sin(at) * (R - lw / 2 - 2)); g.lineTo(cx + Math.cos(at) * (R + lw / 2 + 2), cy + Math.sin(at) * (R + lw / 2 + 2));
   g.lineWidth = 4; g.lineCap = "round"; g.strokeStyle = C.ink; g.stroke();
-  // window handles
-  const handle = (a, k) => { const t = rad(a), hx = cx + Math.cos(t) * R, hy = cy + Math.sin(t) * R; g.beginPath(); g.arc(hx, hy, (dHover === k || dDrag === k) ? 8 : 6.5, 0, 7); g.fillStyle = C.surface; g.fill(); g.lineWidth = 2.5; g.strokeStyle = C.accent; g.stroke(); return [hx, hy]; };
-  DL.hUp = handle(aU, "winUp"); DL.hDn = handle(aD, "winDown");
   if (dHover === "ring" || dDrag === "ring"){ arc(A0, A1, R + lw / 2 + 1, 1.5, alpha(C.accent, 0.5)); }
 }
 function dialHit(x, y, tol){
   if (!DL) return null;
-  const d = (p) => Math.hypot(x - p[0], y - p[1]);
-  if (d(DL.hUp) < tol) return "winUp";
-  if (d(DL.hDn) < tol) return "winDown";
   const r = Math.hypot(x - DL.cx, y - DL.cy);
   if (Math.abs(r - DL.R) < DL.lw / 2 + tol){ const a = Math.atan2(x - DL.cx, -(y - DL.cy)) * 180 / Math.PI; if (a >= A0 - 8 && a <= A1 + 8) return "ring"; }
   return null;
@@ -933,8 +865,6 @@ function dpos(e){ const r = dial.getBoundingClientRect(); return [e.clientX - r.
 function dialApply(x, y){
   const a = Math.atan2(x - DL.cx, -(y - DL.cy)) * 180 / Math.PI, v = a2v(a);
   if (dDrag === "ring") setParam("target", v);
-  else if (dDrag === "winUp") setParam("winUp", v - P.target);
-  else if (dDrag === "winDown") setParam("winDown", P.target - v);
 }
 let vDrag = null;
 dial.addEventListener("touchstart", e => { const t = e.touches[0], r = dial.getBoundingClientRect(); if (dialHit(t.clientX - r.left, t.clientY - r.top, 18)) e.preventDefault(); }, { passive:false });
@@ -948,7 +878,7 @@ dial.addEventListener("pointermove", e => {
   const [x, y] = dpos(e);
   if (dDrag){ dialApply(x, y); return; }
   if (vDrag){ const u = U[P.unit]; setParam("target", vDrag.v + (vDrag.y - y) / 220 * (u.tMax - u.tMin) * (e.shiftKey ? 0.25 : 1)); return; }
-  dHover = dialHit(x, y, 10); dial.style.cursor = dHover ? (dHover === "ring" ? "pointer" : "grab") : "ns-resize";
+  dHover = dialHit(x, y, 10); dial.style.cursor = dHover ? "pointer" : "ns-resize";
 });
 const dEnd = () => { dDrag = null; vDrag = null; };
 dial.addEventListener("pointerup", dEnd); dial.addEventListener("pointercancel", dEnd);
@@ -1032,13 +962,12 @@ function drawHist(){
   const y = v => top + (u.hi - clamp(v, u.lo, u.hi)) / (u.hi - u.lo) * (h1 - top);
   g.font = `10px ${MONO}`; g.textBaseline = "middle"; g.textAlign = "right";
   for (let v = u.hi; v >= u.lo; v -= (P.unit === "vu" ? 10 : 12)){ g.fillStyle = alpha(C.muted, 0.18); g.fillRect(padL, Math.round(y(v)), w, 1); g.fillStyle = C.muted; g.fillText(v === 0 ? "0" : fmt(v, 0), padL - 4, y(v)); }
-  g.fillStyle = alpha(C.accent, 0.22); g.fillRect(padL, y(P.target + P.winUp), w, Math.max(2, y(P.target - P.winDown) - y(P.target + P.winUp)));
-  g.fillStyle = C.accent; g.fillRect(padL, Math.round(y(P.target)), w, 1.5);
+  g.fillStyle = C.accent; g.fillRect(padL, Math.round(y(P.target)) - 1, w, 2.5);
   g.strokeStyle = C.muted; g.setLineDash([4, 3]); g.lineWidth = 1; g.beginPath(); g.moveTo(padL, y(P.threshold)); g.lineTo(padL + w, y(P.threshold)); g.stroke(); g.setLineDash([]);
   const n = hist.length, sx = w / (HMAX - 1), X = k => padL + w - (n - 1 - k) * sx;
   const line = (key, col, lw) => { g.beginPath(); for (let k = 0; k < n; k++){ const yy = y(hist[k][key]); k ? g.lineTo(X(k), yy) : g.moveTo(X(k), yy); } g.strokeStyle = col; g.lineWidth = lw; g.lineJoin = "round"; g.stroke(); };
   if (n > 1){ line("i", alpha(C.muted, 0.85), 1.3); line("o", C.ink, 2); }
-  const Rg = Math.max(12, P.maxBoost, P.maxCut), mid = (sTop + sB) / 2, half = (sB - sTop) / 2 - 1, yG = v => mid - clamp(v, -Rg, Rg) / Rg * half;
+  const Rg = Math.max(12, Math.ceil(Math.max(0, ...hist.map(h => Math.abs(h.g))) / 6) * 6), mid = (sTop + sB) / 2, half = (sB - sTop) / 2 - 1, yG = v => mid - clamp(v, -Rg, Rg) / Rg * half;
   g.fillStyle = alpha(C.muted, 0.1); g.fillRect(padL, sTop, w, sB - sTop);
   g.fillStyle = C.line; g.fillRect(padL, Math.round(mid), w, 1);
   g.fillStyle = C.muted; g.textAlign = "right"; g.fillText("+" + Rg, padL - 4, sTop + 5); g.fillText("−" + Rg, padL - 4, sB - 5);
@@ -1051,22 +980,18 @@ function drawHist(){
 
 /* ================= live readouts ================= */
 const GSTATE = {
-  waiting:"Waiting: below the threshold, gain frozen", returning:"Silence: easing back to 0 dB", inside:"Inside the window: leaving it alone",
-  boosting:"Riding up", cutting:"Riding down", catching:"Sudden burst: fast cut", ceiling:"Boost stopped by the ceiling", maxed:"At the max boost or cut",
-  held:"Holding a fixed correction", analyzing:"Analyzing… gain unchanged", unset:"Holding. Press Analyze to measure."
+  waiting:"Below the threshold: not adjusting", on:"On target", boosting:"Riding up", cutting:"Riding down",
+  ceiling:"Boost stopped by the ceiling", held:"Holding a fixed correction", analyzing:"Analyzing… gain unchanged", unset:"Holding. Press Analyze to measure."
 };
 function sentence(){
   const lev = engine.lev, L = lev.L, g = lev.g, un = shortUnit(), r = v => fmt(v, 1), d = v => fmt(v, 1, true);
   if (B.bypass) return "Bypassed on the test bench. You're hearing the raw input.";
   switch (lev.state){
-    case "inside":   return `Leveled result is ${r(L + g)} ${un}, inside the window around ${r(P.target)}. Leaving it alone.`;
-    case "boosting": return `Coming in at ${r(L)} ${un}, too quiet. Lifting it toward ${r(P.target - P.winDown)} (${d(g)} dB so far).`;
-    case "cutting":  return `Coming in at ${r(L)} ${un}, too loud. Lowering it toward ${r(P.target + P.winUp)} (${d(g)} dB so far).`;
-    case "catching": return `Sudden loud burst. Cutting fast (${d(g)} dB).`;
+    case "on":       return `On target at ${r(L + g)} ${un} (${d(g)} dB applied).`;
+    case "boosting": return `Coming in at ${r(L)} ${un}, below the ${r(P.target)} target. Lifting it (${d(g)} dB so far).`;
+    case "cutting":  return `Coming in at ${r(L)} ${un}, above the ${r(P.target)} target. Lowering it (${d(g)} dB so far).`;
     case "ceiling":  return `It would need more boost, but the peaks would pass the ${r(P.ceiling)} dBFS ceiling. Held at ${d(g)} dB.`;
-    case "returning":return `Silence for over ${fmt(P.hold, 1)} s. Easing back to 0 dB (${d(g)} dB).`;
-    case "maxed":    return g > 0 ? `Still too quiet, but at the max boost of ${fmt(P.maxBoost, 0)} dB.` : `Still too loud, but at the max cut of ${fmt(P.maxCut, 0)} dB.`;
-    default:         return lev.sl < P.threshold ? `Only quiet sound or noise, below the ${r(P.threshold)} threshold. Gain frozen at ${d(g)} dB.` : "Sound just started. Measuring it before acting.";
+    default:         return lev.sl < P.threshold ? `Below the ${r(P.threshold)} threshold (silence, breaths or noise). Not adjusting; gain stays at ${d(g)} dB.` : "Sound just started. Measuring it before acting.";
   }
 }
 let uiT = 0;
@@ -1096,45 +1021,17 @@ function updateUI(t){
       : lev.holdInfo ? `Holding ${fmt(lev.holdG, 1, true)} dB. Measured ${fmt(lev.holdInfo.measured, 1)} ${lev.holdInfo.unit} over ${lev.holdInfo.secs.toFixed(1)} s.` + (lev.holdInfo.ceil ? " Limited by the ceiling." : "")
       : `Play a typical section, press Analyze, then press again to lock. Until then it holds ${fmt(lev.holdG ?? 0, 1, true)} dB.`;
   }
-  $("#intVal").textContent = engine.inM.I > -70 ? fmt(engine.inM.I, 1) + " LUFS" : "—";
   // bench
   const sim = engine.sim, onFile = B.source === "file";
   document.querySelectorAll("#sits button").forEach((b, i) => b.setAttribute("aria-current", String(!onFile && !sim.ev && B.script && i === sim.segIdx)));
   $("#evNow").textContent = onFile ? "Playing: " + (fileSrc ? fileSrc.name : "no file loaded") : "Now: " + sim.label;
-  peersUI();
 }
 
-/* ================= grouping across instances (open a second tab to try) ================= */
-const myId = Math.random().toString(36).slice(2);
-let bc = null; const peers = new Map();
-try{ bc = new BroadcastChannel("corridor-group"); bc.onmessage = e => onMsg(e.data); } catch(e){ bc = null; }
-function broadcast(){
-  if (!bc || P.group === "none") return;
-  const o = {}; SYNC.forEach(k => o[k] = P[k]);
-  try{ bc.postMessage({ from:myId, group:P.group, params:o }); } catch(e){}
-}
-function onMsg(d){
-  if (!d || d.from === myId) return;
-  if (d.hb){ peers.set(d.from, { g:d.group, t:Date.now() }); return; }
-  if (P.group === "none" || d.group !== P.group) return;
-  if (d.ask){ broadcast(); return; }
-  if (d.params){ if (d.params.unit !== P.unit) hist = []; Object.assign(P, d.params); refresh(); }
-}
-setInterval(() => { try{ bc && bc.postMessage({ from:myId, hb:1, group:P.group }); } catch(e){} }, 1500);
-function peersUI(){
-  const now = Date.now(), n = [...peers.values()].filter(p => p.g === P.group && now - p.t < 4000).length;
-  $("#peers").textContent = P.group === "none" ? "Independent. Pick a group in the header to link instances. In this prototype, each browser tab is one instance."
-    : !bc ? "This browser can't link tabs, so grouping can't be shown here."
-    : n ? `Linked with ${n} other instance${n > 1 ? "s" : ""} in Group ${P.group}. Target, window, threshold, response, ceiling and measurement are shared.`
-    : `In Group ${P.group}. Open this page in another tab and choose Group ${P.group} there to see the link.`;
-}
-$("#group").addEventListener("change", e => { P.group = e.target.value; if (bc && P.group !== "none") try{ bc.postMessage({ from:myId, group:P.group, ask:1 }); } catch(err){} refresh(); });
 
 /* ================= header tools ================= */
 $("#resetBtn").addEventListener("click", () => {
-  const keep = { group:P.group, mode:P.mode };
-  Object.assign(P, DEFAULTS, keep); hist = []; engine.lev.resetI(); anMsg = "";
-  broadcast(); refresh();
+  Object.assign(P, DEFAULTS, { mode:P.mode }); hist = []; engine.lev.resetI(); engine.inM.resetI(); engine.outM.resetI(); anMsg = "";
+  refresh();
 });
 function setPTheme(dark){
   $("#plugin").dataset.ptheme = dark ? "dark" : "light";
@@ -1150,7 +1047,6 @@ function setExpanded(on){
   try{ localStorage.setItem("corridor-expanded", on ? "1" : "0"); } catch(e){}
 }
 $("#expandBtn").addEventListener("click", () => setExpanded($("#xpanel").hidden));
-$("#resetI").addEventListener("click", () => { engine.inM.resetI(); engine.outM.resetI(); engine.lev.resetI(); });
 
 /* ================= test bench ================= */
 function benchSeg(){
