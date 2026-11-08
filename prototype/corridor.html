@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one plugin window. Input meter down the left edge, output meter down the right, and between them a scrolling level graph that fills the window. The knob deck floats over the lower part of the graph. Test bench and explanation follow. */
+/* Layout: one landscape plugin window. Input meter down the left edge, output meter down the right, and between them a scrolling level graph. 0 to −60 dB is open graph; the control deck sits just below it, blended over the −60 to −90 dB region. Test bench and explanation follow. */
 :root{
   --bg:#e9e9e4; --fg:#16181b; --muted:#5d636b; --line:#d3d4ce;
   --p-bg:#f4f4f0; --p-surface:#fcfcfa; --p-sunk:#e6e6e0; --p-graph:#eeeee9; --p-ink:#141619; --p-muted:#626870; --p-line:#d6d7d0;
@@ -56,8 +56,8 @@ button,input{font:inherit;color:inherit}
 .stage{position:relative;min-height:0;min-width:0}
 .stage canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y}
 
-.deck{position:absolute;left:0;right:0;bottom:0;padding:40px 18px 12px;display:flex;flex-direction:column;gap:6px;pointer-events:none;
-  background:linear-gradient(to bottom,transparent,color-mix(in srgb,var(--p-graph) 82%,transparent) 32%,var(--p-graph) 70%)}
+.deck{position:absolute;left:0;right:0;bottom:0;padding:26px 18px 12px;display:flex;flex-direction:column;gap:6px;pointer-events:none;
+  background:linear-gradient(to bottom,color-mix(in srgb,var(--p-graph) 35%,transparent),color-mix(in srgb,var(--p-graph) 80%,transparent) 40%,var(--p-graph) 85%)}
 .deck > *{pointer-events:auto}
 .krow{display:flex;align-items:flex-end;justify-content:space-between;gap:10px 14px;flex-wrap:wrap}
 .kgroup{display:flex;align-items:flex-end;gap:14px}
@@ -662,22 +662,29 @@ function fitCanvas(cv){
   const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return [r.width, r.height, ctx];
 }
 const MONO = '"JetBrains Mono", ui-monospace, Consolas, monospace';
-const DB_LO = -60;
+const DB_LO = -90;
+// Shared level scale: 0 to −60 dB fills the open graph down to the top of the control deck;
+// −60 to −90 dB continues behind the blended controls.
+function makeScale(top, split, bottom){
+  const y = v => { const d = clamp(-v, 0, 90); return d <= 60 ? top + d / 60 * (split - top) : split + (d - 60) / 30 * (bottom - split); };
+  const inv = yy => yy <= split ? -clamp((yy - top) / (split - top), 0, 1) * 60 : -(60 + clamp((yy - split) / (bottom - split), 0, 1) * 30);
+  return { y, inv };
+}
+const TICKS = [0, -6, -12, -18, -24, -30, -36, -42, -48, -54, -60, -72, -84];
 
 /* ---------- main graph ---------- */
 let GL = null, gDrag = null, gHover = null;
-const overlaid = () => getComputedStyle($("#deck")).position === "absolute";
 function drawGraph(){
   const cv = $("#graph"), [W, H, g] = fitCanvas(cv);
   g.clearRect(0, 0, W, H);
   const lane = 66, top = lane + 26, scaleW = 34;
-  const bottom = overlaid() ? H - $("#deck").offsetHeight * 0.6 : H - 10;
+  const bottom = H - $("#deck").offsetHeight;
   const x0 = 0, x1 = W - scaleW, w = x1 - x0;
-  const y = v => top + clamp(-v, 0, -DB_LO) / -DB_LO * (bottom - top);
-  GL = { y, top, bottom, x1 };
+  const sc = makeScale(top, bottom, H - 4), y = sc.y;
+  GL = { y, inv:sc.inv, top, bottom, x1 };
   // grid + scale
   g.font = `10.5px ${MONO}`; g.textBaseline = "middle"; g.textAlign = "right";
-  for (let v = 0; v >= DB_LO; v -= 6){
+  for (const v of TICKS){
     const yy = Math.round(y(v)) + 0.5;
     g.fillStyle = alpha(C.muted, v % 12 === 0 ? 0.2 : 0.1); g.fillRect(x0, yy, w, 1);
     g.fillStyle = C.muted; g.fillText(v === 0 ? "0" : fmt(v, 0), W - 5, yy);
@@ -731,7 +738,7 @@ function graphHit(y){
 }
 const gcv = $("#graph");
 const gpos = e => { const r = gcv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
-const gVal = y => -clamp((y - GL.top) / (GL.bottom - GL.top), 0, 1) * -DB_LO;
+const gVal = y => GL.inv(y);
 gcv.addEventListener("touchstart", e => { const r = gcv.getBoundingClientRect(); if (graphHit(e.touches[0].clientY - r.top)) e.preventDefault(); }, { passive:false });
 gcv.addEventListener("pointerdown", e => { const [, y] = gpos(e), h = graphHit(y); if (h){ gDrag = h; gcv.setPointerCapture(e.pointerId); } });
 gcv.addEventListener("pointermove", e => { const [, y] = gpos(e); if (gDrag){ setParam(gDrag, gVal(y)); return; } gHover = graphHit(y); gcv.style.cursor = gHover ? "ns-resize" : "default"; });
@@ -742,8 +749,8 @@ gcv.addEventListener("pointerleave", () => { if (!gDrag) gHover = null; });
 function drawMeter(id, m, side){
   const cv = $(id), [W, H, g] = fitCanvas(cv);
   g.clearRect(0, 0, W, H);
-  const top = 40, bot = H - 10, narrow = W < 44;
-  const y = v => top + clamp(-v, 0, -DB_LO) / -DB_LO * (bot - top);
+  const top = 92, bot = H - 4, narrow = W < 44;   // same 0 dB line as the graph
+  const y = makeScale(top, H - $("#deck").offsetHeight, bot).y;
   const bw = narrow ? 10 : 12, bx = side === "in" ? W - bw - 6 : 6;
   g.fillStyle = C.sunk; g.fillRect(bx, top, bw, bot - top);
   const v = m.Pk;
@@ -755,7 +762,7 @@ function drawMeter(id, m, side){
   g.font = `10px ${MONO}`; g.textBaseline = "middle"; g.fillStyle = C.muted;
   if (!narrow){
     g.textAlign = side === "in" ? "right" : "left";
-    for (let t = 0; t >= DB_LO; t -= 12) g.fillText(t === 0 ? "0" : fmt(t, 0), side === "in" ? bx - 4 : bx + bw + 4, y(t));
+    for (const t of [0, -12, -24, -36, -48, -60, -72, -84]) g.fillText(t === 0 ? "0" : fmt(t, 0), side === "in" ? bx - 4 : bx + bw + 4, y(t));
   }
   g.textAlign = "center"; g.font = `600 10.5px ${MONO}`; g.fillStyle = m.H > -0.1 ? C.limit : C.ink;
   g.fillText(m.H > DB_LO ? fmt(m.H, 1) : "—", W / 2, 11);
