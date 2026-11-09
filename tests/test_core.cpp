@@ -129,7 +129,7 @@ static void testCeiling() {
     std::printf("output peaks never pass the ceiling, at any sample rate\n");
     for (double fs : {44100.0, 48000.0, 96000.0}) {
         Processor p; p.prepare(fs, 2);
-        Params pr; pr.target = -6; pr.ceiling = -3; pr.range = 24; pr.response = 100; p.setParams(pr);
+        Params pr; pr.target = -6; pr.ceiling = -3; pr.range = 24; pr.responseMs = 300; p.setParams(pr);
         std::mt19937 rng(1);
         std::uniform_real_distribution<float> u(-1, 1);
         // bursts of loud noise with sharp transients
@@ -175,7 +175,7 @@ static void testHoldAnalyze() {
 static void testDrums() {
     std::printf("drums: percussive material is detected and the gain stays steady\n");
     const double fs = 48000; Processor p; p.prepare(fs, 2);
-    Params pr; pr.target = -20; pr.response = 70; pr.range = 12; pr.ceiling = 0; p.setParams(pr);
+    Params pr; pr.target = -20; pr.responseMs = 660; pr.range = 12; pr.ceiling = 0; p.setParams(pr);
     // 100 BPM kick and snare on quarter notes: instant attack, short decay
     auto hits = [&](float level) {
         const double step = 60.0 / 100.0;
@@ -226,6 +226,50 @@ static void testMono() {
     CHECK(std::fabs(last + 20.f) < 1.0f, "mono out %.2f", last);
 }
 
+static void testTrim() {
+    std::printf("output trim adds after the leveler\n");
+    const double fs = 48000; Processor p; p.prepare(fs, 2);
+    Params pr; pr.target = -20; pr.trimDb = 4.f; pr.ceiling = 0.f; p.setParams(pr);
+    auto o = run(p, fs, 10.0, sine(-30));
+    const float out = rmsDb(o.l, size_t(9 * fs), size_t(10 * fs));
+    CHECK(std::fabs(out - (-16.f)) < 1.0f, "out %.2f with +4 dB trim on a -20 target", out);
+    CHECK(std::fabs(p.telemetry().gain.load() - 10.f) < 1.0f, "leveler gain %.2f (the trim is not counted in it)", p.telemetry().gain.load());
+}
+
+static void testRiseSpeed() {
+    std::printf("rise sets how fast quiet passages are lifted\n");
+    auto lifted = [](float riseMs) {
+        const double fs = 48000; Processor p; p.prepare(fs, 2);
+        Params pr; pr.target = -20; pr.riseMs = riseMs; pr.responseMs = 100; p.setParams(pr);
+        run(p, fs, 0.6, sine(-30));
+        return p.telemetry().gain.load();
+    };
+    const float fast = lifted(50.f), slow = lifted(2000.f);
+    CHECK(fast > 8.f, "rise 50 ms lifted only %.2f dB in 0.6 s", fast);
+    CHECK(slow < 4.f, "rise 2000 ms lifted %.2f dB in 0.6 s (too fast)", slow);
+}
+
+static void testFastResponse() {
+    std::printf("a 10 ms response reaches the target within a few tenths of a second\n");
+    const double fs = 48000; Processor p; p.prepare(fs, 2);
+    Params pr; pr.target = -20; pr.responseMs = 10; pr.riseMs = 30; pr.fallMs = 10; pr.range = 18; pr.ceiling = 0; p.setParams(pr);
+    auto o = run(p, fs, 0.6, sine(-32));
+    const float out = rmsDb(o.l, size_t(0.45 * fs), size_t(0.6 * fs));
+    CHECK(std::fabs(out + 20.f) < 1.0f, "out %.2f after 0.45 s", out);
+}
+
+static void testBalance() {
+    std::printf("left / right meters and balance\n");
+    const double fs = 48000; Processor p; p.prepare(fs, 2);
+    Params pr; p.setParams(pr);
+    const float al = lin(-20) * std::sqrt(2.f), ar = lin(-26) * std::sqrt(2.f);
+    run(p, fs, 3.0, [&](double t, int c) { return (c ? ar : al) * float(std::sin(2 * M_PI * 300 * t)); });
+    const auto& tl = p.telemetry();
+    CHECK(std::fabs(tl.inBalance.load() - 6.f) < 0.5f, "input balance %.2f dB (left 6 dB louder)", tl.inBalance.load());
+    CHECK(tl.inPeakL.load() > tl.inPeakR.load() + 5.f, "left peak %.1f, right %.1f", tl.inPeakL.load(), tl.inPeakR.load());
+    CHECK(std::fabs(tl.outBalance.load() - 6.f) < 0.5f, "output balance %.2f dB (linked gain keeps it)", tl.outBalance.load());
+}
+
 int main() {
     testLatency();
     testRideToTarget();
@@ -239,6 +283,10 @@ int main() {
     testDrums();
     testVoiceNotPercussive();
     testMono();
+    testTrim();
+    testRiseSpeed();
+    testFastResponse();
+    testBalance();
     if (failures) { std::printf("\n%d check(s) failed\n", failures); return 1; }
     std::printf("\nall checks passed\n");
     return 0;
