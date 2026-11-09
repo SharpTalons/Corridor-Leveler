@@ -105,6 +105,11 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
 .sw span { color: var(--page-muted); font-variant-numeric: tabular-nums; }
 .notes { margin: 0; padding-left: 18px; line-height: 1.6; font-size: 15px; }
 .notes li + li { margin-top: 6px; }
+.dial-edit { position: absolute; transform: translate(-50%, -50%); width: 96px; padding: 5px 8px; border-radius: 10px; border: 0; text-align: center;
+  font: 600 13px var(--font-ui); font-variant-numeric: tabular-nums; color: var(--p-ink); background: var(--p-glass-strong);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: inset 0 1px 0 var(--p-rim), 0 0 0 2px var(--p-data), 0 6px 16px var(--p-shade); z-index: 2; }
+.unit[data-ptheme="dark"] .dial-edit { background: rgba(40, 40, 46, .85); }
+.dial-edit:focus { outline: none; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .drawer, .key { transition: none; } }
 </style>
@@ -113,7 +118,7 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
 <div class="wrap">
   <header class="page">
     <h1>Corridor Leveler in Liquid Glass</h1>
-    <p>A working preview for approval. Drag a dial up or down (Shift for fine steps, double-click to reset), drag the Target, Threshold and Ceiling lines, and try the sun / moon switch in the header.</p>
+    <p>A working preview for approval. Drag a dial up or down (Shift for fine steps), double-click a dial to type a value, Alt-click to reset it, drag the Target, Threshold and Ceiling lines, and try the sun / moon switch in the header.</p>
   </header>
 
   <p class="narrow-note">Corridor is a desktop plugin. Scroll the window sideways to see all of it.</p>
@@ -127,6 +132,7 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
       <input class="sr" type="range" id="k-tgt" aria-label="Target" min="-40" max="-6" step="0.5">
       <input class="sr" type="range" id="k-rng" aria-label="Range" min="0" max="24" step="0.5">
       <input class="sr" type="range" id="k-ceil" aria-label="Ceiling" min="-12" max="0" step="0.1">
+      <input id="dial-edit" class="dial-edit" type="text" inputmode="decimal" autocomplete="off" hidden>
       <button class="sr" id="b-mode">Switch between Ride and Hold</button>
       <button class="sr" id="b-ease">Ease in silence</button>
       <button class="sr" id="b-theme">Switch the plugin between dark and light</button>
@@ -172,6 +178,7 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
         <li>Dials are clear glass discs with a light value ring and pointer. Ride / Hold is a glass capsule whose selected side is a droplet that slides across.</li>
         <li>Each control has its own colour, used on its dial ring, pointer, value and line in the graph: Target teal (and the output it aims at), Threshold amber, Response blue, Range pink, Ceiling coral. The window, glass and text stay neutral. Dark mode uses softer versions; light mode uses deeper ones so their words stay readable.</li>
         <li>Meters use the standard zones fixed to the scale: green up to −18 dBFS, amber to −6, red above, with a clip light on top and the peak readout in its zone colour. Their ticks and numbers sit at exactly the graph's heights, every 5 dB with a number every 10.</li>
+        <li>Response is a time, from 10 ms (very fast, follows every word) to 3000 ms (slow, rides whole phrases), on a log scale so the fast end has room.</li>
         <li>Applied gain reads blue while lifting and orange while lowering, with its sign; the status dot matches. Colour is never the only signal: every state also has words.</li>
         <li>Dark by default; the sun / moon switch turns the plugin light. Hold slides a glass sheet out under the window with the live waveform.</li>
       </ul>
@@ -198,19 +205,21 @@ function readTokens() {
 readTokens();
 
 // ---------------- parameters
-const P = { thr: -48, tgt: -20, resp: 50, rng: 12, ceil: -1, hold: false, ease: false, bypass: false };
+const P = { thr: -48, tgt: -20, resp: 400, rng: 12, ceil: -1, hold: false, ease: false, bypass: false };
 const DEF = { ...P };
 const fmt = (v, d = 1) => { const s = Math.abs(v).toFixed(d); return (v < 0 && +s !== 0 ? '−' : '') + s; };
 const sgn = (v, d = 1) => (v > 0.05 ? '+' : '') + fmt(v, d);
 const PM = '±';
 const knobs = [
   { id: 'thr', label: 'Threshold', min: -70, max: -20, x: 290, y: 496, r: 30, val: v => fmt(v) + ' dB', col: 'thr' },
-  { id: 'resp', label: 'Response', min: 0, max: 100, x: 400, y: 496, r: 30, val: v => (v < 34 ? 'Slow ' : v > 66 ? 'Fast ' : 'Medium ') + Math.round(v), col: 'resp' },
+  { id: 'resp', label: 'Response', min: 10, max: 3000, log: true, x: 400, y: 496, r: 30, val: v => Math.round(v) + ' ms', unit: 'ms', col: 'resp' },
   { id: 'tgt', label: 'Target', min: -40, max: -6, x: 560, y: 478, r: 44, val: v => fmt(v) + ' dB RMS', col: 'data' },
   { id: 'rng', label: 'Range', min: 0, max: 24, x: 720, y: 496, r: 30, val: v => PM + fmt(v) + ' dB', col: 'rng' },
   { id: 'ceil', label: 'Ceiling', min: -12, max: 0, x: 830, y: 496, r: 30, val: v => fmt(v) + ' dBFS', col: 'ceil' },
 ];
 const A0 = -0.75 * Math.PI, A1 = 0.75 * Math.PI;
+const toNorm = (k, v) => k.log ? Math.log(v / k.min) / Math.log(k.max / k.min) : (v - k.min) / (k.max - k.min);
+const fromNorm = (k, n) => { n = Math.min(1, Math.max(0, n)); return k.log ? k.min * Math.pow(k.max / k.min, n) : k.min + n * (k.max - k.min); };
 
 // ---------------- geometry: a full-bleed graph; header, meters and deck float over it
 const PX0 = 90, PX1 = 1030, GT = 118, GB = 596, RANGE_DB = 80;
@@ -251,9 +260,9 @@ function inputLevel() {
 function step() {
   t += dt;
   const inDb = inputLevel();
-  const win = 1.5 - 1.2 * P.resp / 100 * (src === 'drums' ? 0.6 : 1);
+  const ms = P.resp / 1000, win = src === 'drums' ? Math.max(ms, Math.min(0.8, ms * 3)) : ms;  // drums: up to 3x longer, so it follows the groove
   const active = inDb >= P.thr;
-  if (active) { pw += (Math.pow(10, inDb / 10) - pw) * dt / Math.max(0.3, win); silent = 0; } else silent += dt;
+  if (active) { pw += (Math.pow(10, inDb / 10) - pw) * Math.min(1, dt / win); silent = 0; } else silent += dt;
   const lvl = 10 * Math.log10(Math.max(pw, 1e-12)), crest = src === 'drums' ? 14 : 10;
   if (P.hold) {
     if (analyzing) { anT += dt; if (active) { anSum += Math.pow(10, inDb / 10); anN++; } if (anT >= 20) lockAnalyze(); }
@@ -265,7 +274,7 @@ function step() {
     if (want < -P.rng) { want = -P.rng; lim = 'range'; }
     const room = P.ceil - (lvl + crest);
     if (want > room) { want = Math.max(-P.rng, room); lim = 'ceiling'; }
-    if (Math.abs(want - gain) > 0.75 || lim) gain += (want - gain) * dt / (win * 0.8);
+    if (Math.abs(want - gain) > (win < 0.1 ? 0.2 : 0.75) || lim) gain += (want - gain) * Math.min(1, dt / (win * 0.8));
     state = lim || (Math.abs(P.tgt - (lvl + gain)) < 1 ? 'on' : want > gain ? 'boost' : 'cut');
   } else if (P.ease && silent > 2) { gain *= 0.97; state = 'return'; } else state = 'wait';
   const g = P.bypass ? 0 : gain;
@@ -416,7 +425,7 @@ function drawMeter(x, pk, hold, isIn) {
 }
 
 function drawKnob(k) {
-  const v = P[k.id], pos = (v - k.min) / (k.max - k.min), ang = A0 + pos * (A1 - A0);
+  const v = P[k.id], pos = toNorm(k, v), ang = A0 + pos * (A1 - A0);
   const { x, y, r } = k, ringR = r + 9, hot = hover === k.id || drag?.id === k.id;
   const col = k.col ? C[k.col] : C.accent, colText = k.col ? C[k.col + '-text'] : C['accent-text'];
   const arc = (a0, a1, rad) => { ctx.beginPath(); ctx.arc(x, y, rad, a0 - Math.PI / 2, a1 - Math.PI / 2); };
@@ -595,7 +604,7 @@ function hitTest(p) {
   return null;
 }
 const lim = (id, v) => { const k = knobs.find(k => k.id === id); return Math.min(k.max, Math.max(k.min, v)); };
-function syncInput(k) { const el = document.getElementById('k-' + k.id); el.value = P[k.id]; el.setAttribute('aria-valuetext', k.val(P[k.id])); }
+function syncInput(k) { const el = document.getElementById('k-' + k.id); el.min = 0; el.max = 1000; el.step = 1; el.value = Math.round(toNorm(k, P[k.id]) * 1000); el.setAttribute('aria-valuetext', k.val(P[k.id])); }
 function set(id, v) { P[id] = lim(id, v); syncInput(knobs.find(k => k.id === id)); }
 function setTheme(isDark) { dark = isDark; unit.dataset.ptheme = isDark ? 'dark' : 'light'; readTokens(); }
 function click(id) {
@@ -611,7 +620,7 @@ cv.addEventListener('pointermove', e => {
   if (!reduced) lightTarget = { x: Math.max(-1, Math.min(1, (p[0] / W - 0.5) * 2)) * 0.8, y: -0.9 + (p[1] / H) * 0.6 };
   if (drag) {
     if (drag.id.startsWith('line-')) set(drag.id.slice(5), vOf(p[1]));
-    else { const k = knobs.find(k => k.id === drag.id); set(k.id, drag.v0 + (drag.y0 - p[1]) / (e.shiftKey ? 900 : 220) * (k.max - k.min)); }
+    else { const k = knobs.find(k => k.id === drag.id); set(k.id, fromNorm(k, toNorm(k, drag.v0) + (drag.y0 - p[1]) / (e.shiftKey ? 900 : 220))); }
     return;
   }
   hover = hitTest(p);
@@ -620,6 +629,7 @@ cv.addEventListener('pointermove', e => {
 cv.addEventListener('pointerleave', () => { if (!drag) hover = null; lightTarget = { x: -0.5, y: -1 }; });
 cv.addEventListener('pointerdown', e => {
   const p = pt(e), id = hitTest(p); if (!id) return;
+  if (e.altKey && knobs.some(k => k.id === id)) { set(id, DEF[id]); return; }  // Alt-click resets a dial
   if (knobs.some(k => k.id === id) || id.startsWith('line-')) { drag = { id, y0: p[1], v0: P[id.replace('line-', '')] }; cv.setPointerCapture(e.pointerId); }
   else click(id);
 });
@@ -627,11 +637,34 @@ const endDrag = () => { drag = null; };
 ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => cv.addEventListener(ev, endDrag));
 window.addEventListener('blur', endDrag);
 cv.addEventListener('touchstart', e => { const tp = e.touches[0]; if (tp && hitTest(pt(tp))) e.preventDefault(); }, { passive: false });
-cv.addEventListener('dblclick', e => { const id = hitTest(pt(e)); if (id && knobs.some(k => k.id === id)) set(id, DEF[id]); });
-cv.addEventListener('wheel', e => { const k = knobs.find(k => k.id === hitTest(pt(e))); if (!k) return; e.preventDefault(); set(k.id, P[k.id] - Math.sign(e.deltaY) * (k.max - k.min) / 60); }, { passive: false });
+cv.addEventListener('dblclick', e => { const k = knobs.find(k => k.id === hitTest(pt(e))); if (k) { e.preventDefault(); openEditor(k); } });
+// the value editor: a small glass field over the dial's value
+const editor = document.getElementById('dial-edit');
+let editing = null;
+function openEditor(k) {
+  editing = k; drag = null;
+  editor.style.left = (k.x / W * 100) + '%';
+  editor.style.top = ((k.y + k.r + 9 + 37) / H * 100) + '%';
+  editor.value = k.log ? String(Math.round(P[k.id])) : String(+P[k.id].toFixed(1));
+  editor.setAttribute('aria-label', k.label + (k.unit ? ' in ' + k.unit : ''));
+  editor.hidden = false; editor.focus(); editor.select();
+}
+function closeEditor(commit) {
+  if (!editing) return;
+  if (commit) {
+    const raw = editor.value.replace(',', '.').replace('\u2212', '-'), n = parseFloat(raw);
+    if (!isNaN(n)) set(editing.id, editing.log && /s\s*$/i.test(raw) && !/ms\s*$/i.test(raw) ? n * 1000 : n);  // "0.5 s" works for Response
+  }
+  const k = editing; editing = null; editor.hidden = true;
+  document.getElementById('k-' + k.id).focus({ preventScroll: true });
+}
+editor.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); closeEditor(true); } else if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); } });
+editor.addEventListener('blur', () => closeEditor(true));
+cv.addEventListener('wheel', e => { const k = knobs.find(k => k.id === hitTest(pt(e))); if (!k) return; e.preventDefault(); set(k.id, fromNorm(k, toNorm(k, P[k.id]) - Math.sign(e.deltaY) / 60)); }, { passive: false });
 knobs.forEach(k => {
   const el = document.getElementById('k-' + k.id); syncInput(k);
-  el.addEventListener('input', () => { P[k.id] = +el.value; el.setAttribute('aria-valuetext', k.val(P[k.id])); });
+  el.addEventListener('input', () => { P[k.id] = fromNorm(k, +el.value / 1000); el.setAttribute('aria-valuetext', k.val(P[k.id])); });
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); openEditor(k); } });  // Enter types a value
   el.addEventListener('focus', () => focusId = k.id); el.addEventListener('blur', () => focusId = null);
 });
 [['b-mode', 'mode'], ['b-ease', 'ease'], ['b-theme', 'theme'], ['b-bypass', 'bypass']].forEach(([elId, id]) => {
