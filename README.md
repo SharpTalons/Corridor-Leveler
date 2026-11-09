@@ -17,25 +17,42 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
 
 ## Controls
 
-- **Ride / Hold**: Ride adjusts the gain continuously. Hold opens an analysis panel under the window:
-  press **Analyze**, play a typical section while the live input waveform lights up yellow, then press
-  **Lock** (or it locks after 20 s). One fixed correction is then held.
+- **Ride / Hold**: Ride adjusts the gain continuously. Hold slides an analysis sheet out under the window:
+  press **Analyze** (or the **A** key), play a typical section while the live input waveform lights up, then
+  press **Lock** (or it locks after 20 s). One fixed correction is then held. Analyze / Lock is also a host
+  parameter, so a hotkey, Stream Deck or MIDI button can press it: each press analyzes, the next locks.
 - **Threshold** (dB RMS): below this it stops adjusting, so silence, breaths and noise never trigger a boost.
 - **Target** (dB RMS): the level you want.
-- **Response**: slow (1.5 s averaging, smooth) to fast (0.3 s). Drums and other percussive material are
-  detected automatically and averaged over at least 0.8 s, so the gain follows the groove, not each hit.
-  Within 0.75 dB of the target it holds still.
+- **Response** (ms): how long Corridor listens before it judges the level. 10 ms is the fastest and follows
+  almost every word; 3000 ms is the slowest and rides whole phrases. The dial is marked Fast and Slow and
+  runs on a log scale. Drums are detected and stretch it up to 3x (at most 0.8 s), so the gain follows the
+  groove, not each hit. Below about 50 ms the leveler starts to shape the sound itself, like a compressor.
 - **Range** (dB): the most it may boost or cut.
 - **Ceiling** (dBFS): the highest peak allowed. Boosts stop short of it and a 5 ms look-ahead
   brick-wall limiter catches the rest.
-- **Ease in silence**: off, the gain freezes below the threshold; on, after 2 s of silence it glides back to 0 dB.
+- **Rise, fall, trim** (the button next to Ride / Hold opens them):
+  - **Rise** (ms): how fast quiet passages are lifted.
+  - **Fall** (ms): how fast loud passages are pulled down. A slow rise and a fast fall suit voice.
+  - **Output trim** (dB): a final +/-12 dB after the leveler, still under the ceiling.
+- **Return to 0 dB in silence**: off, the gain freezes below the threshold; on, after 2 s of silence it
+  glides back to 0 dB.
 - **Bypass**: click-free, and keeps the same latency so nothing jumps.
 
-The window can be resized freely (it keeps its shape), has an input peak meter on
-the left, output on the right, the applied gain in the bottom-right corner and the latency in the bottom-left
-(5 ms at every sample rate).
+Also in the header: **presets** (Stream voice, Podcast, Music bed, Drums, Quiet room), **A / B** (two complete
+settings to compare; B starts as a copy of A, and both are saved with the session), and **undo / redo**
+(Ctrl+Z, Ctrl+Shift+Z) for every change. Double-click a dial, or press Enter on it, to type a value;
+Alt-click resets it.
 
-![Hold mode with the analysis panel open](docs/window-hold.png)
+The window is drawn in a Liquid Glass style: a full-bleed level graph with the header, meters and readouts
+floating over it as glass, and the controls sitting in the graph where it frosts over. It is dark by default,
+with a light version on the sun / moon switch, and can be resized freely (it keeps its shape). The meters show
+left and right with a balance dot, in green, amber and red zones, marked at the graph's heights. The bottom
+corners show how far the output is from the target and the applied gain; the latency is under them
+(5 ms at every sample rate). A one-time tip explains the two settings that matter most.
+
+![Hold mode with the analysis sheet open](docs/window-hold.png)
+
+![Light theme](docs/window-light.png)
 
 ## Installing
 

@@ -55,6 +55,19 @@ bool Processor::Meter::push(double meanSq, float absPeak) {
     return true;
 }
 
+// left / right peaks (35 dB/s fall, like the main meter) and a smoothed balance
+void Processor::ChannelMeter::finish(int n, bool mono) {
+    if (mono) { sq[1] = sq[0]; pk[1] = pk[0]; }
+    for (int c = 0; c < 2; ++c) {
+        const float pd = linToDb(pk[c]);
+        db[c] = pd > db[c] ? pd : std::max(-120.f, db[c] - 0.35f);
+    }
+    const double l = sq[0] / std::max(1, n), r = sq[1] / std::max(1, n);
+    if (!mono && (l + r) * 0.5 > 1e-7) bal += (float(10.0 * std::log10((l + 1e-12) / (r + 1e-12))) - bal) * 0.05f;  // above ~-70 dB only
+    if (mono) bal = 0.f;
+    sq[0] = sq[1] = 0.0; pk[0] = pk[1] = 0.f;
+}
+
 // ---------------------------------------------------------------- processor
 Processor::Processor() { prepare(48000.0, 2); }
 
@@ -83,7 +96,8 @@ void Processor::reset() {
     for (auto& d : dryDelay_) std::fill(d.begin(), d.end(), 0.f);
     dw_ = 0; qh_ = qt_ = qsz_ = 0; qn_ = 0; env_ = 1.f; minEnv_ = 1.f; slotPeak_ = 0.f;
     ms_.fill(0.0); pk_.fill(0.f); act_.fill(0); li_ = 0;
-    gCur_ = g_; gInc_ = 0.f;
+    gCur_ = g_ + p_.trimDb; gInc_ = 0.f;
+    inCh_ = ChannelMeter{}; outCh_ = ChannelMeter{};
     activeT_ = 0.f; silentT_ = 10.f; crest_ = 10.f; perc_ = false; prevBlockDb_ = -120.f; onsetRate_ = 0.f;
     an_ = Analysis{};
     bypassMix_ = p_.bypass ? 1.f : 0.f;
@@ -112,7 +126,7 @@ void Processor::process(float* const* ch, int numChannels, int numSamples) {
         holdG_ = pendingHold_.load();
         t_.holdValid.store(holdG_ != kNoHold);
         t_.holdGain.store(holdG_ == kNoHold ? 0.f : holdG_);
-        if (p_.hold && holdG_ != kNoHold) { g_ = gCur_ = holdG_; gInc_ = 0.f; }
+        if (p_.hold && holdG_ != kNoHold) { g_ = holdG_; gCur_ = holdG_ + p_.trimDb; gInc_ = 0.f; }
     }
 
     const float ceil = dbToLin(p_.ceiling);
@@ -123,8 +137,8 @@ void Processor::process(float* const* ch, int numChannels, int numSamples) {
     for (int s = 0; s < numSamples; ++s) {
         // ---- input detection (linked across channels)
         double sq = 0.0; float pk = 0.f;
-        for (int c = 0; c < nc; ++c) { const float x = ch[c][s]; sq += double(x) * x; pk = std::max(pk, std::fabs(x)); }
-        if (in_.push(sq * invNc, pk)) controlBlock();
+        for (int c = 0; c < nc; ++c) { const float x = ch[c][s]; sq += double(x) * x; pk = std::max(pk, std::fabs(x)); if (c < 2) inCh_.add(c, x); }
+        if (in_.push(sq * invNc, pk)) { inCh_.finish(in_.block, nc < 2); controlBlock(); }
 
         gCur_ += gInc_;
         const float gl = dbToLin(gCur_);
@@ -159,9 +173,10 @@ void Processor::process(float* const* ch, int numChannels, int numSamples) {
             if (b > 0.f) y = y * (1.f - b) + dry * b;
             ch[c][s] = y;
             osq += double(y) * y; opk = std::max(opk, std::fabs(y));
+            if (c < 2) outCh_.add(c, y);
         }
         dw_ = (dw_ + 1) % dl;
-        out_.push(osq * invNc, opk);
+        if (out_.push(osq * invNc, opk)) outCh_.finish(out_.block, nc < 2);
     }
     // channels beyond what was prepared are passed through untouched
 }
@@ -188,11 +203,10 @@ void Processor::controlBlock() {
     if (active) crest_ += ((pk1 - sl) - crest_) * 0.01f;
     perc_ = crest_ > 12.f && onsetRate_ > 1.0f;
 
-    // Response sets the RMS window: 1.5 s (slow) .. 0.3 s (fast).
-    // Percussive material averages at least 0.8 s, so the gain follows the groove, not each hit.
-    int win = int(std::lround(150.0 - 1.2 * double(p_.response)));
-    win = clampv(win, 30, 150);
-    if (perc_) win = std::max(win, 80);
+    // Response is the listening window in 10 ms blocks: 10 ms (very fast) .. 3000 ms (slow).
+    // Percussive material stretches it up to 3x (at most 0.8 s), so the gain follows the groove, not each hit.
+    int win = clampv(int(std::lround(double(p_.responseMs) / 10.0)), 1, N);
+    if (perc_) win = std::max(win, std::min(80, win * 3));
     double sum = 0.0; int count = 0;
     for (int k = 0; k < win; ++k) {
         const int j = (i - k + N) % N;
@@ -209,52 +223,56 @@ void Processor::controlBlock() {
         if (an_.t >= 20.0) lockAnalysis();
     }
 
-    const float sc = 0.15f * std::pow(40.f, p_.response / 100.f);
+    // Rise and Fall are the time constants of the gain: how fast it lifts and how fast it pulls down.
     const float g = g_;
-    float target = g, rate = 0.f;
+    float target = g, tau = 0.f;  // seconds; 0 = hold still
     State st;
     if (p_.hold) {
         if (holdG_ == kNoHold) holdG_ = clampv(g, -p_.range, p_.range);  // entering Hold keeps the current gain
-        target = holdG_; rate = 12.f;
+        target = holdG_; tau = 0.08f;
         st = an_.on ? State::Analyzing : (t_.holdValid.load() ? State::Held : State::Unset);
     } else if (!active) {
         activeT_ = 0.f; silentT_ += dt;
         if (p_.easeInSilence && silentT_ > float(kEaseDelaySeconds) && std::fabs(g) > 0.01f) {
-            target = 0.f; rate = 3.f * std::max(0.5f, sc); st = State::Returning;
+            target = 0.f; tau = 1.0f; st = State::Returning;
         } else {
             st = State::Waiting;
         }
     } else {
         activeT_ += dt; silentT_ = 0.f;
-        if (!lValid || activeT_ < 0.15f) {
+        if (!lValid || activeT_ < std::min(0.15f, p_.responseMs / 1000.f)) {
             st = State::Waiting;
         } else {
             const float outLvl = L + g, d = std::fabs(outLvl - p_.target);
-            // within 0.75 dB of the target it holds still, so it never fidgets
-            target = d < 0.75f ? g : p_.target - L;
-            rate = clampv(1.5f + 0.8f * d, 1.5f, 12.f) * sc * (perc_ ? 0.7f : 1.f);
-            st = d < 0.75f ? State::OnTarget : (outLvl < p_.target ? State::Boosting : State::Cutting);
+            // within a small dead band of the target it holds still, so it never fidgets
+            // (0.75 dB normally, 0.2 dB at very fast settings, where the user wants it tight)
+            const float band = p_.responseMs < 100.f ? 0.2f : 0.75f;
+            target = d < band ? g : p_.target - L;
+            tau = (target > g ? p_.riseMs : p_.fallMs) / 1000.f;
+            if (perc_) tau = std::max(tau, std::min(0.6f, tau * 3.f));  // drums: follow the groove, not each hit
+            st = d < band ? State::OnTarget : (outLvl < p_.target ? State::Boosting : State::Cutting);
         }
         // ceiling: never boost peaks past it
         const float gC = p_.ceiling - pk1;
         if (target > gC) {
             target = gC;
             if (st == State::Boosting || st == State::OnTarget || g > gC + 0.1f) st = State::Ceiling;
-            if (g > gC) rate = std::max(rate, 30.f);
+            if (g > gC) tau = std::min(tau > 0.f ? tau : 1.f, 0.02f);  // already past it: come down fast
         }
         if ((target > p_.range || target < -p_.range) && (st == State::Boosting || st == State::Cutting)) st = State::Range;
     }
     target = clampv(target, -p_.range, p_.range);
-    const float step = rate * dt;
-    g_ = target > g ? std::min(target, g + step) : std::max(target, g - step);
+    g_ = tau > 0.f ? g + (target - g) * (1.f - std::exp(-dt / tau)) : g;
     if (g_ > p_.range) g_ = std::max(p_.range, g - 12.f * dt);   // Range turned down mid-boost
     if (g_ < -p_.range) g_ = std::min(-p_.range, g + 12.f * dt);
-    gInc_ = (g_ - gCur_) / float(in_.block);
+    gInc_ = (g_ + p_.trimDb - gCur_) / float(in_.block);  // the trim rides along with the gain, so changing it never clicks
 
     // telemetry
     t_.inRms.store(in_.rmsDb); t_.outRms.store(out_.rmsDb);
     t_.inPeak.store(in_.peakDb); t_.inPeakHold.store(in_.holdDb);
     t_.outPeak.store(out_.peakDb); t_.outPeakHold.store(out_.holdDb);
+    t_.inPeakL.store(inCh_.db[0]); t_.inPeakR.store(inCh_.db[1]); t_.inBalance.store(inCh_.bal);
+    t_.outPeakL.store(outCh_.db[0]); t_.outPeakR.store(outCh_.db[1]); t_.outBalance.store(outCh_.bal);
     t_.gain.store(p_.bypass ? 0.f : g_);
     t_.level.store(L); t_.levelValid.store(lValid);
     t_.crest.store(crest_); t_.percussive.store(perc_);

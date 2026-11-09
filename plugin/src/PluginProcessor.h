@@ -9,7 +9,11 @@
 namespace ids {
 inline constexpr const char* threshold = "threshold";
 inline constexpr const char* target = "target";
-inline constexpr const char* response = "response";
+inline constexpr const char* response = "responseMs";  // ms (10..3000); a new ID, because the old 0..100 scale meant something else
+inline constexpr const char* rise = "riseMs";
+inline constexpr const char* fall = "fallMs";
+inline constexpr const char* trim = "trim";
+inline constexpr const char* analyze = "analyze";      // momentary: each press analyzes, the next locks (map it to a hotkey, Stream Deck or MIDI)
 inline constexpr const char* range = "range";
 inline constexpr const char* ceiling = "ceiling";
 inline constexpr const char* mode = "mode";
@@ -54,10 +58,25 @@ public:
     // UI preferences kept with the session
     bool darkTheme = true;
     int editorWidth = 1120;
+    bool tipDismissedThisRun = false;
+
+    // undo / redo of every parameter change, presets, and two A / B slots
+    juce::UndoManager undo;
+    struct Preset { const char* name; float threshold, target, responseMs, range, ceiling, riseMs, fallMs, trim; bool ease; };
+    static const std::vector<Preset>& presets();
+    juce::String presetName = "Default";
+    void applyPreset(int index);
+    bool presetEdited() const;
+    int slot = 0;                      // 0 = A, 1 = B
+    void switchSlot(int to);
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
     void run(juce::AudioBuffer<float>& buffer, bool forceBypass);
+    juce::NamedValueSet captureValues() const;
+    void applyValues(const juce::NamedValueSet& v);
+    juce::NamedValueSet slots[2];
+    bool lastAnalyze = false;
 
     juce::AudioProcessorValueTreeState apvts;
     corridor::Processor dsp;
@@ -70,6 +89,10 @@ private:
     std::atomic<float>* pMode = nullptr;
     std::atomic<float>* pEase = nullptr;
     std::atomic<float>* pBypass = nullptr;
+    std::atomic<float>* pRise = nullptr;
+    std::atomic<float>* pFall = nullptr;
+    std::atomic<float>* pTrim = nullptr;
+    std::atomic<float>* pAnalyze = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CorridorAudioProcessor)
 };

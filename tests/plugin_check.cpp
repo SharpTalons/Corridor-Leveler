@@ -113,6 +113,7 @@ static void snapshots(const File& dir) {
     runSine(proc, 48000, -70.f, 1.5, ph);
     runSine(proc, 48000, -13.f, 2.5, ph);
     runSine(proc, 48000, -24.f, 3.0, ph);
+    proc.tipDismissedThisRun = true;  // the screenshots show the window itself, not the first-run tip
     auto save = [&](const Image& img, const String& name) {
         const File f = dir.getChildFile(name);
         f.deleteFile();
@@ -139,6 +140,13 @@ static void snapshots(const File& dir) {
         }
         save(img, "window-" + String(w) + ".png");
     }
+    {  // the light theme
+        proc.editorWidth = 1120; proc.darkTheme = false;
+        std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
+        static_cast<CorridorEditor*>(ed.get())->refreshNow();
+        save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-light.png");
+        proc.darkTheme = true;
+    }
     // Hold mode: the analysis panel opens under the window while a section is measured
     {
         proc.editorWidth = 1120;
@@ -157,6 +165,7 @@ static void snapshots(const File& dir) {
 }
 
 int main(int argc, char** argv) {
+    std::setvbuf(stdout, nullptr, _IONBF, 0);  // every line reaches the CI log at once, even if a step hangs
     ScopedJuceInitialiser_GUI init;
     setenv_portable();
     String vst3, vst2, snapDir;

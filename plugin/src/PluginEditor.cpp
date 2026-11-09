@@ -1,12 +1,11 @@
-// Corridor Leveler - plugin window.
+// Corridor Leveler - plugin window (Liquid Glass design).
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Design size 1120 x 630, scaled as a whole. A header strip; the input peak meter on the left
-// edge and the output on the right; between them a charcoal level graph (0 to -80 dB) whose lower
-// part fades out under the controls. Threshold and Response on the left, a larger Target in the
-// middle with the Ride / Hold switch under it, Range and Ceiling on the right. In Hold mode an
-// analysis panel (150 px) opens under the window with the Analyze / Lock key and a live input
-// waveform. Matte dials with yellow value rings, raised keys, recessed wells.
+// Design size 1120 x 630, scaled as a whole. A full-bleed level graph (0 to -80 dB) with glass pieces
+// floating over it: the header, the two meters and the readouts. Under the dials the graph frosts and
+// fades into the window colour, so the controls sit in the graph itself. Glass is drawn from a small,
+// blurred copy of the graph, magnified a little under each piece and edged with a lit rim.
+// In Hold mode an analysis sheet (150 px) slides out under the window.
 #include "PluginEditor.h"
 
 #include "Updates.h"
@@ -19,440 +18,607 @@ using namespace juce;
 
 namespace {
 
-// ---------------------------------------------------------------- palette
-// Every colour the window uses. Lighting (shadows, highlights) is black or white at an alpha.
-namespace K {
-const Colour page{0xff121214}, chrome{0xff1b1b1e}, chromeTop{0xff26262a}, seam{0xff0c0c0e}, frame{0xff2e2e33};
-const Colour graphTop{0xff2a2a2e}, graphBottom{0xff1a1a1d};
-const Colour ink{0xffe8e8ea}, label{0xffc9c9cd}, muted{0xff9d9da3};
-const Colour yellow{0xfff5c41c}, green{0xff8cc63f}, red{0xffff5b5b}, trace{0xffb2b2b7}, thrMid{0xffc6c62a};
-const Colour meterLit{0xff5cc834}, meterLow{0xff2f8a1d}, meterWarn{0xffd8c425}, meterOff{0xff2a321f};
-const Colour meterBgTop{0xff202023}, meterBgBottom{0xff151517};
-const Colour knobHi{0xff303035}, knobLo{0xff141416}, skirtTop{0xff45454b}, skirtMid{0xff222226}, skirtBottom{0xff0b0b0c};
-const Colour btnTop{0xff4a4a50}, btnBottom{0xff35353a}, btnEdge{0xff5d5d64}, btnHover{0xff58585e}, btnUnder{0xff1d1d20}, btnPressed{0xff232326};
-const Colour well{0xff141416}, wellDeep{0xff0e0e10}, tagBg{0xd9141416};
-const Colour drawerTop{0xff1a1a1d}, drawerBottom{0xff232326}, floatBg{0xff1f1f22}, floatEdge{0xff3a3a40};
-}  // namespace K
+constexpr int W = CorridorEditor::designW, H = CorridorEditor::designH;
+constexpr float kPi = MathConstants<float>::pi;
+constexpr int kHist = 500;          // 10 s at 20 ms per entry
+constexpr int kWaveEntries = 300;   // 6 s in the analysis sheet
 
-Font sans(float h, bool bold = false, float trackPx = 0.f) {
-    Font f(FontOptions(h, bold ? Font::bold : Font::plain));
-    if (trackPx > 0.f) f.setExtraKerningFactor(trackPx / h);
-    return f;
-}
-Font mono(float h, bool bold = false) {
-    return Font(FontOptions(Font::getDefaultMonospacedFontName(), h, bold ? Font::bold : Font::plain));
-}
+// ---------------------------------------------------------------- geometry
+constexpr float PX0 = 90.f, PX1 = 1030.f, GT = 118.f, GB = 596.f, kDbRange = 80.f;
+const Rectangle<float> kHeader{12.f, 12.f, float(W) - 24.f, 42.f};
+constexpr float kMeterY = 64.f, kMeterH = 554.f, kMeterW = 66.f;
+const Rectangle<float> kDeck{226.f, 408.f, 668.f, 206.f};
+constexpr float kFadeTop = 408.f - 44.f;
+float yOf(float v) { return GT + jlimit(0.f, kDbRange, -v) / kDbRange * (GB - GT); }
+float vOf(float y) { return -jlimit(0.f, kDbRange, (y - GT) / (GB - GT) * kDbRange); }
+
+// ---------------------------------------------------------------- palette (dark and light)
+struct Pal {
+    bool dark;
+    Colour bg, ink, label, muted;
+    Colour data, dataText, thr, thrText, ceil, ceilText, in;
+    Colour mSafe, mWarn, mHot, boost, cut;
+    Colour grid, glass, glassStrong, rim, rimSoft, shade, bloomA, bloomB, meterOff, on, panel;
+};
+const Pal kDark{true, Colour(0xff0f0f11), Colour(0xffededef), Colour(0xffb4b4b9), Colour(0xff8b8b90),
+                Colour(0xff4fd1bf), Colour(0xff6fdccd), Colour(0xfff2b84b), Colour(0xfff2c46a), Colour(0xffff7a6b), Colour(0xffff8f82), Colour(0x73aabed7),
+                Colour(0xff4cd787), Colour(0xfff2c24b), Colour(0xffff5f52), Colour(0xff7fb2ff), Colour(0xffff9a6b),
+                Colour(0x0dffffff), Colour(0x0fffffff), Colour(0x21ffffff), Colour(0x61ffffff), Colour(0x1affffff), Colour(0x66000000),
+                Colour(0x09ffffff), Colour(0x06ffffff), Colour(0x12ffffff), Colour(0x33ffffff), Colour(0xe6222228)};
+const Pal kLight{false, Colour(0xfff2f2f4), Colour(0xff1d1d1f), Colour(0xff48484c), Colour(0xff6e6e73),
+                 Colour(0xff149483), Colour(0xff0f7a6c), Colour(0xffe09a12), Colour(0xff8f5c00), Colour(0xffe0483a), Colour(0xffb2352a), Colour(0x61465a78),
+                 Colour(0xff2fb562), Colour(0xffe3a51b), Colour(0xffe5392c), Colour(0xff1f5cc0), Colour(0xffb8501f),
+                 Colour(0x0d000000), Colour(0x73ffffff), Colour(0xbfffffff), Colour(0xf2ffffff), Colour(0x0f000000), Colour(0x14000000),
+                 Colour(0xb3ffffff), Colour(0x80ffffff), Colour(0x12000000), Colour(0x14000000), Colour(0xf2fbfbfc)};
+
+Font sans(float h, bool bold = false) { return Font(FontOptions(h, bold ? Font::bold : Font::plain)); }
 
 String fmtDb(float v, int dec = 1, bool sign = false) {
     String s = String(std::abs(v), dec);
     const bool zero = s == String(0.0, dec);
-    if (v < 0 && !zero) return "-" + s;
+    if (v < 0 && !zero) return String(CharPointer_UTF8("\xe2\x88\x92")) + s;  // a real minus sign
     if (sign && v > 0 && !zero) return "+" + s;
     return s;
 }
 const String kPlusMinus = String(CharPointer_UTF8("\xc2\xb1"));
+const String kDot = String(CharPointer_UTF8(" \xc2\xb7 "));
 
-constexpr float kTop = 48.f, kBottomPad = 14.f, kDbRange = 80.f;  // graph and meters share this scale
-constexpr int kHead = 40, kMeterW = 66, kHist = 500;              // 10 s at 20 ms per entry
-constexpr int kWaveEntries = 300;                                 // 6 s in the analysis panel
-constexpr float kPi = MathConstants<float>::pi;
+String speedWord(double ms) { return ms < 50 ? "Very fast" : ms < 200 ? "Fast" : ms < 900 ? "Medium" : "Slow"; }
 
-// ---------------------------------------------------------------- icons (vector, drawn at any size)
-void drawIcon(Graphics& g, const String& name, Rectangle<float> area, Colour col) {
-    const float s = jmin(area.getWidth(), area.getHeight());
-    const auto b = area.withSizeKeepingCentre(s, s);
+// ---------------------------------------------------------------- icons
+void drawIcon(Graphics& g, const String& name, Rectangle<float> a, Colour col, bool dark = true) {
+    const float s = jmin(a.getWidth(), a.getHeight());
+    const auto b = a.withSizeKeepingCentre(s, s);
     const float cx = b.getCentreX(), cy = b.getCentreY(), x = b.getX(), y = b.getY();
-    const PathStrokeType st(jmax(1.4f, s * 0.11f), PathStrokeType::curved, PathStrokeType::rounded);
+    const PathStrokeType st(jmax(1.5f, s * 0.1f), PathStrokeType::curved, PathStrokeType::rounded);
     g.setColour(col);
     Path p;
     if (name == "power") {
-        p.addCentredArc(cx, cy + s * 0.04f, s * 0.38f, s * 0.38f, 0.f, 0.7f, 2.f * kPi - 0.7f, true);
-        p.startNewSubPath(cx, y + s * 0.04f); p.lineTo(cx, cy - s * 0.02f);
+        p.addCentredArc(cx, cy + s * 0.05f, s * 0.36f, s * 0.36f, 0.f, 0.7f, 2.f * kPi - 0.7f, true);
+        p.startNewSubPath(cx, y + s * 0.06f); p.lineTo(cx, cy);
+        g.strokePath(p, st);
+    } else if (name == "theme") {
+        if (dark) {  // moon
+            Path m; m.addEllipse(cx - s * 0.36f, cy - s * 0.36f, s * 0.72f, s * 0.72f);
+            m.addEllipse(cx - s * 0.08f, cy - s * 0.58f, s * 0.68f, s * 0.68f);
+            m.setUsingNonZeroWinding(false);
+            Graphics::ScopedSaveState ss(g);
+            Path clip; clip.addEllipse(cx - s * 0.36f, cy - s * 0.36f, s * 0.72f, s * 0.72f);
+            g.reduceClipRegion(clip);
+            g.fillPath(m);
+        } else {     // sun
+            g.fillEllipse(cx - s * 0.2f, cy - s * 0.2f, s * 0.4f, s * 0.4f);
+            for (int k = 0; k < 8; ++k) {
+                const float an = float(k) * kPi / 4.f;
+                p.startNewSubPath(cx + std::cos(an) * s * 0.32f, cy + std::sin(an) * s * 0.32f);
+                p.lineTo(cx + std::cos(an) * s * 0.46f, cy + std::sin(an) * s * 0.46f);
+            }
+            g.strokePath(p, st);
+        }
+    } else if (name == "undo" || name == "redo") {  // a hooked arrow: undo points back, redo forward
+        const float d = name == "undo" ? -1.f : 1.f;
+        p.startNewSubPath(cx - d * s * 0.3f, cy + s * 0.3f);
+        p.quadraticTo(cx - d * s * 0.3f, cy - s * 0.24f, cx + d * s * 0.3f, cy - s * 0.24f);
+        p.startNewSubPath(cx + d * s * 0.08f, cy - s * 0.46f); p.lineTo(cx + d * s * 0.3f, cy - s * 0.24f); p.lineTo(cx + d * s * 0.08f, cy - s * 0.02f);
+        g.strokePath(p, st);
+    } else if (name == "chevron-down" || name == "chevron-up") {
+        const float d = name == "chevron-down" ? 1.f : -1.f;
+        p.startNewSubPath(cx - s * 0.25f, cy - d * s * 0.12f); p.lineTo(cx, cy + d * s * 0.12f); p.lineTo(cx + s * 0.25f, cy - d * s * 0.12f);
         g.strokePath(p, st);
     } else if (name == "download") {
-        p.startNewSubPath(cx, y + s * 0.08f); p.lineTo(cx, y + s * 0.62f);
+        p.startNewSubPath(cx, y + s * 0.1f); p.lineTo(cx, y + s * 0.62f);
         p.startNewSubPath(cx - s * 0.24f, y + s * 0.4f); p.lineTo(cx, y + s * 0.64f); p.lineTo(cx + s * 0.24f, y + s * 0.4f);
-        p.startNewSubPath(x + s * 0.12f, y + s * 0.74f); p.lineTo(x + s * 0.12f, y + s * 0.9f); p.lineTo(x + s * 0.88f, y + s * 0.9f); p.lineTo(x + s * 0.88f, y + s * 0.74f);
+        p.startNewSubPath(x + s * 0.14f, y + s * 0.76f); p.lineTo(x + s * 0.14f, y + s * 0.9f); p.lineTo(x + s * 0.86f, y + s * 0.9f); p.lineTo(x + s * 0.86f, y + s * 0.76f);
         g.strokePath(p, st);
-    } else if (name == "refresh") {
-        p.addCentredArc(cx, cy, s * 0.34f, s * 0.34f, 0.f, 0.5f, 2.f * kPi - 0.3f, true);
-        g.strokePath(p, st);
-        Path a; a.addTriangle(cx + s * 0.06f, y + s * 0.04f, cx + s * 0.06f, y + s * 0.36f, cx + s * 0.3f, y + s * 0.2f);
-        g.fillPath(a);
     } else if (name == "close") {
-        p.startNewSubPath(x + s * 0.25f, y + s * 0.25f); p.lineTo(x + s * 0.75f, y + s * 0.75f);
-        p.startNewSubPath(x + s * 0.75f, y + s * 0.25f); p.lineTo(x + s * 0.25f, y + s * 0.75f);
+        p.startNewSubPath(x + s * 0.28f, y + s * 0.28f); p.lineTo(x + s * 0.72f, y + s * 0.72f);
+        p.startNewSubPath(x + s * 0.72f, y + s * 0.28f); p.lineTo(x + s * 0.28f, y + s * 0.72f);
         g.strokePath(p, st);
     } else if (name == "logo") {  // a level held between two walls: the corridor
-        g.fillRect(x, y + s * 0.1f, s, s * 0.12f);
-        g.fillRect(x, y + s * 0.78f, s, s * 0.12f);
+        g.fillRoundedRectangle(x, y + s * 0.08f, s, s * 0.14f, s * 0.07f);
+        g.fillRoundedRectangle(x, y + s * 0.78f, s, s * 0.14f, s * 0.07f);
         for (int k = 0; k <= 30; ++k) {
             const float t = float(k) / 30.f, env = 1.f - t * 0.72f;
-            const float px = x + s * t, py = cy - std::sin(t * 4.f * kPi) * s * 0.2f * env;
+            const float px = x + s * t, py = cy - std::sin(t * 4.f * kPi) * s * 0.22f * env;
             if (k == 0) p.startNewSubPath(px, py); else p.lineTo(px, py);
         }
-        g.strokePath(p, PathStrokeType(jmax(1.4f, s * 0.08f), PathStrokeType::curved, PathStrokeType::rounded));
+        g.strokePath(p, PathStrokeType(jmax(1.5f, s * 0.09f), PathStrokeType::curved, PathStrokeType::rounded));
     }
 }
 
-// A recessed well: dark fill, shadow falling in from the top edge, a faint lit lip at the bottom.
-void drawWell(Graphics& g, Rectangle<float> r, float rad, Colour fill = K::well) {
-    Path p; p.addRoundedRectangle(r, rad);
-    g.setColour(fill); g.fillPath(p);
+// ---------------------------------------------------------------- glass
+// The shared state every glass piece draws from: the theme, the blurred graph and where the light is.
+struct GlassContext {
+    const Pal* pal = &kDark;
+    Image blur;                 // the graph, drawn small and blurred; maps onto the whole 1120 x 630 design
+    Component* root = nullptr;  // the design-size content component
+    Point<float> light{-0.5f, -1.f};
+};
+
+struct GlassOpts {
+    Colour tint;              // transparent = the theme's glass tint
+    float lens = 1.05f;       // how much the backdrop is magnified under the glass
+    bool shadow = true;
+    float shadowRadius = 20.f, shadowY = 7.f;
+    float rimWidth = 1.4f;
+};
+
+// Draws a glass shape in `comp`'s coordinates. The backdrop is mapped through the component's position
+// in the content, so every piece shows the part of the graph that is really behind it.
+void drawGlass(Graphics& g, const GlassContext& gc, Component& comp, const Path& shape, GlassOpts o = {}) {
+    const Pal& p = *gc.pal;
+    const auto b = shape.getBounds();
+    if (o.shadow) DropShadow(p.shade, int(o.shadowRadius), {0, int(o.shadowY)}).drawForPath(g, shape);
     {
         Graphics::ScopedSaveState ss(g);
-        g.reduceClipRegion(p);
-        g.setGradientFill(ColourGradient(Colours::black.withAlpha(0.7f), 0.f, r.getY(), Colours::transparentBlack, 0.f, r.getY() + jmin(10.f, r.getHeight() * 0.5f), false));
-        g.fillRect(r);
+        g.reduceClipRegion(shape);
+        if (gc.blur.isValid() && gc.root != nullptr) {
+            const auto origin = gc.root->getLocalPoint(&comp, Point<float>());
+            const auto t = AffineTransform::scale(float(W) / float(gc.blur.getWidth()), float(H) / float(gc.blur.getHeight()))
+                               .translated(-origin.x, -origin.y)
+                               .scaled(o.lens, o.lens, b.getCentreX(), b.getCentreY());
+            g.setImageResamplingQuality(Graphics::mediumResamplingQuality);
+            g.drawImageTransformed(gc.blur, t);
+        }
+        g.setColour(o.tint.isTransparent() ? p.glass : o.tint);
+        g.fillRect(b);
+        // light pooling on the lit side: the glass has thickness
+        const float lx = b.getCentreX() + gc.light.x * b.getWidth() * 0.5f, ly = b.getCentreY() + gc.light.y * b.getHeight() * 0.5f;
+        g.setGradientFill(ColourGradient(Colours::white.withAlpha(p.dark ? 0.10f : 0.45f), lx, ly, Colours::white.withAlpha(0.f),
+                                         lx + jmax(b.getWidth(), b.getHeight()) * 0.9f, ly, true));
+        g.fillRect(b);
     }
-    g.setColour(Colours::black.withAlpha(0.8f)); g.strokePath(p, PathStrokeType(1.f));
-    g.setColour(Colours::white.withAlpha(0.07f));
-    g.drawLine(r.getX() + rad, r.getBottom() + 0.5f, r.getRight() - rad, r.getBottom() + 0.5f, 1.f);
+    // rim: bright where the light catches the edge, a softer catch on the far side
+    const float rx0 = b.getCentreX() + gc.light.x * b.getWidth() * 0.5f, ry0 = b.getCentreY() + gc.light.y * b.getHeight() * 0.5f;
+    const float rx1 = b.getCentreX() - gc.light.x * b.getWidth() * 0.5f, ry1 = b.getCentreY() - gc.light.y * b.getHeight() * 0.5f;
+    ColourGradient rim(p.rim, rx0, ry0, Colours::white.withAlpha(p.dark ? 0.28f : 0.8f), rx1, ry1, false);
+    rim.addColour(0.35, Colours::white.withAlpha(0.04f));
+    rim.addColour(0.7, Colours::white.withAlpha(0.02f));
+    g.setGradientFill(rim);
+    g.strokePath(shape, PathStrokeType(o.rimWidth));
+    if (!p.dark) { g.setColour(p.rimSoft); g.strokePath(shape, PathStrokeType(0.6f)); }
 }
-
-// A raised key: lower edge and drop shadow, lit top bevel, a sheen on the upper half.
-void drawKey(Graphics& g, Rectangle<float> r, bool hot, float rad = 7.f) {
-    Path under; under.addRoundedRectangle(r.translated(0.f, 2.f), rad);
-    DropShadow(Colours::black.withAlpha(0.6f), 8, {0, 3}).drawForPath(g, under);
-    g.setColour(K::btnUnder); g.fillPath(under);
-    Path face; face.addRoundedRectangle(r, rad);
-    g.setGradientFill(ColourGradient(hot ? K::btnHover : K::btnTop, 0.f, r.getY(), K::btnBottom, 0.f, r.getBottom(), false));
-    g.fillPath(face);
-    g.setGradientFill(ColourGradient(Colours::white.withAlpha(0.10f), 0.f, r.getY(), Colours::white.withAlpha(0.f), 0.f, r.getCentreY(), false));
-    g.fillRoundedRectangle(r.reduced(1.f).withHeight(r.getHeight() * 0.5f), rad - 1.f);
-    g.setColour(K::btnEdge); g.strokePath(face, PathStrokeType(1.f));
-    g.setColour(Colours::white.withAlpha(0.2f));
-    g.drawLine(r.getX() + rad, r.getY() + 1.5f, r.getRight() - rad, r.getY() + 1.5f, 1.f);
-}
-
-// A pressed key: sunk into a well, with a faint yellow glow.
-void drawPressed(Graphics& g, Rectangle<float> r, float rad = 7.f) {
-    drawWell(g, r, rad, K::btnPressed);
-    g.setGradientFill(ColourGradient(K::yellow.withAlpha(0.10f), r.getCentreX(), r.getCentreY(), K::yellow.withAlpha(0.f),
-                                     r.getCentreX() + r.getWidth() * 0.6f, r.getCentreY(), true));
-    g.fillRoundedRectangle(r, rad);
-}
+Path capsule(Rectangle<float> r, float rad = -1.f) { Path p; p.addRoundedRectangle(r, rad < 0.f ? r.getHeight() * 0.5f : rad); return p; }
+Path circle(Rectangle<float> r) { Path p; p.addEllipse(r); return p; }
 
 // ---------------------------------------------------------------- look and feel
 class Look : public LookAndFeel_V4 {
 public:
-    Look() {
-        setColour(Label::textColourId, K::muted);
-        setColour(Label::textWhenEditingColourId, K::ink);
-        setColour(Label::backgroundWhenEditingColourId, K::well);
-        setColour(Label::outlineWhenEditingColourId, K::yellow);
-        setColour(TextEditor::textColourId, K::ink);
-        setColour(TextEditor::highlightColourId, K::yellow.withAlpha(0.3f));
-        setColour(CaretComponent::caretColourId, K::yellow);
-        setColour(TooltipWindow::backgroundColourId, K::floatBg);
-        setColour(TooltipWindow::textColourId, K::ink);
-        setColour(TooltipWindow::outlineColourId, K::floatEdge);
-        setColour(HyperlinkButton::textColourId, K::label);
+    GlassContext* gc = nullptr;
+    const Pal& p() const { return *gc->pal; }
+
+    void apply() {
+        const Pal& c = p();
+        setColour(Label::textColourId, c.muted);
+        setColour(Label::textWhenEditingColourId, c.ink);
+        setColour(Label::backgroundWhenEditingColourId, c.panel);
+        setColour(Label::outlineWhenEditingColourId, c.data);
+        setColour(TextEditor::textColourId, c.ink);
+        setColour(TextEditor::backgroundColourId, c.panel);
+        setColour(TextEditor::highlightColourId, c.data.withAlpha(0.35f));
+        setColour(TextEditor::focusedOutlineColourId, c.data);
+        setColour(CaretComponent::caretColourId, c.ink);
+        setColour(TooltipWindow::backgroundColourId, c.panel);
+        setColour(TooltipWindow::textColourId, c.ink);
+        setColour(TooltipWindow::outlineColourId, c.rimSoft);
+        setColour(PopupMenu::backgroundColourId, c.panel);
+        setColour(PopupMenu::textColourId, c.ink);
+        setColour(PopupMenu::highlightedBackgroundColourId, c.on);
+        setColour(PopupMenu::highlightedTextColourId, c.ink);
+        setColour(PopupMenu::headerTextColourId, c.muted);
+        setColour(HyperlinkButton::textColourId, c.ink);
     }
 
-    // Static parts of a dial (groove, body) are rendered once per size and pixel density.
-    std::map<String, Image> cache;
-    template <typename Fn> void drawCached(Graphics& g, const String& key, Rectangle<float> area, Fn&& draw) {
-        const float sc = jlimit(1.f, 4.f, g.getInternalContext().getPhysicalPixelScaleFactor());
-        const String k = key + "|" + String(area.getWidth(), 1) + "x" + String(area.getHeight(), 1) + "@" + String(sc, 2);
-        auto it = cache.find(k);
-        if (it == cache.end()) {
-            if (cache.size() > 64) cache.clear();
-            Image img(Image::ARGB, jmax(1, roundToInt(area.getWidth() * sc)), jmax(1, roundToInt(area.getHeight() * sc)), true);
-            { Graphics gi(img); gi.addTransform(AffineTransform::scale(sc)); draw(gi); }
-            it = cache.emplace(k, img).first;
-        }
-        g.drawImage(it->second, area, RectanglePlacement::stretchToFit);
+    Colour roleColour(const String& role) const {
+        const Pal& c = p();
+        return role == "data" ? c.data : role == "thr" ? c.thr : role == "ceil" ? c.ceil : c.label;
+    }
+    Colour roleText(const String& role) const {
+        const Pal& c = p();
+        return role == "data" ? c.dataText : role == "thr" ? c.thrText : role == "ceil" ? c.ceilText : c.ink;
     }
 
-    // A raised matte dial in a groove: contact shadow, a bevelled skirt lit from above, a dished
-    // face, a yellow value ring (green to yellow for Threshold) and a yellow dot pointer.
+    // A glass dial: a coloured value ring in a faint track, a clear glass disc, a coloured pointer.
     void drawRotarySlider(Graphics& g, int x, int y, int w, int h, float pos, float a0, float a1, Slider& s) override {
-        const auto box = Rectangle<float>(float(x), float(y), float(w), float(h));
-        const float lcx = float(w) * 0.5f, lcy = float(h) * 0.5f;
-        const float cx = float(x) + lcx, cy = float(y) + lcy;
-        const float ringR = float(jmin(w, h)) * 0.5f - 6.f, r = ringR - 7.f;
+        const Pal& c = p();
+        const float cx = float(x) + float(w) * 0.5f, cy = float(y) + float(h) * 0.5f;
+        const float ringR = float(jmin(w, h)) * 0.5f - 7.f, r = ringR - 9.f;
         const float ang = a0 + pos * (a1 - a0);
-        const bool grad = s.getProperties().getWithDefault("role", "") == "thr";
-
-        drawCached(g, "groove", box, [&](Graphics& k) {
-            Path gr1; gr1.addCentredArc(lcx, lcy, ringR + 1.f, ringR + 1.f, 0.f, a0, a1, true);
-            k.setColour(Colours::white.withAlpha(0.06f));
-            k.strokePath(gr1, PathStrokeType(7.f, PathStrokeType::curved, PathStrokeType::rounded));
-            Path gr2; gr2.addCentredArc(lcx, lcy, ringR, ringR, 0.f, a0, a1, true);
-            k.setColour(Colours::black.withAlpha(0.75f));
-            k.strokePath(gr2, PathStrokeType(6.f, PathStrokeType::curved, PathStrokeType::rounded));
-        });
+        const String role = s.getProperties().getWithDefault("role", "");
+        const Colour col = roleColour(role);
+        const PathStrokeType ring(6.f, PathStrokeType::curved, PathStrokeType::rounded);
+        Path track; track.addCentredArc(cx, cy, ringR, ringR, 0.f, a0, a1, true);
+        g.setColour(c.dark ? Colours::white.withAlpha(0.12f) : Colours::black.withAlpha(0.08f));
+        g.strokePath(track, ring);
         if (pos > 0.003f) {
             Path val; val.addCentredArc(cx, cy, ringR, ringR, 0.f, a0, ang, true);
-            if (grad) {
-                ColourGradient cg(K::green, cx + ringR * std::sin(a0), cy - ringR * std::cos(a0), K::yellow, cx + ringR * std::sin(a1), cy - ringR * std::cos(a1), false);
-                cg.addColour(0.55, K::thrMid);
-                g.setGradientFill(cg);
-            } else {
-                g.setColour(K::yellow);
-            }
-            g.setOpacity(0.18f);
-            g.strokePath(val, PathStrokeType(10.f, PathStrokeType::curved, PathStrokeType::rounded));
-            g.setOpacity(1.f);
-            g.strokePath(val, PathStrokeType(4.f, PathStrokeType::curved, PathStrokeType::rounded));
+            g.setColour(col); g.strokePath(val, ring);
         }
-        // live level marker on the ring (Target shows the output level, Threshold the input)
+        // live level on the ring: Target shows the output level, Threshold the input level
         const var live = s.getProperties()["live"];
         if (!live.isVoid()) {
             const double lv = double(live);
             if (lv >= s.getMinimum() && lv <= s.getMaximum()) {
-                const float la = a0 + float((lv - s.getMinimum()) / (s.getMaximum() - s.getMinimum())) * (a1 - a0);
-                g.setColour(K::ink);
-                g.fillEllipse(cx + ringR * std::sin(la) - 2.6f, cy - ringR * std::cos(la) - 2.6f, 5.2f, 5.2f);
+                const float la = a0 + float(s.valueToProportionOfLength(lv)) * (a1 - a0);
+                g.setColour(c.ink);
+                g.fillEllipse(cx + ringR * std::sin(la) - 2.3f, cy - ringR * std::cos(la) - 2.3f, 4.6f, 4.6f);
             }
         }
-        drawCached(g, "body", box, [&](Graphics& k) {
-            Path skirt; skirt.addEllipse(lcx - r, lcy - r, r * 2.f, r * 2.f);
-            DropShadow(Colours::black.withAlpha(0.8f), int(r * 0.6f), {0, int(r * 0.22f)}).drawForPath(k, skirt);
-            ColourGradient sk(K::skirtTop, lcx, lcy - r, K::skirtBottom, lcx, lcy + r, false);
-            sk.addColour(0.5, K::skirtMid);
-            k.setGradientFill(sk); k.fillPath(skirt);
-            const float fr = r * 0.86f;
-            Path face; face.addEllipse(lcx - fr, lcy - fr, fr * 2.f, fr * 2.f);
-            k.setGradientFill(ColourGradient(K::knobLo, lcx, lcy - fr, K::knobHi, lcx, lcy + fr, false));  // dished
-            k.fillPath(face);
-            k.setGradientFill(ColourGradient(Colours::white.withAlpha(0.10f), lcx - r * 0.28f, lcy - r * 0.42f,
-                                             Colours::white.withAlpha(0.f), lcx - r * 0.28f + r * 0.75f, lcy - r * 0.42f, true));
-            k.fillPath(face);
-            k.setColour(Colours::black.withAlpha(0.7f)); k.strokePath(face, PathStrokeType(1.f));
-            ColourGradient rim(Colours::white.withAlpha(0.30f), lcx, lcy - r, Colours::black.withAlpha(0.5f), lcx, lcy + r, false);
-            rim.addColour(0.45, Colours::white.withAlpha(0.04f));
-            Path rp; rp.addEllipse(lcx - r + 0.5f, lcy - r + 0.5f, r * 2.f - 1.f, r * 2.f - 1.f);
-            k.setGradientFill(rim); k.strokePath(rp, PathStrokeType(1.2f));
-        });
-        if (s.isMouseOverOrDragging()) { g.setColour(Colours::white.withAlpha(0.12f)); g.drawEllipse(cx - r - 1.5f, cy - r - 1.5f, (r + 1.5f) * 2.f, (r + 1.5f) * 2.f, 1.f); }
-        if (s.hasKeyboardFocus(false)) { g.setColour(K::yellow); g.drawEllipse(cx - ringR - 5.f, cy - ringR - 5.f, (ringR + 5.f) * 2.f, (ringR + 5.f) * 2.f, 1.5f); }
-        // yellow dot pointer with a soft glow
-        const float pr = r * 0.74f, px = cx + pr * std::sin(ang), py = cy - pr * std::cos(ang), dr = jmax(2.6f, r * 0.075f);
-        g.setColour(K::yellow.withAlpha(0.35f)); g.fillEllipse(px - r * 0.14f, py - r * 0.14f, r * 0.28f, r * 0.28f);
-        g.setColour(K::yellow); g.fillEllipse(px - dr, py - dr, dr * 2.f, dr * 2.f);
+        const bool hot = s.isMouseOverOrDragging();
+        drawGlass(g, *gc, s, circle({cx - r, cy - r, r * 2.f, r * 2.f}),
+                  {hot ? c.glassStrong : Colour(), 1.12f, true, 16.f, 6.f, 1.4f});
+        // pointer: a short coloured capsule set into the glass
+        const float p0 = r * 0.42f, p1 = r * 0.78f;
+        g.setColour(col);
+        g.drawLine(cx + std::sin(ang) * p0, cy - std::cos(ang) * p0, cx + std::sin(ang) * p1, cy - std::cos(ang) * p1, jmax(3.f, r * 0.1f));
+        if (s.hasKeyboardFocus(false)) { g.setColour(c.ink); g.drawEllipse(cx - ringR - 8.f, cy - ringR - 8.f, (ringR + 8.f) * 2.f, (ringR + 8.f) * 2.f, 2.f); }
     }
 
-    // Buttons come in three kinds (property "kind"):
-    //   key     - a raised key that sinks into a well, text lit yellow, when on (default)
-    //   segment - one side of the Ride / Hold switch: the selected side stands up as a key with
-    //             yellow text; the other side is plain text in the slot
-    //   flat    - header toggles: text or an icon that lights yellow when on
+    // The thin sliders in the Rise / Fall / Trim panel.
+    void drawLinearSlider(Graphics& g, int x, int y, int w, int h, float pos, float, float, Slider::SliderStyle, Slider& s) override {
+        const Pal& c = p();
+        const float cy = float(y) + float(h) * 0.5f, x0 = float(x) + 8.f, x1 = float(x + w) - 8.f;
+        g.setColour(c.meterOff); g.fillRoundedRectangle(x0, cy - 2.f, x1 - x0, 4.f, 2.f);
+        const float px = jlimit(x0, x1, pos);
+        g.setColour(c.ink.withAlpha(0.85f)); g.fillRoundedRectangle(x0, cy - 2.f, px - x0, 4.f, 2.f);
+        drawGlass(g, *gc, s, circle({px - 9.f, cy - 9.f, 18.f, 18.f}), {c.glassStrong, 1.1f, true, 8.f, 2.f, 1.2f});
+        if (s.hasKeyboardFocus(false)) { g.setColour(c.ink); g.drawEllipse(px - 12.f, cy - 12.f, 24.f, 24.f, 2.f); }
+    }
+
+    // Buttons, by property "kind":
+    //   capsule - a glass capsule; when on, a stronger tint (Return to 0 dB, Rise / fall / trim, Update)
+    //   circle  - a round glass button with an icon (theme, bypass, undo, redo)
+    //   key     - the large Analyze / Lock key; filled with ink while analyzing
+    //   plain   - text only (Got it, links in panels)
     void drawButtonBackground(Graphics& g, Button& b, const Colour&, bool over, bool down) override {
-        const String kind = b.getProperties().getWithDefault("kind", "key");
-        const auto r = b.getLocalBounds().toFloat().reduced(1.f, 2.f);
+        const Pal& c = p();
+        const String kind = b.getProperties().getWithDefault("kind", "capsule");
+        auto r = b.getLocalBounds().toFloat().reduced(1.f);
         const bool on = b.getToggleState();
+        if (kind == "circle") r = r.withSizeKeepingCentre(jmin(r.getWidth(), r.getHeight()), jmin(r.getWidth(), r.getHeight()));
+        const Path shape = kind == "circle" ? circle(r) : capsule(r);
         if (kind == "key") {
-            if (on || down) drawPressed(g, r); else drawKey(g, r, over && b.isEnabled());
-        } else if (kind == "segment") {
-            if (on) drawKey(g, r, over);
+            if (on) { DropShadow(c.shade, 12, {0, 4}).drawForPath(g, shape); g.setColour(c.ink); g.fillPath(shape); }
+            else drawGlass(g, *gc, b, shape, {c.glassStrong, 1.05f, true, 14.f, 5.f, 1.4f});
+        } else if (kind != "plain") {
+            const bool red = b.getProperties().getWithDefault("danger", false) && on;
+            Colour tint = on ? (red ? c.ceil.withAlpha(c.dark ? 0.35f : 0.28f) : c.on) : (over || down ? c.glassStrong : Colour());
+            drawGlass(g, *gc, b, shape, {tint, 1.08f, false, 0.f, 0.f, 1.3f});
+        } else if (over) {
+            g.setColour(c.on); g.fillPath(shape);
         }
-        if (b.hasKeyboardFocus(false)) { g.setColour(K::yellow); g.drawRoundedRectangle(r.expanded(2.f), 8.f, 1.5f); }
+        if (b.hasKeyboardFocus(false)) { g.setColour(c.ink); g.strokePath(kind == "circle" ? circle(r.expanded(3.f)) : capsule(r.expanded(3.f)), PathStrokeType(2.f)); }
     }
 
     void drawButtonText(Graphics& g, TextButton& b, bool over, bool) override {
-        const String kind = b.getProperties().getWithDefault("kind", "key");
+        const Pal& c = p();
+        const String kind = b.getProperties().getWithDefault("kind", "capsule");
         const bool on = b.getToggleState();
-        const bool lit = on || (kind == "key" && bool(b.getProperties().getWithDefault("accentText", false)));
-        const Colour col = !b.isEnabled() ? K::muted
-                         : lit ? K::yellow
-                         : kind == "key" ? K::label
-                         : over ? K::ink : K::muted;
-        const auto r = b.getLocalBounds().toFloat().translated(0.f, on && kind == "key" ? 1.f : 0.f);
+        const Colour col = !b.isEnabled() ? c.muted.withAlpha(0.5f)
+                         : (kind == "key" && on) || bool(b.getProperties().getWithDefault("inverse", false)) ? c.bg
+                         : on || over ? c.ink : c.label;
+        const auto r = b.getLocalBounds().toFloat();
         const String icon = b.getProperties().getWithDefault("icon", "");
-        const float size = float(b.getProperties().getWithDefault("fontSize", 12.5));
-        const Font f = sans(size, true, float(b.getProperties().getWithDefault("track", 0.6)));
+        const String trailing = b.getProperties().getWithDefault("trailing", "");
+        const Font f = sans(float(b.getProperties().getWithDefault("fontSize", 13.0)), true);
         g.setFont(f);
-        if (icon.isEmpty()) { g.setColour(col); g.drawText(b.getButtonText(), r, Justification::centred); return; }
-        const float is = jmin(16.f, r.getHeight() * 0.55f);
-        if (b.getButtonText().isEmpty()) { drawIcon(g, icon, r.withSizeKeepingCentre(is, is), col); return; }
-        const float tw = GlyphArrangement::getStringWidth(f, b.getButtonText());
-        const float x0 = r.getCentreX() - (is + 7.f + tw) * 0.5f;
-        drawIcon(g, icon, Rectangle<float>(x0, r.getCentreY() - is * 0.5f, is, is), col);
+        if (icon.isNotEmpty() && b.getButtonText().isEmpty()) {
+            const float is = jmin(18.f, r.getHeight() * 0.55f);
+            drawIcon(g, icon, r.withSizeKeepingCentre(is, is), col, p().dark);
+            return;
+        }
+        if (trailing.isNotEmpty()) {  // text on the left, a chevron on the right
+            g.setColour(col);
+            g.drawFittedText(b.getButtonText(), r.reduced(14.f, 0.f).withTrimmedRight(16.f).toNearestInt(), Justification::centredLeft, 1, 0.9f);
+            drawIcon(g, trailing, Rectangle<float>(r.getRight() - 26.f, r.getCentreY() - 7.f, 14.f, 14.f), c.label);
+            return;
+        }
+        if (icon.isNotEmpty()) {
+            const float is = 15.f, tw = GlyphArrangement::getStringWidth(f, b.getButtonText());
+            const float x0 = r.getCentreX() - (is + 7.f + tw) * 0.5f;
+            drawIcon(g, icon, Rectangle<float>(x0, r.getCentreY() - is * 0.5f, is, is), col, p().dark);
+            g.setColour(col);
+            g.drawText(b.getButtonText(), Rectangle<float>(x0 + is + 7.f, r.getY(), tw + 4.f, r.getHeight()), Justification::centredLeft);
+            return;
+        }
         g.setColour(col);
-        g.drawText(b.getButtonText(), Rectangle<float>(x0 + is + 7.f, r.getY(), tw + 4.f, r.getHeight()), Justification::centredLeft);
+        g.drawText(b.getButtonText(), r, Justification::centred);
+    }
+
+    // the preset menu
+    void drawPopupMenuBackground(Graphics& g, int w, int h) override {
+        g.setColour(p().panel); g.fillRoundedRectangle(0.f, 0.f, float(w), float(h), 12.f);
+        g.setColour(p().rimSoft); g.drawRoundedRectangle(0.5f, 0.5f, float(w) - 1.f, float(h) - 1.f, 12.f, 1.f);
+    }
+    Font getPopupMenuFont() override { return sans(14.f); }
+    int getPopupMenuBorderSize() override { return 6; }
+};
+
+// ---------------------------------------------------------------- a button that opens an undo step before it acts
+class GlassButton : public TextButton {
+public:
+    using TextButton::TextButton;
+    std::function<void()> onPress;  // runs before the click changes anything
+    void mouseDown(const MouseEvent& e) override { if (onPress && isEnabled()) onPress(); TextButton::mouseDown(e); }
+    bool keyPressed(const KeyPress& k) override {
+        if (onPress && isEnabled() && (k == KeyPress::spaceKey || k == KeyPress::returnKey)) onPress();
+        return TextButton::keyPressed(k);
     }
 };
 
-// ---------------------------------------------------------------- dial with its label and value
+// ---------------------------------------------------------------- dial slider: type a value, Alt-click to reset
+class DialSlider : public Slider {
+public:
+    std::function<void()> onEdit, onGestureStart;
+    double resetValue = 0.0;
+    void mouseDown(const MouseEvent& e) override {
+        if (e.mods.isAltDown()) {  // Alt-click resets
+            if (onGestureStart) onGestureStart();
+            setValue(resetValue, sendNotificationSync);
+            return;
+        }
+        Slider::mouseDown(e);
+    }
+    void mouseDoubleClick(const MouseEvent&) override { if (onEdit) onEdit(); }
+    bool keyPressed(const KeyPress& k) override {
+        if (k == KeyPress::returnKey) { if (onEdit) onEdit(); return true; }
+        if (onGestureStart && (k.isKeyCode(KeyPress::upKey) || k.isKeyCode(KeyPress::downKey) || k.isKeyCode(KeyPress::leftKey) ||
+                               k.isKeyCode(KeyPress::rightKey) || k.isKeyCode(KeyPress::pageUpKey) || k.isKeyCode(KeyPress::pageDownKey)))
+            onGestureStart();
+        return Slider::keyPressed(k);
+    }
+    void mouseWheelMove(const MouseEvent& e, const MouseWheelDetails& w) override {
+        const auto now = Time::getMillisecondCounter();
+        if (onGestureStart && now - lastWheel > 600) onGestureStart();  // one undo step per burst of scrolling
+        lastWheel = now;
+        Slider::mouseWheelMove(e, w);
+    }
+
+private:
+    uint32 lastWheel = 0;
+};
+
+// ---------------------------------------------------------------- dial with its name, value and editor
 class Knob : public Component {
 public:
-    Knob(AudioProcessorValueTreeState& st, const char* id, String title_, std::function<String(double)> fmt, float radius, const char* role = "")
-        : title(std::move(title_)), r(radius) {
+    Knob(CorridorAudioProcessor& proc, const char* id, String title_, std::function<String(double)> fmt, float radius, const char* role,
+         std::pair<String, String> ends = {})
+        : title(std::move(title_)), r(radius), endLabels(std::move(ends)) {
+        auto& st = proc.state();
         slider.getProperties().set("role", role);
-        slider.setTitle(title);                // screen readers announce the control by name
-        slider.setWantsKeyboardFocus(true);    // arrow keys adjust it once it is focused
+        slider.setTitle(title);
+        slider.setWantsKeyboardFocus(true);
         slider.setSliderStyle(Slider::RotaryVerticalDrag);
         slider.setRotaryParameters(kPi * 1.25f, kPi * 2.75f, true);
         slider.setTextBoxStyle(Slider::NoTextBox, false, 0, 0);
         slider.setMouseDragSensitivity(220);
+        slider.setDoubleClickReturnValue(false, 0.0);
         addAndMakeVisible(slider);
         att = std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(st, id, slider);
-        // after the attachment, which installs the parameter's own text functions
-        slider.textFromValueFunction = fmt;
-        slider.valueFromTextFunction = [](const String& s) { return s.retainCharacters("-+.0123456789").getDoubleValue(); };
-        if (auto* p = st.getParameter(id)) slider.setDoubleClickReturnValue(true, p->convertFrom0to1(p->getDefaultValue()));
-        // the value under the label; double-click it to type a value
-        value.setJustificationType(Justification::centred);
-        value.setFont(mono(12.f));
-        value.setEditable(false, true, false);
-        value.setTooltip("Double-click to type a value");
-        value.onTextChange = [this] { slider.setValue(slider.valueFromTextFunction(value.getText()), sendNotificationSync); refresh(); };
-        addAndMakeVisible(value);
-        slider.onValueChange = [this] { refresh(); };
-        refresh();
+        slider.textFromValueFunction = fmt;  // after the attachment, which installs the parameter's own
+        if (auto* prm = st.getParameter(id)) slider.resetValue = prm->convertFrom0to1(prm->getDefaultValue());
+        slider.onGestureStart = [&proc] { proc.undo.beginNewTransaction(); };
+        slider.onDragStart = [&proc] { proc.undo.beginNewTransaction(); };
+        slider.onEdit = [this] { openEditor(); };
+        slider.onValueChange = [this] { repaint(); };
+        // the editor: a small field over the value; Enter applies, Escape cancels
+        editor.setJustification(Justification::centred);
+        editor.setFont(sans(13.f, true));
+        editor.setIndents(4, 3);
+        editor.onReturnKey = [this, &proc] { commit(proc); };
+        editor.onEscapeKey = [this] { closeEditor(); };
+        editor.onFocusLost = [this, &proc] { if (editor.isVisible()) commit(proc); };
+        addChildComponent(editor);
         setInterceptsMouseClicks(false, true);
     }
-    int dialSize() const { return int(2.f * (r + 13.f)); }
-    int preferredWidth() const { return jmax(120, dialSize() + 16); }
-    int preferredHeight() const { return dialSize() + 38; }
-    void placeCentredOn(Point<int> c) { setBounds(c.x - preferredWidth() / 2, c.y - dialSize() / 2, preferredWidth(), preferredHeight()); }
-    void refresh() {
-        if (!value.isBeingEdited()) value.setText(slider.getTextFromValue(slider.getValue()), dontSendNotification);
-        value.setColour(Label::textColourId, slider.isMouseOverOrDragging() || value.isMouseOver() ? K::yellow : K::muted);
+    void openEditor() {
+        const double v = slider.getValue();
+        editor.setText(std::abs(v) >= 100.0 ? String(roundToInt(v)) : String(v, 1), false);
+        editor.setVisible(true);
+        editor.grabKeyboardFocus();
+        editor.selectAll();
     }
-    void setLive(float db) { slider.getProperties().set("live", db); slider.repaint(); }
-    void focusOfChildComponentChanged(FocusChangeType) override { slider.repaint(); }
+    void commit(CorridorAudioProcessor& proc) {
+        String t = editor.getText().replace(",", ".").replace(String(CharPointer_UTF8("\xe2\x88\x92")), "-").trim();
+        const bool seconds = t.endsWithIgnoreCase("s") && !t.endsWithIgnoreCase("ms");
+        double v = t.retainCharacters("-+.0123456789").getDoubleValue();
+        if (seconds && endLabels.first.isNotEmpty()) v *= 1000.0;  // "0.5 s" works for Response
+        if (t.containsAnyOf("0123456789")) { proc.undo.beginNewTransaction(); slider.setValue(v, sendNotificationSync); }
+        closeEditor();
+    }
+    void closeEditor() { editor.setVisible(false); slider.grabKeyboardFocus(); }
+    bool isEditing() const { return editor.isVisible(); }
+    bool inUse() const { return slider.isMouseOverOrDragging() || isEditing(); }
+
+    int ringR() const { return int(r + 9.f); }
+    int dialSize() const { return (ringR() + 7) * 2; }
+    void placeAt(Point<int> c) {
+        const int w = jmax(150, dialSize() + 20), h = dialSize() + 46;
+        setBounds(c.x - w / 2, c.y - dialSize() / 2, w, h);
+    }
+    void setLive(float db) { slider.getProperties().set("live", db); }
     void resized() override {
         const int d = dialSize();
         slider.setBounds((getWidth() - d) / 2, 0, d, d);
-        value.setBounds(0, d + 17, getWidth(), 18);
+        editor.setBounds((getWidth() - 100) / 2, d + 13, 100, 24);
     }
     void paint(Graphics& g) override {
-        g.setFont(sans(r > 40.f ? 13.5f : 12.5f, true, 1.4f));
-        g.setColour(K::label);
-        g.drawText(title.toUpperCase(), Rectangle<int>(0, dialSize() + 1, getWidth(), 16), Justification::centred);
+        auto* look = dynamic_cast<Look*>(&getLookAndFeel());
+        if (look == nullptr) return;
+        const Pal& c = look->p();
+        const float cx = float(getWidth()) * 0.5f, cy = float(dialSize()) * 0.5f, rr = float(ringR());
+        if (endLabels.first.isNotEmpty()) {  // which way is which: the start of the sweep is fast, the end slow
+            const float ex = std::sin(kPi * 0.75f) * (rr + 2.f), ey = std::cos(kPi * 0.25f) * (rr + 2.f) + 10.f;
+            g.setFont(sans(11.f)); g.setColour(c.muted);
+            g.drawText(endLabels.first, Rectangle<float>(cx - ex - 60.f, cy + ey - 8.f, 60.f, 16.f), Justification::centredRight);
+            g.drawText(endLabels.second, Rectangle<float>(cx + ex, cy + ey - 8.f, 60.f, 16.f), Justification::centredLeft);
+        }
+        const float ly = cy + rr + 16.f;
+        g.setFont(sans(r > 40.f ? 15.f : 13.5f, true)); g.setColour(c.ink);
+        g.drawText(title, Rectangle<float>(0.f, ly - 9.f, float(getWidth()), 18.f), Justification::centred);
+        if (!isEditing()) {
+            const String role = slider.getProperties()["role"].toString();
+            g.setFont(sans(12.5f)); g.setColour(slider.isMouseOverOrDragging() ? look->roleText(role) : c.muted);
+            g.drawText(slider.getTextFromValue(slider.getValue()), Rectangle<float>(0.f, ly + 8.f, float(getWidth()), 18.f), Justification::centred);
+        }
     }
-    Slider slider;
+    DialSlider slider;
 
 private:
     String title;
     float r;
-    Label value;
+    std::pair<String, String> endLabels;
+    TextEditor editor;
     std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> att;
 };
 
-// ---------------------------------------------------------------- graph
-float yOf(float v, float height) { return kTop + jlimit(0.f, kDbRange, -v) / kDbRange * (height - kBottomPad - kTop); }
-
-class Graph : public Component {
+// ---------------------------------------------------------------- segmented control (Ride / Hold, A / B)
+// A glass capsule whose selected side is a brighter droplet that slides across.
+class Segmented : public Component {
 public:
-    explicit Graph(CorridorAudioProcessor& p) : proc(p) { hist.reserve(kHist); }
+    Segmented(GlassContext& g_, StringArray labels_) : gc(g_), labels(std::move(labels_)) { setWantsKeyboardFocus(true); }
+    std::function<void(int)> onSelect;
+    int selected = 0;
+    float thumb = 0.f;  // animated position of the droplet, in segments
+    float fontSize = 13.5f;
+    void setSelected(int s) { selected = s; }
+    void advance() { const float to = float(selected); thumb = std::abs(to - thumb) < 0.01f ? to : thumb + (to - thumb) * 0.3f; }
+    void paint(Graphics& g) override {
+        const Pal& c = *gc.pal;
+        const auto r = getLocalBounds().toFloat().reduced(1.f);
+        drawGlass(g, gc, *this, capsule(r), {c.dark ? Colours::black.withAlpha(0.18f) : Colours::black.withAlpha(0.05f), 1.f, false, 0.f, 0.f, 1.2f});
+        const float sw = r.getWidth() / float(labels.size());
+        drawGlass(g, gc, *this, capsule(Rectangle<float>(r.getX() + 2.f + thumb * sw, r.getY() + 2.f, sw - 4.f, r.getHeight() - 4.f)),
+                  {c.glassStrong, 1.2f, true, 8.f, 2.f, 1.2f});
+        g.setFont(sans(fontSize, true));
+        for (int i = 0; i < labels.size(); ++i) {
+            g.setColour(i == selected ? c.ink : (hoverIndex == i ? c.label : c.muted));
+            g.drawText(labels[i], Rectangle<float>(r.getX() + float(i) * sw, r.getY(), sw, r.getHeight()), Justification::centred);
+        }
+        if (hasKeyboardFocus(false)) { g.setColour(c.ink); g.strokePath(capsule(r.expanded(3.f)), PathStrokeType(2.f)); }
+    }
+    int indexAt(Point<float> p) const { return jlimit(0, labels.size() - 1, int(p.x / (float(getWidth()) / float(labels.size())))); }
+    void mouseMove(const MouseEvent& e) override { hoverIndex = indexAt(e.position); repaint(); }
+    void mouseExit(const MouseEvent&) override { hoverIndex = -1; repaint(); }
+    void mouseDown(const MouseEvent& e) override { choose(indexAt(e.position)); }
+    bool keyPressed(const KeyPress& k) override {
+        if (k.isKeyCode(KeyPress::leftKey)) { choose(jmax(0, selected - 1)); return true; }
+        if (k.isKeyCode(KeyPress::rightKey)) { choose(jmin(labels.size() - 1, selected + 1)); return true; }
+        if (k == KeyPress::spaceKey || k == KeyPress::returnKey) { choose((selected + 1) % labels.size()); return true; }
+        return false;
+    }
+    void choose(int i) { if (i != selected && onSelect) onSelect(i); }
 
+private:
+    GlassContext& gc;
+    StringArray labels;
+    int hoverIndex = -1;
+};
+
+// ---------------------------------------------------------------- the graph and everything behind the glass
+class Scene : public Component {
+public:
+    Scene(CorridorAudioProcessor& p, GlassContext& g_) : proc(p), gc(g_) { hist.reserve(kHist); }
     std::vector<corridor::Snapshot> hist;
     bool analyzing = false;
     float analyzeSeconds = 0.f;
-    float fadeTop = 1.0e6f;  // graph-local y where the controls begin
+    const char* hover = nullptr;
+    const char* dragId = nullptr;
 
-    float yOf(float v) const { return ::yOf(v, float(getHeight())); }
-    float vOf(float y) const { return -jlimit(0.f, kDbRange, (y - kTop) / (float(getHeight()) - kBottomPad - kTop) * kDbRange); }
-    float traceRight() const { return float(getWidth()) - 34.f; }
-
-    void paint(Graphics& g) override {
-        const float W = float(getWidth()), H = float(getHeight()), x1 = traceRight();
-        g.setGradientFill(ColourGradient(K::graphTop, 0.f, 0.f, K::graphBottom, 0.f, H, false));
-        g.fillAll();
-        // grid every 5 dB, labelled every 10 at the right edge
-        for (int v = 0; v >= -80; v -= 5) {
-            const float y = std::round(yOf(float(v))) + 0.5f;
-            g.setColour(Colours::white.withAlpha(v % 10 == 0 ? 0.075f : 0.035f));
-            g.fillRect(0.f, y, x1, 1.f);
-            if (v % 10 == 0) {
-                g.setFont(mono(11.f)); g.setColour(K::muted);
-                g.drawText(String(v), Rectangle<float>(x1, y - 7.f, W - x1 - 8.f, 14.f), Justification::centredRight);
-            }
+    // background, grid, traces and the three lines: what the glass shows blurred
+    void drawBackdrop(Graphics& g) {
+        const Pal& c = *gc.pal;
+        g.fillAll(c.bg);
+        auto bloom = [&](float x, float y, float rad, Colour col) {
+            g.setGradientFill(ColourGradient(col, x, y, col.withAlpha(0.f), x + rad, y, true));
+            g.fillRect(0, 0, W, H);
+        };
+        bloom(160.f, 40.f, 520.f, c.bloomA); bloom(1000.f, 600.f, 560.f, c.bloomB);
+        for (int v = 0; v >= -80; v -= 5) {  // the numbers are on the meters, at these same heights
+            g.setColour(c.grid.withMultipliedAlpha(v % 10 == 0 ? 1.f : 0.5f));
+            g.fillRect(PX0 - 6.f, std::round(yOf(float(v))), PX1 - PX0 + 12.f, 1.f);
         }
-        g.setColour(Colours::white.withAlpha(0.025f));
-        for (int i = 1; i < 10; ++i) g.fillRect(x1 * float(i) / 10.f, kTop, 1.f, H - kBottomPad - kTop);
-
-        // traces: input grey over a faint fill, output bold red
+        const float x0 = PX0 + 22.f, x1 = PX1 - 22.f;
         const int n = int(hist.size());
-        const float sx = x1 / float(kHist - 1);
+        const float sx = (x1 - x0) / float(kHist - 1);
         auto X = [&](int k) { return x1 - float(n - 1 - k) * sx; };
         if (n > 1) {
             Path fillP, inP, outP;
-            fillP.startNewSubPath(X(0), H - kBottomPad);
+            fillP.startNewSubPath(X(0), GB);
             for (int k = 0; k < n; ++k) {
                 const float yi = yOf(hist[size_t(k)].inRms), yo = yOf(hist[size_t(k)].outRms);
                 fillP.lineTo(X(k), yi);
                 if (k == 0) { inP.startNewSubPath(X(k), yi); outP.startNewSubPath(X(k), yo); }
                 else { inP.lineTo(X(k), yi); outP.lineTo(X(k), yo); }
             }
-            fillP.lineTo(X(n - 1), H - kBottomPad); fillP.closeSubPath();
-            g.setGradientFill(ColourGradient(K::trace.withAlpha(0.16f), 0.f, kTop, K::trace.withAlpha(0.02f), 0.f, H, false));
+            fillP.lineTo(X(n - 1), GB); fillP.closeSubPath();
+            g.setGradientFill(ColourGradient(c.in.withMultipliedAlpha(0.45f), 0.f, GT, c.in.withAlpha(0.f), 0.f, GB, false));
             g.fillPath(fillP);
-            g.setColour(K::trace.withAlpha(0.75f)); g.strokePath(inP, PathStrokeType(1.2f, PathStrokeType::curved));
-            g.setColour(K::red); g.strokePath(outP, PathStrokeType(2.6f, PathStrokeType::curved, PathStrokeType::rounded));
+            g.setColour(c.in); g.strokePath(inP, PathStrokeType(1.3f, PathStrokeType::curved));
+            g.setColour(c.data); g.strokePath(outP, PathStrokeType(2.4f, PathStrokeType::curved, PathStrokeType::rounded));
         }
         if (analyzing && n > 1) {
             const int span = jmin(n - 1, int(analyzeSeconds * 50.f));
-            g.setColour(K::yellow.withAlpha(0.07f));
-            g.fillRect(Rectangle<float>(X(n - 1 - span), kTop, X(n - 1) - X(n - 1 - span), H - kBottomPad - kTop));
+            g.setColour(c.data.withAlpha(0.08f));
+            g.fillRect(Rectangle<float>(X(n - 1 - span), GT, X(n - 1) - X(n - 1 - span), GB - GT));
         }
-        // reference lines
         auto& st = proc.state();
         auto line = [&](const char* id, Colour col, float d1, float d2, float width) {
             const float y = std::round(yOf(st.getRawParameterValue(id)->load())) + 0.5f;
-            const bool hot = hover == id || dragId == id;
+            const float w = (hover == id || dragId == id) ? 2.6f : width;
             g.setColour(col);
-            if (d1 <= 0.f) g.fillRect(0.f, y - (hot ? 1.2f : width * 0.5f), x1, hot ? 2.4f : width);
-            else { const float dashes[] = {d1, d2}; g.drawDashedLine(Line<float>(0.f, y, x1, y), dashes, 2, hot ? 2.4f : width); }
+            if (d1 <= 0.f) g.fillRect(x0, y - w * 0.5f, x1 - x0, w);
+            else { const float dashes[] = {d1, d2}; g.drawDashedLine(Line<float>(x0, y, x1, y), dashes, 2, w); }
         };
-        line(ids::ceiling, K::ink.withAlpha(0.55f), 5.f, 4.f, 1.2f);
-        line(ids::threshold, K::green, 7.f, 5.f, 1.2f);
-        line(ids::target, K::yellow, 0.f, 0.f, 1.8f);
-        // the controls sit on the graph: fade it out behind them
-        if (fadeTop < H) {
-            ColourGradient fade(K::graphBottom.withAlpha(0.f), 0.f, fadeTop, K::graphBottom.withAlpha(0.96f), 0.f, H, false);
-            fade.addColour(0.45, K::graphBottom.withAlpha(0.82f));
-            g.setGradientFill(fade); g.fillRect(0.f, fadeTop, W, H - fadeTop);
+        line(ids::ceiling, c.ceil, 5.f, 5.f, 1.3f);
+        line(ids::threshold, c.thr, 7.f, 5.f, 1.4f);
+        line(ids::target, c.data, 0.f, 0.f, 2.f);
+    }
+
+    // a small blurred copy of the backdrop for the glass, made once per frame
+    void renderBlur() {
+        constexpr int bw = W / 5, bh = H / 5;
+        if (!blurSrc.isValid()) blurSrc = Image(Image::ARGB, bw, bh, true);
+        {
+            Graphics g(blurSrc);
+            g.addTransform(AffineTransform::scale(float(bw) / float(W), float(bh) / float(H)));
+            drawBackdrop(g);
         }
+        if (!gc.blur.isValid()) gc.blur = Image(Image::ARGB, bw, bh, true);
+        if (!kernelReady) { kernel.createGaussianBlur(2.6f); kernelReady = true; }
+        kernel.applyToImage(gc.blur, blurSrc, blurSrc.getBounds());
+    }
+
+    void paint(Graphics& g) override {
+        const Pal& c = *gc.pal;
+        drawBackdrop(g);
         // legend
-        g.setFont(sans(11.f, true, 1.2f));
-        g.setColour(K::trace.withAlpha(0.8f)); g.fillRect(W - 344.f, 15.f, 16.f, 2.f);
-        g.setColour(K::muted); g.drawText("INPUT", Rectangle<float>(W - 322.f, 8.f, 70.f, 16.f), Justification::centredLeft);
-        g.setColour(K::red); g.fillRect(W - 262.f, 14.5f, 16.f, 3.f);
-        g.setColour(K::muted); g.drawText("OUTPUT", Rectangle<float>(W - 240.f, 8.f, 80.f, 16.f), Justification::centredLeft);
-        g.drawText("RMS, LAST 10 S", Rectangle<float>(W - 160.f, 8.f, 120.f, 16.f), Justification::centredRight);
-        // a screen set into the panel: shadow falls in from the top and both sides
-        g.setGradientFill(ColourGradient(Colours::black.withAlpha(0.6f), 0.f, 0.f, Colours::transparentBlack, 0.f, 18.f, false));
-        g.fillRect(0.f, 0.f, W, 18.f);
-        g.setGradientFill(ColourGradient(Colours::black.withAlpha(0.45f), 0.f, 0.f, Colours::transparentBlack, 12.f, 0.f, false));
-        g.fillRect(0.f, 0.f, 12.f, H);
-        g.setGradientFill(ColourGradient(Colours::black.withAlpha(0.45f), W, 0.f, Colours::transparentBlack, W - 12.f, 0.f, false));
-        g.fillRect(W - 12.f, 0.f, 12.f, H);
-    }
-
-    // Line labels, drawn above the controls layer. A label whose line runs under the controls is
-    // pinned at the top of the fade with a small arrow pointing down at it.
-    void paintTags(Graphics& g) {
-        auto& st = proc.state();
-        auto chip = [&](const char* id, const String& label, Colour col) {
-            const float v = st.getRawParameterValue(id)->load();
-            float y = std::round(yOf(v)) + 0.5f;
-            const bool under = y > fadeTop + 6.f;
-            if (under) y = fadeTop + 6.f;
-            const String txt = label + "  " + fmtDb(v, 1);
-            const Font f = sans(11.f, true, 0.8f);
-            const float tw = GlyphArrangement::getStringWidth(f, txt) + (under ? 30.f : 20.f);
-            const Rectangle<float> box(10.f, y - 10.f, tw, 20.f);
-            g.setColour(K::tagBg); g.fillRoundedRectangle(box, 5.f);
-            g.setColour(col); g.drawRoundedRectangle(box, 5.f, 1.f);
-            g.setFont(f); g.drawText(txt, box.withTrimmedLeft(9.f), Justification::centredLeft);
-            if (under) {
-                Path a; const float ax = box.getRight() - 12.f, ay = box.getCentreY();
-                a.addTriangle(ax - 4.f, ay - 2.f, ax + 4.f, ay - 2.f, ax, ay + 3.f);
-                g.fillPath(a);
+        const float lx = PX1 - 330.f, ly = 80.f;
+        g.setFont(sans(12.f));
+        g.setColour(c.in); g.fillRect(lx, ly - 1.f, 16.f, 2.f);
+        g.setColour(c.muted); g.drawText("Input", Rectangle<float>(lx + 22.f, ly - 8.f, 60.f, 16.f), Justification::centredLeft);
+        g.setColour(c.data); g.fillRect(lx + 76.f, ly - 1.5f, 16.f, 3.f);
+        g.setColour(c.muted); g.drawText("Output", Rectangle<float>(lx + 98.f, ly - 8.f, 70.f, 16.f), Justification::centredLeft);
+        g.drawText("RMS, last 10 s", Rectangle<float>(PX1 - 222.f, ly - 8.f, 200.f, 16.f), Justification::centredRight);
+        // the controls sit in the graph: below here it frosts over and fades into the window colour
+        if (gc.blur.isValid()) {
+            constexpr int bands = 16;
+            const float span = float(H) - kFadeTop;
+            for (int i = 0; i < bands; ++i) {
+                Graphics::ScopedSaveState ss(g);
+                g.reduceClipRegion(Rectangle<int>(0, int(kFadeTop + span * float(i) / bands), W, int(span / bands) + 2));
+                g.setOpacity(jmin(1.f, std::pow(float(i + 1) / bands, 0.8f)));
+                g.drawImage(gc.blur, Rectangle<float>(0.f, 0.f, float(W), float(H)), RectanglePlacement::stretchToFit);
             }
-        };
-        chip(ids::ceiling, "CEILING", K::ink.withAlpha(0.7f));
-        chip(ids::threshold, "THRESHOLD", K::green);
-        chip(ids::target, "TARGET", K::yellow);
+        }
+        ColourGradient f(c.bg.withAlpha(0.f), 0.f, kFadeTop, c.bg.withAlpha(0.9f), 0.f, float(H), false);
+        f.addColour(0.4, c.bg.withAlpha(0.62f));
+        g.setGradientFill(f); g.fillRect(0.f, kFadeTop, float(W), float(H) - kFadeTop);
     }
 
+    // drag the Target, Threshold and Ceiling lines (above the controls)
     const char* hit(Point<float> p) const {
-        if (p.x > traceRight() || p.y > fadeTop + 10.f) return nullptr;  // below that, the controls own the clicks
+        if (p.x < PX0 + 22.f || p.x > PX1 - 22.f || p.y < GT - 8.f || p.y > GB + 8.f || kDeck.contains(p)) return nullptr;
         const char* best = nullptr; float bd = 8.f;
         for (const char* id : {ids::target, ids::threshold, ids::ceiling}) {
             const float d = std::abs(yOf(proc.state().getRawParameterValue(id)->load()) - p.y);
@@ -461,19 +627,16 @@ public:
         return best;
     }
     void mouseMove(const MouseEvent& e) override {
-        const char* h = hit(e.position);
-        if (h != hover) { hover = h; repaint(); }
-        setMouseCursor(h ? MouseCursor::UpDownResizeCursor : MouseCursor::NormalCursor);
+        hover = hit(e.position);
+        setMouseCursor(hover ? MouseCursor::UpDownResizeCursor : MouseCursor::NormalCursor);
     }
-    void mouseExit(const MouseEvent&) override { hover = nullptr; repaint(); }
+    void mouseExit(const MouseEvent&) override { hover = nullptr; }
     void mouseDown(const MouseEvent& e) override {
         dragId = hit(e.position);
-        if (dragId) if (auto* p = proc.state().getParameter(dragId)) { p->beginChangeGesture(); mouseDrag(e); }
+        if (dragId) if (auto* p = proc.state().getParameter(dragId)) { proc.undo.beginNewTransaction(); p->beginChangeGesture(); mouseDrag(e); }
     }
     void mouseDrag(const MouseEvent& e) override {
-        if (!dragId) return;
-        if (auto* p = proc.state().getParameter(dragId)) p->setValueNotifyingHost(p->convertTo0to1(vOf(e.position.y)));
-        repaint();
+        if (dragId) if (auto* p = proc.state().getParameter(dragId)) p->setValueNotifyingHost(p->convertTo0to1(vOf(e.position.y)));
     }
     void mouseUp(const MouseEvent&) override {
         if (dragId) if (auto* p = proc.state().getParameter(dragId)) p->endChangeGesture();
@@ -482,121 +645,271 @@ public:
 
 private:
     CorridorAudioProcessor& proc;
-    const char* hover = nullptr;
-    const char* dragId = nullptr;
+    GlassContext& gc;
+    Image blurSrc;
+    ImageConvolutionKernel kernel{7};
+    bool kernelReady = false;
 };
 
-class TagLayer : public Component {
-public:
-    explicit TagLayer(Graph& gr) : graph(gr) { setInterceptsMouseClicks(false, false); }
-    void paint(Graphics& g) override { graph.paintTags(g); }
-
-private:
-    Graph& graph;
-};
-
-// ---------------------------------------------------------------- peak meter (dBFS)
+// ---------------------------------------------------------------- a meter: a glass capsule with L and R bars
 class Meter : public Component {
 public:
-    Meter(bool isInput, corridor::Processor& d) : input(isInput), dsp(d) {}
-    float peak = -120.f, hold = -120.f;
+    Meter(bool isInput, GlassContext& g_, corridor::Processor& d) : input(isInput), gc(g_), dsp(d) {}
+    float peakL = -120.f, peakR = -120.f, hold = -120.f, balance = 0.f;
     void paint(Graphics& g) override {
-        const float W = float(getWidth()), H = float(getHeight()), top = kTop, bot = H - kBottomPad;
-        g.setGradientFill(ColourGradient(K::meterBgTop, 0.f, 0.f, K::meterBgBottom, 0.f, H, false));
-        g.fillAll();
-        g.setColour(K::seam); g.fillRect(input ? W - 1.f : 0.f, 0.f, 1.f, H);
-        auto y = [&](float v) { return ::yOf(v, H); };
-        const float bw = 7.f, gap = 3.f, bx = input ? W - 12.f - bw * 2.f - gap : 12.f;
-        drawWell(g, Rectangle<float>(bx - 3.f, top - 3.f, bw * 2.f + gap + 6.f, bot - top + 6.f), 3.f, K::wellDeep);
+        const Pal& c = *gc.pal;
+        const float w = float(getWidth()), cx = w * 0.5f;
+        auto ly = [](float v) { return yOf(v) - kMeterY; };  // the graph's scale, in this component's coordinates
+        const float top = ly(0.f), bot = ly(-kDbRange);
+        drawGlass(g, gc, *this, capsule(getLocalBounds().toFloat(), 24.f), {Colour(), 1.05f, true, 18.f, 7.f, 1.4f});
+        auto zone = [&](float v) { return v > -6.f ? c.mHot : v > -18.f ? c.mWarn : c.mSafe; };
+        // clip light, peak readout in its zone colour, name
+        g.setColour(hold > -0.5f ? c.mHot : c.meterOff); g.fillRoundedRectangle(cx - 12.f, 8.f, 24.f, 5.f, 2.5f);
+        g.setFont(sans(11.5f, true)); g.setColour(hold > -kDbRange ? zone(hold) : c.muted);
+        g.drawText(hold > -kDbRange ? fmtDb(hold) : String(CharPointer_UTF8("\xe2\x88\x92\xe2\x88\x9e")), Rectangle<float>(0.f, 17.f, w, 16.f), Justification::centred);
+        g.setFont(sans(11.f)); g.setColour(c.muted);
+        g.drawText(input ? "In" : "Out", Rectangle<float>(0.f, 33.f, w, 16.f), Justification::centred);
+        // left and right bars in fixed zones: green up to -18 dBFS, amber to -6, red above
+        const float bw = 5.f, gap = 3.f, bx = input ? 12.f : w - 12.f - bw * 2.f - gap;
+        const double f18 = (kDbRange - 18.0) / kDbRange, f6 = (kDbRange - 6.0) / kDbRange;
+        ColourGradient zg(c.mSafe, 0.f, bot, c.mHot, 0.f, top, false);
+        zg.addColour(f18 - 0.001, c.mSafe); zg.addColour(f18, c.mWarn); zg.addColour(f6 - 0.001, c.mWarn); zg.addColour(f6, c.mHot);
+        const float pk[2] = {peakL, peakR};
         for (int ch = 0; ch < 2; ++ch) {
-            const float cx = bx + float(ch) * (bw + gap);
-            g.setColour(K::meterOff); g.fillRect(cx, top, bw, bot - top);
-            if (peak > -kDbRange) {
-                const float t = y(jmin(0.f, peak));
-                ColourGradient cg(K::meterLow, 0.f, bot, K::red, 0.f, top, false);
-                const double warn = 1.0 - 6.0 / kDbRange, clip = 1.0 - 1.0 / kDbRange;
-                cg.addColour(warn - 0.001, K::meterLit); cg.addColour(warn, K::meterWarn);
-                cg.addColour(clip, K::meterWarn); cg.addColour(clip + 0.001, K::red);
-                g.setGradientFill(cg); g.fillRect(cx, t, bw, bot - t);
+            const float x = bx + float(ch) * (bw + gap);
+            g.setColour(c.meterOff); g.fillRoundedRectangle(x, top, bw, bot - top, 2.5f);
+            if (pk[ch] > -kDbRange) {
+                const float t = ly(jmin(0.f, pk[ch]));
+                g.setGradientFill(zg); g.fillRoundedRectangle(x, t, bw, bot - t, 2.5f);
             }
-            if (hold > -kDbRange) { g.setColour(K::yellow); g.fillRect(cx, y(jmin(0.f, hold)) - 1.f, bw, 2.f); }
-            // rounded glass over each bar
-            ColourGradient glass(Colours::white.withAlpha(0.16f), cx, 0.f, Colours::black.withAlpha(0.35f), cx + bw, 0.f, false);
-            glass.addColour(0.45, Colours::white.withAlpha(0.03f));
-            g.setGradientFill(glass); g.fillRect(cx, top, bw, bot - top);
+            if (hold > -kDbRange) { g.setColour(zone(hold)); g.fillRect(x - 1.f, ly(jmin(0.f, hold)) - 1.f, bw + 2.f, 2.f); }
         }
-        // the same marks as the graph
+        // the graph's marks: a tick every 5 dB, a number every 10, at the same heights
+        const float tickX = input ? bx + bw * 2.f + gap + 3.f : bx - 7.f;
+        g.setFont(sans(11.f));
         for (int v = 0; v >= -80; v -= 5) {
-            const float yy = std::round(y(float(v))) + 0.5f;
+            const float y = std::round(ly(float(v))) + 0.5f;
             const bool major = v % 10 == 0;
-            g.setColour(Colours::white.withAlpha(major ? 0.35f : 0.16f));
-            g.fillRect(input ? bx - 7.f : bx + bw * 2.f + gap + 3.f, yy, major ? 4.f : 3.f, 1.f);
+            g.setColour(c.muted.withMultipliedAlpha(major ? 0.9f : 0.5f));
+            g.fillRect(tickX, y, major ? 4.f : 3.f, 1.f);
             if (!major) continue;
-            g.setFont(mono(11.f)); g.setColour(K::muted);
-            if (input) g.drawText(String(v), Rectangle<float>(0.f, yy - 7.f, bx - 10.f, 14.f), Justification::centredRight);
-            else g.drawText(String(v), Rectangle<float>(bx + bw * 2.f + gap + 9.f, yy - 7.f, W, 14.f), Justification::centredLeft);
+            g.setColour(c.muted);
+            if (input) g.drawText(fmtDb(float(v), 0), Rectangle<float>(tickX + 7.f, y - 7.f, 30.f, 14.f), Justification::centredLeft);
+            else g.drawText(fmtDb(float(v), 0), Rectangle<float>(tickX - 33.f, y - 7.f, 30.f, 14.f), Justification::centredRight);
         }
-        // peak readout and name
-        const auto rb = Rectangle<float>(8.f, 3.f, W - 16.f, 18.f);
-        drawWell(g, rb, 4.f, K::wellDeep);
-        g.setFont(mono(11.5f));
-        g.setColour(hold > -1.f ? K::red : hold > -6.f ? K::yellow : K::label);
-        g.drawText(hold > -kDbRange ? fmtDb(hold, 1) : "-inf", rb, Justification::centred);
-        g.setFont(sans(11.f, true, 1.4f)); g.setColour(K::muted);
-        g.drawText(input ? "IN" : "OUT", Rectangle<float>(0.f, 25.f, W, 16.f), Justification::centred);
+        // stereo balance: L and R at the ends of a short track, the dot leans to the louder side
+        const float by = bot + 11.f, half = 15.f, lean = jlimit(-1.f, 1.f, balance / 4.f);
+        g.setColour(c.muted); g.setFont(sans(11.f, true));
+        g.drawText("L", Rectangle<float>(cx - half - 13.f, by - 7.f, 12.f, 14.f), Justification::centred);
+        g.drawText("R", Rectangle<float>(cx + half + 1.f, by - 7.f, 12.f, 14.f), Justification::centred);
+        g.setColour(c.meterOff); g.fillRoundedRectangle(cx - half, by - 1.5f, half * 2.f, 3.f, 1.5f);
+        g.setColour(c.muted); g.fillRect(cx - 0.5f, by - 4.f, 1.f, 8.f);
+        g.setColour(c.ink); g.fillEllipse(cx - lean * half - 3.5f, by - 3.5f, 7.f, 7.f);
     }
     void mouseDown(const MouseEvent&) override { dsp.resetPeakHolds(); }
 
 private:
     bool input;
+    GlassContext& gc;
     corridor::Processor& dsp;
 };
 
-// ---------------------------------------------------------------- deck: drawn above the graph, under the controls
-class Deck : public Component {
+// ---------------------------------------------------------------- readouts: from target, applied gain, latency
+class Readouts : public Component {
 public:
-    Deck() { setInterceptsMouseClicks(false, false); }
-    Rectangle<float> switchSlot, gainBox;
-    Point<float> latencyAt;
-    String latencyText, gainText = "+0.0";
-    bool gainActive = false;
+    explicit Readouts(GlassContext& g_) : gc(g_) { setInterceptsMouseClicks(false, false); }
+    String fromTarget = "Waiting", gainText = "0.0", latency;
+    bool onTarget = false;
+    int gainSign = 0;
     void paint(Graphics& g) override {
-        // the header casts a shadow on the graph
-        g.setGradientFill(ColourGradient(Colours::black.withAlpha(0.45f), 0.f, float(kHead), Colours::transparentBlack, 0.f, float(kHead) + 8.f, false));
-        g.fillRect(0.f, float(kHead), float(getWidth()), 8.f);
-        drawWell(g, switchSlot, 10.f);
-        g.setFont(sans(11.f, true, 1.f)); g.setColour(K::muted);
-        g.drawText(latencyText, Rectangle<float>(latencyAt.x, latencyAt.y - 8.f, 360.f, 16.f), Justification::centredLeft);
-        drawWell(g, gainBox, 7.f, K::wellDeep);  // the screen's key number
-        g.setFont(sans(11.f, true, 1.f)); g.setColour(K::muted);
-        g.drawText("APPLIED GAIN", gainBox.reduced(12.f, 6.f).withHeight(14.f), Justification::centredLeft);
-        g.setFont(mono(21.f)); g.setColour(gainActive ? K::yellow : K::ink);
-        g.drawText(gainText + " dB", gainBox.reduced(12.f, 4.f).withTrimmedTop(18.f), Justification::centredRight);
+        const Pal& c = *gc.pal;
+        auto box = [&](Rectangle<float> r, const String& name, const String& value, Colour col, float size) {
+            drawGlass(g, gc, *this, capsule(r, 22.f), {Colour(), 1.05f, true, 18.f, 7.f, 1.4f});
+            g.setFont(sans(12.f)); g.setColour(c.muted);
+            g.drawText(name, r.reduced(16.f, 9.f).withHeight(16.f), Justification::centredLeft);
+            g.setFont(sans(size, true)); g.setColour(col);
+            g.drawFittedText(value, r.reduced(14.f, 6.f).withTrimmedTop(20.f).toNearestInt(), Justification::centredRight, 1, 0.8f);
+        };
+        box({90.f, 548.f, 124.f, 58.f}, "From target", fromTarget, onTarget ? c.dataText : c.ink, 17.f);
+        box({kDeck.getRight() + 12.f, 548.f, 124.f, 58.f}, "Applied gain", gainText + " dB", gainSign > 0 ? c.boost : gainSign < 0 ? c.cut : c.ink, 22.f);
+        g.setFont(sans(11.f)); g.setColour(c.muted);
+        g.drawText(latency, Rectangle<float>(94.f, GB + 14.f, 300.f, 16.f), Justification::centredLeft);
     }
+
+private:
+    GlassContext& gc;
 };
 
-// ---------------------------------------------------------------- header status: a dot and a short sentence
-class StatusLine : public Component, public SettableTooltipClient {
+// ---------------------------------------------------------------- line labels, shown while their line or dial is in use
+class Tags : public Component {
 public:
-    String text;
-    Colour dot = K::muted;
+    Tags(CorridorAudioProcessor& p, GlassContext& g_) : proc(p), gc(g_) { setInterceptsMouseClicks(false, false); }
+    bool show[3] = {false, false, false};  // ceiling, threshold, target
     void paint(Graphics& g) override {
-        const Font f = sans(13.5f);
-        const float tw = jmin(float(getWidth()) - 16.f, GlyphArrangement::getStringWidth(f, text));
-        const float x0 = (float(getWidth()) - tw - 14.f) * 0.5f, cy = float(getHeight()) * 0.5f;
-        g.setColour(dot); g.fillEllipse(x0, cy - 3.5f, 7.f, 7.f);
-        g.setFont(f); g.setColour(K::ink);
-        g.drawText(text, Rectangle<float>(x0 + 14.f, 0.f, tw + 2.f, float(getHeight())), Justification::centredLeft, true);
+        const Pal& c = *gc.pal;
+        const char* idsList[3] = {ids::ceiling, ids::threshold, ids::target};
+        const char* names[3] = {"Ceiling", "Threshold", "Target"};
+        const Colour cols[3] = {c.ceil, c.thr, c.data}, texts[3] = {c.ceilText, c.thrText, c.dataText};
+        for (int i = 0; i < 3; ++i) {
+            if (!show[i]) continue;
+            const float v = proc.state().getRawParameterValue(idsList[i])->load();
+            const float lineY = yOf(v);
+            const bool under = lineY > kFadeTop + 24.f;
+            const float y = under ? kFadeTop + 22.f : lineY;
+            const String label = String(names[i]) + "  " + fmtDb(v);
+            const float w = GlyphArrangement::getStringWidth(sans(12.f, true), label) + (under ? 40.f : 28.f);
+            const Rectangle<float> r(PX0 + 26.f, y - 12.f, w, 24.f);
+            drawGlass(g, gc, *this, capsule(r), {Colour(), 1.06f, false, 0.f, 0.f, 1.3f});
+            g.setColour(cols[i]); g.fillEllipse(r.getX() + 7.5f, y - 3.5f, 7.f, 7.f);
+            g.setFont(sans(12.f, true)); g.setColour(texts[i]);
+            g.drawText(label, r.withTrimmedLeft(20.f), Justification::centredLeft);
+            if (under) {
+                Path a; const float ax = r.getRight() - 12.f;
+                a.addTriangle(ax - 4.f, y - 2.f, ax + 4.f, y - 2.f, ax, y + 3.f);
+                g.fillPath(a);
+            }
+        }
     }
+
+private:
+    CorridorAudioProcessor& proc;
+    GlassContext& gc;
 };
 
-// ---------------------------------------------------------------- analysis panel (Hold mode)
+// ---------------------------------------------------------------- the header plate: glass, mark, name and status
+class Header : public Component, public SettableTooltipClient {
+public:
+    explicit Header(GlassContext& g_) : gc(g_) { setInterceptsMouseClicks(false, false); }
+    String status;
+    Colour dot;
+    Rectangle<float> statusArea;
+    void paint(Graphics& g) override {
+        const Pal& c = *gc.pal;
+        drawGlass(g, gc, *this, capsule(getLocalBounds().toFloat().reduced(0.5f)), {Colour(), 1.05f, true, 20.f, 7.f, 1.4f});
+        drawIcon(g, "logo", Rectangle<float>(18.f, 11.f, 20.f, 20.f), c.ink);
+        g.setFont(sans(16.f, true)); g.setColour(c.ink);
+        g.drawText("Corridor", Rectangle<float>(48.f, 0.f, 90.f, 42.f), Justification::centredLeft);
+        const float nw = GlyphArrangement::getStringWidth(sans(16.f, true), "Corridor");
+        g.setFont(sans(16.f)); g.setColour(c.muted);
+        g.drawText("Leveler", Rectangle<float>(48.f + nw + 6.f, 0.f, 80.f, 42.f), Justification::centredLeft);
+        // status: a dot and a short sentence, centred in the space left between the controls
+        if (status.isNotEmpty() && statusArea.getWidth() > 40.f) {
+            const Font f = sans(13.5f);
+            const float tw = jmin(statusArea.getWidth() - 24.f, GlyphArrangement::getStringWidth(f, status));
+            const float x0 = statusArea.getCentreX() - (tw + 14.f) * 0.5f;
+            g.setColour(dot); g.fillEllipse(x0, 21.f - 4.f, 8.f, 8.f);
+            g.setFont(f); g.setColour(c.ink);
+            g.drawText(status, Rectangle<float>(x0 + 14.f, 0.f, tw + 2.f, 42.f), Justification::centredLeft, true);
+        }
+    }
+
+private:
+    GlassContext& gc;
+};
+
+// ---------------------------------------------------------------- Rise / Fall / Trim panel
+class MorePanel : public Component {
+public:
+    MorePanel(CorridorAudioProcessor& p, GlassContext& g_) : proc(p), gc(g_) {
+        setTitle("Rise, fall and output trim");
+        add(rise, riseValue, ids::rise, "Rise", [](double v) { return String(roundToInt(v)) + " ms"; });
+        add(fall, fallValue, ids::fall, "Fall", [](double v) { return String(roundToInt(v)) + " ms"; });
+        add(trim, trimValue, ids::trim, "Output trim", [](double v) { return fmtDb(float(v), 1, true) + " dB"; });
+    }
+    void resized() override {
+        int y = 14;
+        for (auto* row : {&rows[0], &rows[1], &rows[2]}) {
+            row->slider->setBounds(96, y, 120, 28);
+            row->value->setBounds(222, y + 2, 64, 24);
+            y += 36;
+        }
+    }
+    void refresh() { for (auto& r : rows) if (!r.value->isBeingEdited()) r.value->setText(r.slider->getTextFromValue(r.slider->getValue()), dontSendNotification); }
+    void paint(Graphics& g) override {
+        const Pal& c = *gc.pal;
+        drawGlass(g, gc, *this, capsule(getLocalBounds().toFloat().reduced(0.5f), 20.f), {c.panel, 1.03f, true, 24.f, 10.f, 1.4f});
+        g.setFont(sans(13.f, true)); g.setColour(c.ink);
+        int y = 14;
+        for (auto* name : {"Rise", "Fall", "Output trim"}) { g.drawText(name, Rectangle<int>(16, y, 80, 28), Justification::centredLeft); y += 36; }
+        g.setFont(sans(11.5f)); g.setColour(c.muted);
+        g.drawFittedText("Rise: how fast quiet passages are lifted. Fall: how fast loud ones are pulled down. A slow rise and a fast fall suit voice.",
+                         Rectangle<int>(16, y + 2, getWidth() - 32, 34), Justification::topLeft, 2, 1.f);
+        if (auto* look = dynamic_cast<Look*>(&getLookAndFeel())) {
+            for (auto* v : {&riseValue, &fallValue, &trimValue}) {
+                v->setColour(Label::textColourId, c.ink);
+                v->setColour(Label::backgroundColourId, c.on);
+            }
+            ignoreUnused(look);
+        }
+    }
+
+private:
+    struct Row { Slider* slider; Label* value; };
+    void add(Slider& s, Label& v, const char* id, const char* name, std::function<String(double)> fmt) {
+        s.setSliderStyle(Slider::LinearHorizontal);
+        s.setTextBoxStyle(Slider::NoTextBox, false, 0, 0);
+        s.setTitle(name);
+        s.onDragStart = [this] { proc.undo.beginNewTransaction(); };
+        addAndMakeVisible(s);
+        atts.push_back(std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(proc.state(), id, s));
+        s.textFromValueFunction = fmt;
+        v.setEditable(true, true, false);
+        v.setJustificationType(Justification::centredRight);
+        v.setFont(sans(13.f));
+        v.setTitle(String(name) + " value");
+        v.onTextChange = [this, &s, &v] {
+            const String t = v.getText().replace(",", ".").replace(String(CharPointer_UTF8("\xe2\x88\x92")), "-");
+            if (t.containsAnyOf("0123456789")) { proc.undo.beginNewTransaction(); s.setValue(t.retainCharacters("-+.0123456789").getDoubleValue(), sendNotificationSync); }
+            refresh();
+        };
+        addAndMakeVisible(v);
+        rows[rowCount++] = {&s, &v};
+    }
+    CorridorAudioProcessor& proc;
+    GlassContext& gc;
+    Slider rise, fall, trim;
+    Label riseValue, fallValue, trimValue;
+    Row rows[3]{};
+    int rowCount = 0;
+    std::vector<std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment>> atts;
+};
+
+// ---------------------------------------------------------------- first-run tip
+class Tip : public Component {
+public:
+    explicit Tip(GlassContext& g_) : gc(g_) {
+        ok.getProperties().set("kind", "plain");
+        ok.getProperties().set("inverse", true);  // light text on the ink pill
+        ok.getProperties().set("fontSize", 13.5);
+        ok.onClick = [this] { if (onDismiss) onDismiss(); };
+        addAndMakeVisible(ok);
+        setTitle("Getting started");
+    }
+    std::function<void()> onDismiss;
+    void resized() override { ok.setBounds(getWidth() - 96, (getHeight() - 34) / 2, 80, 34); }
+    void paint(Graphics& g) override {
+        const Pal& c = *gc.pal;
+        drawGlass(g, gc, *this, capsule(getLocalBounds().toFloat().reduced(0.5f), 20.f), {c.panel, 1.03f, true, 24.f, 10.f, 1.4f});
+        g.setFont(sans(13.f, true)); g.setColour(c.ink);
+        g.drawText("Getting started", Rectangle<int>(16, 12, getWidth() - 120, 18), Justification::centredLeft);
+        g.setFont(sans(13.f)); g.setColour(c.label);
+        g.drawFittedText("Set Target where you want your voice. Then lower Threshold until the room noise sits below its dashed line.",
+                         Rectangle<int>(16, 30, getWidth() - 124, 36), Justification::topLeft, 2, 1.f);
+        g.setColour(c.ink); g.fillRoundedRectangle(ok.getBounds().toFloat(), 17.f);
+    }
+
+private:
+    GlassContext& gc;
+    GlassButton ok{"Got it"};
+};
+
+// ---------------------------------------------------------------- the Hold sheet under the window
 class Drawer : public Component {
 public:
-    explicit Drawer(CorridorAudioProcessor& p) : proc(p) {
-        analyze.getProperties().set("fontSize", 12.5);
-        analyze.getProperties().set("track", 1.0);
-        analyze.setTitle("Analyze");
+    Drawer(CorridorAudioProcessor& p, GlassContext& g_) : proc(p), gc(g_) {
+        analyze.getProperties().set("kind", "key");
+        analyze.getProperties().set("fontSize", 14.0);
+        analyze.setTitle("Analyze or lock");
         analyze.onClick = [this] {
             if (proc.core().telemetry().analyzing.load()) proc.core().requestAnalyzeLock();
             else proc.core().requestAnalyzeStart();
@@ -605,94 +918,92 @@ public:
         setTitle("Analyze and hold");
     }
     std::vector<corridor::Snapshot> wave;
-    TextButton analyze{"ANALYZE"};
-
+    GlassButton analyze{"Analyze"};
     void refresh() {
         const auto& t = proc.core().telemetry();
         const bool an = t.analyzing.load();
-        analyze.setButtonText(an ? "LOCK" : t.holdValid.load() ? "ANALYZE AGAIN" : "ANALYZE");
+        analyze.setButtonText(an ? "Lock" : t.holdValid.load() ? "Analyze again" : "Analyze");
         analyze.setToggleState(an, dontSendNotification);
         repaint();
     }
-    void resized() override { analyze.setBounds(30, 40, 188, 34); }
+    void resized() override { analyze.setBounds(36, 36, 196, 36); }
     void paint(Graphics& g) override {
-        const float W = float(getWidth()), H = float(getHeight());
-        const auto panel = Rectangle<float>(14.f, 0.f, W - 28.f, H - 6.f);
-        Path p; p.addRoundedRectangle(panel.getX(), panel.getY(), panel.getWidth(), panel.getHeight(), 10.f, 10.f, false, false, true, true);
-        DropShadow(Colours::black.withAlpha(0.45f), 18, {0, 8}).drawForPath(g, p);
-        g.setGradientFill(ColourGradient(K::drawerTop, 0.f, 0.f, K::drawerBottom, 0.f, H, false)); g.fillPath(p);
-        g.setColour(K::frame); g.strokePath(p, PathStrokeType(1.f));
-        g.setGradientFill(ColourGradient(Colours::black.withAlpha(0.8f), 0.f, 0.f, Colours::transparentBlack, 0.f, 14.f, false));
-        g.fillRect(panel.withHeight(14.f));  // the window's edge casts a shadow into the panel
-
+        const Pal& c = *gc.pal;
+        const float w = float(getWidth()), h = float(getHeight());
+        Path sheet; sheet.addRoundedRectangle(18.f, -24.f, w - 36.f, h - 6.f + 24.f, 26.f, 26.f, false, false, true, true);
+        DropShadow(c.shade, 24, {0, 10}).drawForPath(g, sheet);
+        g.setColour(c.panel); g.fillPath(sheet);
+        g.setColour(c.rimSoft); g.strokePath(sheet, PathStrokeType(1.f));
         const auto& t = proc.core().telemetry();
-        g.setFont(sans(13.f, true)); g.setColour(K::label);
-        g.drawText("Analyze & hold", Rectangle<float>(30.f, 12.f, 190.f, 20.f), Justification::centredLeft);
-        // readout
-        StringArray lines; Array<bool> hot;
+        g.setFont(sans(15.f, true)); g.setColour(c.ink);
+        g.drawText("Analyze & hold", Rectangle<float>(36.f, 10.f, 200.f, 22.f), Justification::centredLeft);
+        // readout: words first, the key figure in the data colour
+        struct ReadLine { String text; bool hot; };
+        std::vector<ReadLine> lines;
         if (t.analyzing.load()) {
-            lines.add("Analyzing " + String(t.analyzeSeconds.load(), 1) + " s"); hot.add(true);
-            lines.add("Above threshold " + String(t.analyzeActiveSeconds.load(), 1) + " s"); hot.add(false);
-            lines.add("Locks by itself at 20 s"); hot.add(false);
+            lines = {{"Analyzing " + String(t.analyzeSeconds.load(), 1) + " s", true},
+                     {"Above threshold " + String(t.analyzeActiveSeconds.load(), 1) + " s", false},
+                     {"Locks by itself at 20 s", false}};
         } else if (t.analyzeFailed.load()) {
-            lines.add("Not enough sound above"); hot.add(false);
-            lines.add("the threshold. Analyze again."); hot.add(false);
+            lines = {{"Not enough sound above", false}, {"the threshold. Analyze again.", false}};
         } else if (t.holdValid.load()) {
-            lines.add("Holding " + fmtDb(t.holdGain.load(), 1, true) + " dB"); hot.add(true);
-            lines.add("Measured " + fmtDb(t.holdMeasured.load(), 1) + " dB RMS"); hot.add(false);
-            lines.add("over " + String(t.holdSeconds.load(), 1) + " s"); hot.add(false);
+            lines = {{"Holding " + fmtDb(t.holdGain.load(), 1, true) + " dB", true},
+                     {"Measured " + fmtDb(t.holdMeasured.load(), 1) + " dB RMS", false},
+                     {"over " + String(t.holdSeconds.load(), 1) + " s", false}};
         } else {
-            lines.add("Press Analyze, then play"); hot.add(false);
-            lines.add("a typical section."); hot.add(false);
+            lines = {{"Press Analyze, then play", false}, {"a typical section.", false}};
         }
-        g.setFont(mono(12.5f));
-        for (int i = 0; i < lines.size(); ++i) {
-            g.setColour(hot[i] ? K::yellow : K::muted);
-            g.drawText(lines[i], Rectangle<float>(30.f, 84.f + float(i) * 18.f, 200.f, 18.f), Justification::centredLeft);
+        g.setFont(sans(12.5f));
+        float y = 78.f;
+        for (const auto& l : lines) {
+            g.setColour(l.hot ? c.dataText : c.muted);
+            g.drawText(l.text, Rectangle<float>(36.f, y, 210.f, 18.f), Justification::centredLeft);
+            y += 16.f;
         }
-        // waveform: input peaks above the centre line, RMS below; yellow where it is being measured
-        const auto wr = Rectangle<float>(240.f, 12.f, W - 240.f - 30.f, H - 32.f);
-        drawWell(g, wr, 6.f, K::wellDeep);
-        const float mid = wr.getCentreY(), half = wr.getHeight() * 0.5f - 6.f;
+        g.setFont(sans(11.f)); g.setColour(c.muted);
+        g.drawText("Shortcut A: analyze, then lock", Rectangle<float>(36.f, h - 24.f, 220.f, 14.f), Justification::centredLeft);
+        // waveform: input peaks above the centre line, RMS below; the measured stretch in the data colour
+        const auto wr = Rectangle<float>(262.f, 14.f, w - 262.f - 36.f, h - 40.f);
+        g.setColour(c.dark ? Colours::black.withAlpha(0.28f) : Colours::white.withAlpha(0.5f));
+        g.fillRoundedRectangle(wr, 18.f);
+        g.setColour(c.rimSoft); g.drawRoundedRectangle(wr, 18.f, 1.f);
+        const float mid = wr.getCentreY(), half = wr.getHeight() * 0.5f - 8.f;
         auto amp = [](float db) { return jlimit(0.f, 1.f, (db + 66.f) / 60.f); };  // -66 dB at the centre, -6 at the edge
-        g.setColour(Colours::white.withAlpha(0.06f)); g.fillRect(wr.getX(), mid, wr.getWidth(), 1.f);
-        const float thr = proc.state().getRawParameterValue(ids::threshold)->load();
-        const float ta = amp(thr) * half;
+        g.setColour(c.grid); g.fillRect(wr.getX(), mid, wr.getWidth(), 1.f);
+        const float thr = proc.state().getRawParameterValue(ids::threshold)->load(), ta = amp(thr) * half;
         const float dashes[] = {4.f, 4.f};
-        g.setColour(K::green.withAlpha(0.55f));
-        g.drawDashedLine(Line<float>(wr.getX() + 2.f, mid - ta, wr.getRight() - 2.f, mid - ta), dashes, 2, 1.f);
-        g.drawDashedLine(Line<float>(wr.getX() + 2.f, mid + ta, wr.getRight() - 2.f, mid + ta), dashes, 2, 1.f);
+        g.setColour(c.thr.withAlpha(0.8f));
+        g.drawDashedLine(Line<float>(wr.getX() + 6.f, mid - ta, wr.getRight() - 6.f, mid - ta), dashes, 2, 1.f);
+        g.drawDashedLine(Line<float>(wr.getX() + 6.f, mid + ta, wr.getRight() - 6.f, mid + ta), dashes, 2, 1.f);
         const int n = int(wave.size());
-        const float step = (wr.getWidth() - 4.f) / float(kWaveEntries);
+        const float step = (wr.getWidth() - 12.f) / float(kWaveEntries);
         for (int i = 0; i < n; ++i) {
             const auto& s = wave[size_t(i)];
             const bool act = s.inRms >= thr;
-            const Colour c = s.analyzing ? (act ? K::yellow : K::yellow.withAlpha(0.35f)) : K::trace.withAlpha(act ? 0.8f : 0.3f);
-            const float x = wr.getRight() - 2.f - float(n - i) * step;
+            g.setColour((s.analyzing ? c.data : c.in).withMultipliedAlpha(act ? 1.f : 0.35f));
+            const float x = wr.getRight() - 6.f - float(n - i) * step;
             const float up = amp(s.inPeak) * half, down = amp(s.inRms) * half;
-            g.setColour(c); g.fillRect(x, mid - up, jmax(1.f, step * 0.8f), up + down);
+            g.fillRect(x, mid - up, jmax(1.f, step * 0.8f), up + down);
         }
-        g.setFont(sans(11.f, true, 1.f)); g.setColour(K::muted);
-        g.drawText("INPUT, LAST 6 S   PEAK ABOVE, RMS BELOW, DASHED: THRESHOLD", wr.reduced(9.f, 6.f).withHeight(14.f), Justification::centredLeft);
+        g.setFont(sans(12.f)); g.setColour(c.muted);
+        g.drawText("Input, last 6 s. Peak above, RMS below; dashed: threshold", wr.reduced(12.f, 8.f).withHeight(14.f), Justification::centredLeft);
     }
 
 private:
     CorridorAudioProcessor& proc;
+    GlassContext& gc;
 };
 
 // ---------------------------------------------------------------- updates: About panel and prompt
-// The About panel is the "Settings row" of the update-check spec: version, last result, one action.
 class AboutPanel : public Component {
 public:
-    explicit AboutPanel(updates::Checker& c) : checker(c) {
-        for (auto* b : {&action, &close}) { b->getProperties().set("fontSize", 12.5); b->getProperties().set("track", 0.3); addAndMakeVisible(*b); }
+    AboutPanel(updates::Checker& c, GlassContext& g_) : checker(c), gc(g_) {
+        for (auto* b : {&action, &close}) addAndMakeVisible(*b);
         close.getProperties().set("icon", "close");
-        close.getProperties().set("kind", "flat");
+        close.getProperties().set("kind", "circle");
         close.setTitle("Close");
         close.setButtonText({});
-        action.onClick = [this] {
-            if (checker.known().valid()) checker.install(); else checker.check(true);
-        };
+        action.onClick = [this] { if (checker.known().valid()) checker.install(); else checker.check(true); };
         close.onClick = [this] { setVisible(false); };
         link.setFont(sans(13.f), false, Justification::centredLeft);
         addAndMakeVisible(link);
@@ -704,47 +1015,43 @@ public:
                              : ph == updates::Checker::Phase::Downloading ? "Downloading " + String(int(checker.progress() * 100.f)) + "%"
                              : r.valid() ? "Update to " + r.version : "Check for updates");
         action.setEnabled(ph == updates::Checker::Phase::Idle);
-        action.getProperties().set("icon", r.valid() ? "download" : "refresh");
-        action.getProperties().set("accentText", r.valid());
+        action.getProperties().set("icon", r.valid() ? "download" : "");
         link.setURL(URL(r.valid() ? r.page : String(updates::kReleasesPage)));
+        link.setColour(HyperlinkButton::textColourId, gc.pal->ink);
         repaint();
     }
     void resized() override {
-        close.setBounds(getWidth() - 40, 10, 30, 30);
-        action.setBounds(20, getHeight() - 56, 190, 36);
+        close.setBounds(getWidth() - 44, 12, 30, 30);
+        action.setBounds(20, getHeight() - 54, 190, 34);
         link.setButtonText("Release page");
-        link.setBounds(226, getHeight() - 56, 120, 36);
+        link.setBounds(226, getHeight() - 54, 120, 34);
     }
     void paint(Graphics& g) override {
-        auto r = getLocalBounds().toFloat().reduced(1.f);
-        Path p; p.addRoundedRectangle(r, 10.f);
-        DropShadow(Colours::black.withAlpha(0.7f), 24, {0, 8}).drawForPath(g, p);  // it floats
-        g.setColour(K::floatBg); g.fillPath(p);
-        g.setColour(K::floatEdge); g.strokePath(p, PathStrokeType(1.f));
-        drawIcon(g, "logo", Rectangle<float>(20.f, 20.f, 22.f, 20.f), K::yellow);
-        g.setColour(K::ink); g.setFont(sans(16.f, true));
-        g.drawText("Corridor Leveler " + updates::currentVersion(), Rectangle<float>(52.f, 16.f, r.getWidth() - 100.f, 28.f), Justification::centredLeft);
-        g.setFont(sans(13.5f)); g.setColour(K::ink);
-        g.drawFittedText(checker.status(), Rectangle<int>(20, 56, getWidth() - 40, 40), Justification::topLeft, 2);
+        const Pal& c = *gc.pal;
+        drawGlass(g, gc, *this, capsule(getLocalBounds().toFloat().reduced(1.f), 20.f), {c.panel, 1.03f, true, 24.f, 10.f, 1.4f});
+        drawIcon(g, "logo", Rectangle<float>(20.f, 18.f, 22.f, 22.f), c.ink);
+        g.setColour(c.ink); g.setFont(sans(16.f, true));
+        g.drawText("Corridor Leveler " + updates::currentVersion(), Rectangle<float>(52.f, 14.f, float(getWidth()) - 104.f, 28.f), Justification::centredLeft);
+        g.setFont(sans(13.5f)); g.setColour(c.ink);
+        g.drawFittedText(checker.status(), Rectangle<int>(20, 54, getWidth() - 40, 40), Justification::topLeft, 2);
         const String msg = checker.message();
-        g.setColour(K::muted); g.setFont(sans(13.f));
+        g.setColour(c.muted); g.setFont(sans(13.f));
         g.drawFittedText(msg.isNotEmpty() ? msg : "The check is a plain request to GitHub. Nothing about you or your computer is sent.",
-                         Rectangle<int>(20, 98, getWidth() - 40, 36), Justification::topLeft, 2);
+                         Rectangle<int>(20, 96, getWidth() - 40, 36), Justification::topLeft, 2);
     }
 
 private:
     updates::Checker& checker;
-    TextButton action{"Check for updates"}, close{"x"};
+    GlassContext& gc;
+    GlassButton action{"Check for updates"}, close{"x"};
     HyperlinkButton link{"Release page", URL(updates::kReleasesPage)};
 };
 
-// The prompt: once per start, Update and Ignore. Escape or a click outside closes it for this start.
 class UpdatePrompt : public Component {
 public:
-    explicit UpdatePrompt(updates::Checker& c) : checker(c) {
-        for (auto* b : {&update, &ignore}) { b->getProperties().set("fontSize", 13.5); b->getProperties().set("track", 0.3); addAndMakeVisible(*b); }
+    UpdatePrompt(updates::Checker& c, GlassContext& g_) : checker(c), gc(g_) {
+        for (auto* b : {&update, &ignore}) { b->getProperties().set("fontSize", 14.0); addAndMakeVisible(*b); }
         update.getProperties().set("icon", "download");
-        update.getProperties().set("accentText", true);
         update.onClick = [this] { checker.install(); };
         ignore.onClick = [this] { checker.ignoreKnown(); };
         setWantsKeyboardFocus(true);
@@ -768,38 +1075,49 @@ public:
         return false;
     }
     void paint(Graphics& g) override {
-        g.fillAll(Colours::black.withAlpha(0.55f));
+        const Pal& c = *gc.pal;
+        g.fillAll(Colours::black.withAlpha(0.5f));
         const auto b = box().toFloat();
-        Path p; p.addRoundedRectangle(b, 12.f);
-        DropShadow(Colours::black.withAlpha(0.6f), 30, {0, 10}).drawForPath(g, p);
-        g.setColour(K::floatBg); g.fillPath(p);
-        g.setColour(K::floatEdge); g.strokePath(p, PathStrokeType(1.f));
+        drawGlass(g, gc, *this, capsule(b, 22.f), {c.panel, 1.03f, true, 30.f, 10.f, 1.4f});
         const auto r = checker.known();
-        const String cur = updates::currentVersion();
-        g.setColour(K::ink); g.setFont(sans(20.f, true));
+        g.setColour(c.ink); g.setFont(sans(20.f, true));
         g.drawText("Corridor Leveler " + r.version + " is available", b.reduced(24.f).withHeight(30.f), Justification::centredLeft);
-        g.setFont(sans(14.f)); g.setColour(K::label);
+        g.setFont(sans(14.f)); g.setColour(c.label);
         String body;
         if (checker.phase() == updates::Checker::Phase::Downloading)
             body = "Downloading... " + String(int(checker.progress() * 100.f)) + "%. The installer opens when it's done.";
         else {
             const String size = r.bytes > 0 ? " (" + String(double(r.bytes) / 1048576.0, 1) + " MB)" : String();
-            body = "You have " + cur + ". Update downloads the new version" + size + " and opens its installer. When it asks, close OBS or your DAW. "
-                   "Your settings and sessions are kept.";
+            body = "You have " + updates::currentVersion() + ". Update downloads the new version" + size +
+                   " and opens its installer. When it asks, close OBS or your DAW. Your settings and sessions are kept.";
             if (checker.message().isNotEmpty()) body = checker.message();
         }
         g.drawFittedText(body, b.reduced(24.f).withTrimmedTop(40.f).withHeight(64.f).toNearestInt(), Justification::topLeft, 3);
         if (checker.phase() == updates::Checker::Phase::Downloading) {
-            const auto bar = Rectangle<float>(b.getX() + 24.f, b.getBottom() - 92.f, b.getWidth() - 48.f, 8.f);
-            drawWell(g, bar, 4.f);
-            g.setColour(K::yellow); g.fillRoundedRectangle(bar.withWidth(bar.getWidth() * checker.progress()), 4.f);
+            const auto bar = Rectangle<float>(b.getX() + 24.f, b.getBottom() - 92.f, b.getWidth() - 48.f, 6.f);
+            g.setColour(c.meterOff); g.fillRoundedRectangle(bar, 3.f);
+            g.setColour(c.data); g.fillRoundedRectangle(bar.withWidth(bar.getWidth() * checker.progress()), 3.f);
         }
     }
 
 private:
     updates::Checker& checker;
-    TextButton update{"Update"}, ignore{"Ignore"};
+    GlassContext& gc;
+    GlassButton update{"Update"}, ignore{"Ignore"};
 };
+
+// per-user settings (the one-time tip): opened when needed and closed straight away,
+// so nothing outlives the plugin
+PropertiesFile::Options settingsOptions() {
+    PropertiesFile::Options o;
+    o.applicationName = "settings";
+    o.filenameSuffix = "settings";
+    o.folderName = "CorridorLeveler";
+    o.osxLibrarySubFolder = "Application Support";
+    return o;
+}
+bool tipSeen() { PropertiesFile f(settingsOptions()); return f.getBoolValue("tipSeen", false); }
+void markTipSeen() { PropertiesFile f(settingsOptions()); f.setValue("tipSeen", true); f.saveIfNeeded(); }
 
 }  // namespace
 
@@ -807,75 +1125,94 @@ private:
 class CorridorContent : public Component, private ChangeListener {
 public:
     explicit CorridorContent(CorridorAudioProcessor& p)
-        : proc(p), graph(p), meterIn(true, p.core()), meterOut(false, p.core()), tags(graph), drawer(p),
-          threshold(p.state(), ids::threshold, "Threshold", [](double v) { return fmtDb(float(v)) + " dB"; }, 34.f, "thr"),
-          response(p.state(), ids::response, "Response", [](double v) { return String(v < 34 ? "Slow " : v > 66 ? "Fast " : "Medium ") + String(roundToInt(v)); }, 34.f),
-          target(p.state(), ids::target, "Target", [](double v) { return fmtDb(float(v)) + " dB RMS"; }, 50.f, "tgt"),
-          range(p.state(), ids::range, "Range", [](double v) { return kPlusMinus + fmtDb(float(v)) + " dB"; }, 34.f),
-          ceiling(p.state(), ids::ceiling, "Ceiling", [](double v) { return fmtDb(float(v)) + " dBFS"; }, 34.f),
-          about(*checker), prompt(*checker) {
+        : proc(p), scene(p, gc), meterIn(true, gc, p.core()), meterOut(false, gc, p.core()), readouts(gc), tags(p, gc), header(gc),
+          threshold(p, ids::threshold, "Threshold", [](double v) { return fmtDb(float(v)) + " dB"; }, 30.f, "thr"),
+          response(p, ids::response, "Response", [](double v) { return String(roundToInt(v)) + " ms" + kDot + speedWord(v); }, 30.f, "", {"Fast", "Slow"}),
+          target(p, ids::target, "Target", [](double v) { return fmtDb(float(v)) + " dB RMS"; }, 44.f, "data"),
+          range(p, ids::range, "Range", [](double v) { return kPlusMinus + fmtDb(float(v)) + " dB"; }, 30.f, ""),
+          ceiling(p, ids::ceiling, "Ceiling", [](double v) { return fmtDb(float(v)) + " dBFS"; }, 30.f, "ceil"),
+          rideHold(gc, {"Ride", "Hold"}), ab(gc, {"A", "B"}), more(p, gc), tip(gc), drawer(p, gc), about(*checker, gc), prompt(*checker, gc) {
+        gc.pal = p.darkTheme ? &kDark : &kLight;
+        gc.root = this;
+        look.gc = &gc;
+        look.apply();
         setLookAndFeel(&look);
-        addAndMakeVisible(graph);
+        setWantsKeyboardFocus(true);
+
+        addAndMakeVisible(scene);
         addAndMakeVisible(meterIn); addAndMakeVisible(meterOut);
-        addAndMakeVisible(deck);
-        addAndMakeVisible(tags);
+        addAndMakeVisible(readouts);
         for (auto* k : {&threshold, &response, &target, &range, &ceiling}) addAndMakeVisible(*k);
-        addChildComponent(drawer);
+        addAndMakeVisible(rideHold);
+        rideHold.setTitle("Ride or Hold");
+        rideHold.onSelect = [this](int i) { proc.undo.beginNewTransaction(); setParam(ids::mode, float(i)); };
+        moreBtn.getProperties().set("trailing", "chevron-down");
+        moreBtn.getProperties().set("fontSize", 12.5);
+        moreBtn.setTitle("Rise, fall and output trim");
+        moreBtn.onClick = [this] { more.setVisible(!more.isVisible()); if (more.isVisible()) { more.refresh(); more.toFront(false); } };
+        addAndMakeVisible(moreBtn);
+        addChildComponent(more);
+        addAndMakeVisible(tags);
+        addAndMakeVisible(header);
 
-        for (auto* b : {&ride, &hold}) {
-            b->setClickingTogglesState(false);
-            b->getProperties().set("kind", "segment");
-            addAndMakeVisible(*b);
-        }
-        ride.setTitle("Ride: adjust the gain continuously");
-        hold.setTitle("Hold: measure a section and lock one gain");
-        ride.onClick = [this] { setMode(0); };
-        hold.onClick = [this] { setMode(1); };
-
-        for (auto* b : {&ease, &bypass}) {
-            b->setClickingTogglesState(true);
-            b->getProperties().set("kind", "flat");
-            addAndMakeVisible(*b);
-        }
-        ease.getProperties().set("fontSize", 11.5);
-        ease.getProperties().set("track", 1.3);
-        ease.setTooltip("Off: the gain freezes below the threshold. On: after 2 s of silence it glides back to 0 dB.");
-        bypass.getProperties().set("icon", "power");
-        bypass.setButtonText({});
-        bypass.setTitle("Bypass");
-        bypass.setTooltip("Bypass (keeps the same latency, so nothing jumps)");
-        easeAtt = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state(), ids::ease, ease);
-        bypassAtt = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state(), ids::bypass, bypass);
-
-        addAndMakeVisible(status);
-        graph.setTitle("Level graph");
-        graph.setDescription("Input and output level (RMS) over the last 10 seconds, with the target, threshold and ceiling lines. Drag a line to change it.");
-        meterIn.setTitle("Input peak meter");
-        meterOut.setTitle("Output peak meter");
-
-        // updates: the version in the header opens the About panel; a known update gets its own key
-        versionBtn.setButtonText("v" + updates::currentVersion());
-        versionBtn.getProperties().set("fontSize", 11.5);
-        versionBtn.getProperties().set("track", 0.3);
-        versionBtn.setTitle("About Corridor Leveler and updates");
-        versionBtn.onClick = [this] { about.refresh(); about.setVisible(!about.isVisible()); about.toFront(false); };
-        addAndMakeVisible(versionBtn);
-        updateBtn.getProperties().set("fontSize", 11.5);
-        updateBtn.getProperties().set("track", 0.3);
+        // header controls
+        presetBtn.getProperties().set("trailing", "chevron-down");
+        presetBtn.setTitle("Presets");
+        presetBtn.onClick = [this] { showPresets(); };
+        addAndMakeVisible(presetBtn);
+        ab.fontSize = 13.f;
+        ab.setTitle("Settings A or B");
+        ab.onSelect = [this](int i) { proc.switchSlot(i); };
+        addAndMakeVisible(ab);
+        for (auto* b : {&undoBtn, &redoBtn, &themeBtn, &bypassBtn}) { b->getProperties().set("kind", "circle"); b->setButtonText({}); addAndMakeVisible(*b); }
+        undoBtn.getProperties().set("icon", "undo"); undoBtn.setTitle("Undo"); undoBtn.setTooltip("Undo (Ctrl+Z)");
+        redoBtn.getProperties().set("icon", "redo"); redoBtn.setTitle("Redo"); redoBtn.setTooltip("Redo (Ctrl+Shift+Z)");
+        undoBtn.onClick = [this] { proc.undo.undo(); };
+        redoBtn.onClick = [this] { proc.undo.redo(); };
+        themeBtn.getProperties().set("icon", "theme"); themeBtn.setTitle("Switch between dark and light"); themeBtn.setTooltip("Dark or light");
+        themeBtn.onClick = [this] { applyTheme(gc.pal != &kDark); };
+        bypassBtn.getProperties().set("icon", "power"); bypassBtn.getProperties().set("danger", true);
+        bypassBtn.setTitle("Bypass"); bypassBtn.setTooltip("Bypass (keeps the same latency, so nothing jumps)");
+        bypassBtn.setClickingTogglesState(true);
+        bypassBtn.onPress = [this] { proc.undo.beginNewTransaction(); };
+        bypassAtt = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state(), ids::bypass, bypassBtn);
+        easeBtn.setClickingTogglesState(true);
+        easeBtn.setTitle("Return to 0 dB in silence");
+        easeBtn.setTooltip("Off: the gain freezes below the threshold. On: after 2 s of silence it glides back to 0 dB.");
+        easeBtn.onPress = [this] { proc.undo.beginNewTransaction(); };
+        easeAtt = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state(), ids::ease, easeBtn);
+        addAndMakeVisible(easeBtn);
+        aboutBtn.getProperties().set("kind", "plain");
+        aboutBtn.setTitle("About Corridor Leveler and updates");
+        aboutBtn.setTooltip("Version " + updates::currentVersion() + " and updates");
+        aboutBtn.setColour(TextButton::textColourOffId, Colours::transparentBlack);
+        aboutBtn.onClick = [this] { about.refresh(); about.setVisible(!about.isVisible()); about.toFront(false); };
+        addAndMakeVisible(aboutBtn);
         updateBtn.getProperties().set("icon", "download");
-        updateBtn.getProperties().set("accentText", true);
+        updateBtn.getProperties().set("fontSize", 12.5);
         updateBtn.onClick = [this] { if (checker->known().valid()) checker->install(); };
         addChildComponent(updateBtn);
+
+        // the one-time tip
+        tip.setVisible(!p.tipDismissedThisRun && !tipSeen());
+        tip.onDismiss = [this] { tip.setVisible(false); proc.tipDismissedThisRun = true; markTipSeen(); };
+        addChildComponent(tip);
+
+        addChildComponent(drawer);
         addChildComponent(about);
         addChildComponent(prompt);
         checker->addChangeListener(this);
         checker->check(false);  // silent; at most one prompt per host session
-        setSize(CorridorEditor::designW, CorridorEditor::designH);
+        setSize(W, H);
+        sendLookAndFeelChange();
+        addMouseListener(this, true);  // a click anywhere lets Ctrl+Z and A reach the window
+    }
+    void mouseDown(const MouseEvent&) override {
+        if (auto* f = Component::getCurrentlyFocusedComponent(); f == nullptr || !isParentOf(f)) grabKeyboardFocus();
     }
     ~CorridorContent() override { checker->removeChangeListener(this); setLookAndFeel(nullptr); }
 
-    std::function<void(bool)> onDrawerChange;  // the editor grows by the panel's height
-    bool drawerOpen() const { return drawer.isVisible(); }
+    std::function<void(bool)> onDrawerChange;
 
     void changeListenerCallback(ChangeBroadcaster*) override {
         const auto r = checker->known();
@@ -890,64 +1227,67 @@ public:
         resized();
     }
 
-    void setMode(int m) {
-        if (auto* prm = proc.state().getParameter(ids::mode)) {
-            prm->beginChangeGesture(); prm->setValueNotifyingHost(prm->convertTo0to1(float(m))); prm->endChangeGesture();
-        }
+    void applyTheme(bool dark) {
+        proc.darkTheme = dark;
+        gc.pal = dark ? &kDark : &kLight;
+        look.apply();
+        sendLookAndFeelChange();
+        repaint();
     }
 
-    void paint(Graphics& g) override {
-        g.fillAll(K::page);
-        // header plate
-        g.setGradientFill(ColourGradient(K::chromeTop, 0.f, 0.f, K::chrome, 0.f, float(kHead), false));
-        g.fillRect(0, 0, getWidth(), kHead);
-        g.setColour(Colours::white.withAlpha(0.10f)); g.fillRect(0, 0, getWidth(), 1);
-        g.setColour(K::seam); g.fillRect(0, kHead - 1, getWidth(), 1);
-        drawIcon(g, "logo", Rectangle<float>(18.f, 10.f, 20.f, 20.f), K::yellow);
-        g.setFont(sans(14.f, true, 3.f)); g.setColour(K::ink);
-        g.drawText("CORRIDOR", Rectangle<int>(48, 0, 120, kHead), Justification::centredLeft);
-        g.setFont(sans(12.f, false, 2.f)); g.setColour(K::muted);
-        g.drawText("LEVELER", Rectangle<int>(150, 0, 100, kHead), Justification::centredLeft);
+    void setParam(const char* id, float v) {
+        if (auto* prm = proc.state().getParameter(id)) { prm->beginChangeGesture(); prm->setValueNotifyingHost(prm->convertTo0to1(v)); prm->endChangeGesture(); }
+    }
+
+    void showPresets() {
+        PopupMenu m;
+        m.addSectionHeader("Presets");
+        const auto& list = CorridorAudioProcessor::presets();
+        for (int i = 0; i < int(list.size()); ++i) m.addItem(i + 1, list[size_t(i)].name, true, proc.presetName == list[size_t(i)].name);
+        m.showMenuAsync(PopupMenu::Options().withTargetComponent(&presetBtn).withMinimumWidth(210),
+                        [this](int r) { if (r > 0) proc.applyPreset(r - 1); });
+    }
+
+    bool keyPressed(const KeyPress& k) override {
+        const auto mods = k.getModifiers();
+        const int code = k.getKeyCode();
+        if (mods.isCommandDown() && (code == 'Z' || code == 'z')) { mods.isShiftDown() ? proc.undo.redo() : proc.undo.undo(); return true; }
+        if (mods.isCommandDown() && (code == 'Y' || code == 'y')) { proc.undo.redo(); return true; }
+        if (!mods.isAnyModifierKeyDown() && (code == 'A' || code == 'a') && drawer.isVisible()) { drawer.analyze.triggerClick(); return true; }
+        return false;
     }
 
     void resized() override {
-        const int W = getWidth(), H = CorridorEditor::designH;
-        // header, right to left: bypass, ease, version, update
-        auto head = Rectangle<int>(0, 0, W, kHead).reduced(12, 6);
-        bypass.setBounds(head.removeFromRight(40));
-        head.removeFromRight(8);
-        ease.setBounds(head.removeFromRight(150));
-        head.removeFromRight(8);
-        versionBtn.setBounds(head.removeFromRight(76));
-        if (updateBtn.isVisible()) { head.removeFromRight(8); updateBtn.setBounds(head.removeFromRight(150)); }
-        head.removeFromRight(8);
-        head.removeFromLeft(250 - 12);
-        status.setBounds(head);
-        about.setBounds(W - 12 - 420, kHead + 8, 420, 190);
+        scene.setBounds(0, 0, W, H);
+        meterIn.setBounds(12, int(kMeterY), int(kMeterW), int(kMeterH));
+        meterOut.setBounds(W - 12 - int(kMeterW), int(kMeterY), int(kMeterW), int(kMeterH));
+        readouts.setBounds(0, 0, W, H);
+        tags.setBounds(0, 0, W, H);
+        header.setBounds(kHeader.toNearestInt());
+        // header, left to right: wordmark (About), preset, A / B, undo, redo ... status ... return to 0 dB, theme, bypass
+        aboutBtn.setBounds(18, 12, 160, 42);
+        presetBtn.setBounds(200, 18, 156, 30);
+        ab.setBounds(364, 18, 72, 30);
+        undoBtn.setBounds(444, 18, 30, 30);
+        redoBtn.setBounds(478, 18, 30, 30);
+        bypassBtn.setBounds(W - 12 - 42, 18, 30, 30);
+        themeBtn.setBounds(W - 12 - 80, 18, 30, 30);
+        easeBtn.setBounds(W - 12 - 296, 18, 206, 30);
+        int statusRight = easeBtn.getX() - 12;
+        if (updateBtn.isVisible()) { updateBtn.setBounds(easeBtn.getX() - 12 - 150, 18, 150, 30); statusRight = updateBtn.getX() - 8; }
+        header.statusArea = Rectangle<float>(520.f - kHeader.getX(), 0.f, float(statusRight - 520), 42.f);
+        // controls: Threshold and Response left, Target in the middle with Ride / Hold under it, Range and Ceiling right
+        threshold.placeAt({290, 496});
+        response.placeAt({400, 496});
+        target.placeAt({560, 478});
+        range.placeAt({720, 496});
+        ceiling.placeAt({830, 496});
+        rideHold.setBounds(560 - 76, 578, 152, 30);
+        moreBtn.setBounds(int(kDeck.getX()) + 116, 578, 128, 30);
+        more.setBounds(236, 572 - 168, 300, 168);
+        tip.setBounds(W / 2 - 235, 70, 470, 76);
+        about.setBounds(W - 12 - 420, 62, 420, 190);
         prompt.setBounds(0, 0, W, H);
-
-        // body: meters at the edges, the graph between them
-        meterIn.setBounds(0, kHead, kMeterW, H - kHead);
-        meterOut.setBounds(W - kMeterW, kHead, kMeterW, H - kHead);
-        graph.setBounds(kMeterW, kHead, W - 2 * kMeterW, H - kHead);
-        tags.setBounds(graph.getBounds());
-        deck.setBounds(0, 0, W, H);
-
-        // controls: Threshold, Response | Target with Ride / Hold under it | Range, Ceiling
-        const int cx = W / 2, row = 492;
-        threshold.placeCentredOn({cx - 270, row});
-        response.placeCentredOn({cx - 160, row});
-        target.placeCentredOn({cx, 466});
-        range.placeCentredOn({cx + 160, row});
-        ceiling.placeCentredOn({cx + 270, row});
-        graph.fadeTop = float(threshold.getY() - 40 - graph.getY());
-        const int by = 466 + 50 + 7 + 44, bw = 64, bh = 26;
-        ride.setBounds(cx - bw, by, bw, bh);
-        hold.setBounds(cx, by, bw, bh);
-        deck.switchSlot = Rectangle<float>(float(cx - bw - 4), float(by - 4), float(bw * 2 + 8), float(bh + 8));
-        deck.latencyAt = {float(kMeterW + 14), float(H - 22)};
-        deck.gainBox = Rectangle<float>(float(W - kMeterW - 176), float(H - 64), 162.f, 52.f);
-
         drawer.setBounds(0, H, W, CorridorEditor::drawerH);
     }
 
@@ -955,18 +1295,30 @@ public:
         auto& dsp = proc.core();
         const auto& t = dsp.telemetry();
         const int n = dsp.copyHistory(scratch, kHist);
-        graph.hist.assign(scratch, scratch + n);
-        graph.analyzing = t.analyzing.load();
-        graph.analyzeSeconds = t.analyzeSeconds.load();
-        meterIn.peak = t.inPeak.load(); meterIn.hold = t.inPeakHold.load();
-        meterOut.peak = t.outPeak.load(); meterOut.hold = t.outPeakHold.load();
+        scene.hist.assign(scratch, scratch + n);
+        scene.analyzing = t.analyzing.load();
+        scene.analyzeSeconds = t.analyzeSeconds.load();
+        scene.renderBlur();
+
+        const bool byp = proc.state().getRawParameterValue(ids::bypass)->load() > 0.5f;
+        meterIn.peakL = t.inPeakL.load(); meterIn.peakR = t.inPeakR.load(); meterIn.hold = t.inPeakHold.load(); meterIn.balance = t.inBalance.load();
+        meterOut.peakL = byp ? t.inPeakL.load() : t.outPeakL.load(); meterOut.peakR = byp ? t.inPeakR.load() : t.outPeakR.load();
+        meterOut.hold = byp ? t.inPeakHold.load() : t.outPeakHold.load(); meterOut.balance = t.outBalance.load();
         target.setLive(t.outRms.load());
         threshold.setLive(t.inRms.load());
-        for (auto* k : {&threshold, &response, &target, &range, &ceiling}) k->refresh();
 
         const bool holdMode = proc.state().getRawParameterValue(ids::mode)->load() > 0.5f;
-        ride.setToggleState(!holdMode, dontSendNotification);
-        hold.setToggleState(holdMode, dontSendNotification);
+        rideHold.setSelected(holdMode ? 1 : 0);
+        rideHold.advance();
+        ab.setSelected(proc.slot);
+        ab.advance();
+        presetBtn.setButtonText(proc.presetName + (proc.presetEdited() ? " (edited)" : ""));
+        undoBtn.setEnabled(proc.undo.canUndo());
+        redoBtn.setEnabled(proc.undo.canRedo());
+        moreBtn.setToggleState(more.isVisible(), dontSendNotification);
+        moreBtn.getProperties().set("trailing", more.isVisible() ? "chevron-up" : "chevron-down");
+        if (more.isVisible()) more.refresh();
+
         if (holdMode != drawer.isVisible()) {
             drawer.setVisible(holdMode);
             if (onDrawerChange) onDrawerChange(holdMode);
@@ -977,36 +1329,51 @@ public:
             drawer.refresh();
         }
 
-        const bool byp = proc.state().getRawParameterValue(ids::bypass)->load() > 0.5f;
+        // readouts
         const float g = byp ? 0.f : t.gain.load();
-        deck.gainText = fmtDb(g, 1, true);
-        deck.gainActive = std::abs(g) >= 0.05f;
+        readouts.gainText = fmtDb(g, 1, true);
+        readouts.gainSign = g > 0.05f ? 1 : g < -0.05f ? -1 : 0;
+        const float tgt = proc.state().getRawParameterValue(ids::target)->load();
+        const float out = t.outRms.load(), thr = proc.state().getRawParameterValue(ids::threshold)->load();
+        const bool active = !holdMode && !byp && t.inRms.load() >= thr;
+        const float d = out - tgt;
+        readouts.onTarget = active && std::abs(d) < 1.f;
+        readouts.fromTarget = holdMode ? "Holding" : !active ? "Waiting" : std::abs(d) < 1.f ? "On target"
+                                                                         : fmtDb(std::abs(d)) + (d > 0 ? " dB over" : " dB under");
         const double fs = dsp.sampleRate();
-        deck.latencyText = "LATENCY " + String(1000.0 * dsp.latencySamples() / fs, 1) + " ms  (" + String(dsp.latencySamples()) +
-                           " samples at " + String(fs / 1000.0, 1) + " kHz)";
-        status.text = shortStatus(byp, holdMode);
-        status.dot = stateColour(byp, holdMode);
-        const String longText = sentence(byp, holdMode);
-        status.setTooltip(longText);
-        status.setTitle("Status");
-        status.setDescription(longText);  // screen readers read the full sentence
+        readouts.latency = "Latency " + String(1000.0 * dsp.latencySamples() / fs, 1) + " ms (" + String(dsp.latencySamples()) + " samples at " + String(fs / 1000.0, 1) + " kHz)";
 
-        graph.repaint(); tags.repaint(); meterIn.repaint(); meterOut.repaint(); deck.repaint(); status.repaint();
+        // line labels while their line or dial is in use
+        tags.show[0] = scene.hover == ids::ceiling || scene.dragId == ids::ceiling || ceiling.inUse();
+        tags.show[1] = scene.hover == ids::threshold || scene.dragId == ids::threshold || threshold.inUse();
+        tags.show[2] = scene.hover == ids::target || scene.dragId == ids::target || target.inUse();
+
+        header.status = shortStatus(byp, holdMode);
+        header.dot = stateColour(byp, holdMode);
+        const String longText = sentence(byp, holdMode);
+        header.setTitle("Status");
+        header.setDescription(longText);  // screen readers hear the full sentence
+        header.setTooltip(longText);
+
+        repaint();
     }
 
-    // The status dot: green on target, yellow while adjusting or holding, red when the ceiling or
-    // range holds it back, grey when waiting or bypassed.
     Colour stateColour(bool byp, bool holdMode) const {
-        if (byp) return K::muted;
-        if (holdMode) return K::yellow;
+        const Pal& c = *gc.pal;
+        if (byp) return c.muted;
+        if (holdMode) return c.ink;
         switch (corridor::State(proc.core().telemetry().state.load())) {
-            case corridor::State::OnTarget: return K::green;
-            case corridor::State::Boosting:
-            case corridor::State::Cutting: return K::yellow;
-            case corridor::State::Ceiling:
-            case corridor::State::Range: return K::red;
-            case corridor::State::Returning: return K::label;
-            default: return K::muted;
+            case corridor::State::OnTarget: return c.data;
+            case corridor::State::Boosting: return c.boost;
+            case corridor::State::Cutting: return c.cut;
+            case corridor::State::Ceiling: return c.ceil;
+            case corridor::State::Range: return c.label;
+            case corridor::State::Returning: return c.label;
+            case corridor::State::Waiting:
+            case corridor::State::Held:
+            case corridor::State::Analyzing:
+            case corridor::State::Unset:
+            default: return c.muted;
         }
     }
 
@@ -1015,10 +1382,10 @@ public:
         const float g = t.gain.load();
         if (byp) return "Bypassed";
         if (holdMode) {
-            if (t.analyzing.load()) return "Analyzing " + String(t.analyzeSeconds.load(), 1) + " s. Press Lock after a typical section";
-            if (t.analyzeFailed.load()) return "Not enough sound above the threshold. Analyze again";
+            if (t.analyzing.load()) return "Analyzing " + String(t.analyzeSeconds.load(), 1) + " s" + kDot + "press Lock";
+            if (t.analyzeFailed.load()) return "Not enough sound. Analyze again";
             if (t.holdValid.load()) return "Holding " + fmtDb(t.holdGain.load(), 1, true) + " dB";
-            return "Hold: play a typical section, then press Analyze";
+            return "Hold: press Analyze, then play";
         }
         switch (corridor::State(t.state.load())) {
             case corridor::State::OnTarget: return "On target";
@@ -1026,7 +1393,11 @@ public:
             case corridor::State::Cutting: return "Cutting (" + fmtDb(g, 1, true) + " dB)";
             case corridor::State::Ceiling: return "Held back by the ceiling";
             case corridor::State::Range: return "At the edge of the range";
-            case corridor::State::Returning: return "Easing back to 0 dB";
+            case corridor::State::Returning: return "Returning to 0 dB";
+            case corridor::State::Waiting:
+            case corridor::State::Held:
+            case corridor::State::Analyzing:
+            case corridor::State::Unset:
             default: {
                 const float thr = proc.state().getRawParameterValue(ids::threshold)->load();
                 return t.inRms.load() < thr ? "Below the threshold, not adjusting" : "Measuring";
@@ -1063,7 +1434,11 @@ public:
             case corridor::State::Cutting: return "Coming in at " + fmtDb(L, 1) + " dB RMS, above the " + fmtDb(tgt, 1) + " target. Lowering it (" + fmtDb(g, 1, true) + " dB so far).";
             case corridor::State::Ceiling: return "More boost would push peaks past the " + fmtDb(cei, 1) + " dBFS ceiling. Held at " + fmtDb(g, 1, true) + " dB.";
             case corridor::State::Range: return "It needs more than the " + kPlusMinus + String(rng, 1) + " dB range allows. Held at " + fmtDb(g, 1, true) + " dB.";
-            case corridor::State::Returning: return "Silence for over 2 s. Easing back to 0 dB (" + fmtDb(g, 1, true) + " dB).";
+            case corridor::State::Returning: return "Silence for over 2 s. Returning to 0 dB (" + fmtDb(g, 1, true) + " dB).";
+            case corridor::State::Waiting:
+            case corridor::State::Held:
+            case corridor::State::Analyzing:
+            case corridor::State::Unset:
             default:
                 return t.inRms.load() < thr ? "Below the " + fmtDb(thr, 1) + " dB threshold (silence, breaths or noise). Not adjusting; gain stays at " + fmtDb(g, 1, true) + " dB."
                                             : "Sound just started. Measuring it before acting.";
@@ -1072,17 +1447,21 @@ public:
 
 private:
     CorridorAudioProcessor& proc;
+    GlassContext gc;
     Look look;
-    Graph graph;
+    Scene scene;
     Meter meterIn, meterOut;
-    Deck deck;
-    TagLayer tags;
-    Drawer drawer;
+    Readouts readouts;
+    Tags tags;
+    Header header;
     Knob threshold, response, target, range, ceiling;
-    TextButton ride{"RIDE"}, hold{"HOLD"};
-    TextButton ease{"EASE IN SILENCE"}, bypass{"Bypass"};
-    TextButton versionBtn{"v0"}, updateBtn{"Update"};
-    StatusLine status;
+    Segmented rideHold, ab;
+    GlassButton moreBtn{"Rise, fall, trim"};
+    MorePanel more;
+    GlassButton presetBtn{"Default"}, undoBtn{"Undo"}, redoBtn{"Redo"}, themeBtn{"Theme"}, bypassBtn{"Bypass"};
+    GlassButton easeBtn{"Return to 0 dB in silence"}, aboutBtn{""}, updateBtn{"Update"};
+    Tip tip;
+    Drawer drawer;
     TooltipWindow tooltips{this, 600};
     SharedResourcePointer<updates::Checker> checker;  // declared before the panels that use it
     AboutPanel about;
@@ -1098,6 +1477,7 @@ CorridorEditor::CorridorEditor(CorridorAudioProcessor& p) : AudioProcessorEditor
     content->onDrawerChange = [this](bool open) { applyDrawer(open); };
     addAndMakeVisible(*content);
     setResizable(true, true);
+    setWantsKeyboardFocus(false);
     width0 = jlimit(960, 2240, savedWidth);
     drawerOpen = p.state().getRawParameterValue(ids::mode)->load() > 0.5f;
     applyDrawer(drawerOpen);
@@ -1109,8 +1489,7 @@ CorridorEditor::~CorridorEditor() { stopTimer(); }
 
 int CorridorEditor::contentHeight() const { return designH + (drawerOpen ? drawerH : 0); }
 
-// Hold mode opens the analysis panel under the window: the window grows by the panel's height
-// and keeps its width; the aspect ratio follows.
+// Hold mode opens the analysis sheet under the window: the window grows by its height and keeps its width.
 void CorridorEditor::applyDrawer(bool open) {
     drawerOpen = open;
     const double ratio = double(designW) / double(contentHeight());
@@ -1121,7 +1500,7 @@ void CorridorEditor::applyDrawer(bool open) {
     resized();
 }
 
-void CorridorEditor::paint(Graphics& g) { g.fillAll(Colour(0xff121214)); }
+void CorridorEditor::paint(Graphics& g) { g.fillAll(proc.darkTheme ? Colour(0xff0f0f11) : Colour(0xfff2f2f4)); }
 
 void CorridorEditor::resized() {
     const float s = float(getWidth()) / float(designW);

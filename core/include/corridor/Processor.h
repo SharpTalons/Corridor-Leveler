@@ -5,7 +5,9 @@
 // with mono or stereo (any channel count; detection is linked across channels).
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <atomic>
 #include <cstdint>
 #include <vector>
@@ -20,7 +22,10 @@ constexpr int kHistorySize = 1024;           // UI history ring (one entry per 2
 struct Params {
     float target = -20.f;        // dB RMS
     float threshold = -48.f;     // dB RMS: below this, no adjusting
-    float response = 50.f;       // 0 (slow, smooth) .. 100 (fast)
+    float responseMs = 400.f;    // how long it listens before judging the level: 10 (very fast) .. 3000 ms (slow)
+    float riseMs = 400.f;        // how fast the gain lifts quiet passages (time constant)
+    float fallMs = 80.f;         // how fast the gain pulls loud passages down (time constant)
+    float trimDb = 0.f;          // output trim after the leveler, before the ceiling limiter
     float range = 12.f;          // max boost and cut, dB
     float ceiling = -1.f;        // dBFS peak
     bool hold = false;           // false = Ride, true = Hold
@@ -56,6 +61,9 @@ struct Snapshot {
 struct Telemetry {
     std::atomic<float> inPeak{-120.f}, inPeakHold{-120.f}, outPeak{-120.f}, outPeakHold{-120.f};
     std::atomic<float> inRms{-120.f}, outRms{-120.f};
+    // per channel (left, right; mono shows the same on both) and balance in dB, + = left louder
+    std::atomic<float> inPeakL{-120.f}, inPeakR{-120.f}, outPeakL{-120.f}, outPeakR{-120.f};
+    std::atomic<float> inBalance{0.f}, outBalance{0.f};
     std::atomic<float> gain{0.f}, level{-120.f}, limiterDb{0.f}, crest{10.f};
     std::atomic<int> state{0};
     std::atomic<bool> percussive{false};
@@ -114,6 +122,12 @@ private:
     };
 
     void controlBlock();
+    struct ChannelMeter {  // left / right peaks and balance for the meters
+        double sq[2]{}; float pk[2]{}; float db[2]{-120.f, -120.f}; float bal = 0.f;
+        void add(int c, float x) { sq[c] += double(x) * x; pk[c] = std::max(pk[c], std::fabs(x)); }
+        void finish(int n, bool mono);
+    };
+    ChannelMeter inCh_, outCh_;
     void lockAnalysis();
 
     double fs_ = 48000.0;

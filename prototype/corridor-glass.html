@@ -1,0 +1,924 @@
+<title>Corridor Leveler Glass</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: the plugin window as the hero (1120x630 design, scaled to fit), the analysis panel under it in Hold,
+   then the palette and notes. The page follows the viewer's theme; the plugin has its own dark / light switch. */
+:root {
+  --page: #f2f2f7;
+  --page-ink: #1c1c1e;
+  --page-muted: #6e6e73;
+  --page-card: #ffffff;
+  --page-edge: rgba(0, 0, 0, .08);
+  --font-ui: "SF Pro Text", -apple-system, "Inter", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #000000; --page-ink: #f5f5f7; --page-muted: #98989d; --page-card: #1c1c1e; --page-edge: rgba(255, 255, 255, .1); color-scheme: dark; } }
+:root[data-theme="dark"] { --page: #000000; --page-ink: #f5f5f7; --page-muted: #98989d; --page-card: #1c1c1e; --page-edge: rgba(255, 255, 255, .1); color-scheme: dark; }
+
+/* the plugin's own two looks; .unit carries data-ptheme */
+.unit {
+  --p-bg: #0f0f11; --p-ink: #ededef; --p-label: #b4b4b9; --p-muted: #8b8b90;
+  --p-accent: #ededef; --p-accent-text: #ededef; --p-green: #a1a1a6; --p-green-text: #b4b4b9; --p-red: #cf6a60;
+  --p-trace: rgba(235, 235, 240, .34); --p-out: rgba(245, 245, 247, .92); --p-meter: rgba(235, 235, 240, .7); --p-grid: rgba(255, 255, 255, .05);
+  --p-glass: rgba(255, 255, 255, .06); --p-glass-strong: rgba(255, 255, 255, .13);
+  --p-rim: rgba(255, 255, 255, .38); --p-rim-soft: rgba(255, 255, 255, .1); --p-shade: rgba(0, 0, 0, .4);
+  --p-bloom-a: rgba(255, 255, 255, .035); --p-bloom-b: rgba(255, 255, 255, .025); --p-bloom-c: rgba(255, 255, 255, 0);
+  --p-meter-off: rgba(255, 255, 255, .07); --p-on: rgba(255, 255, 255, .2);
+  --p-data: #4fd1bf; --p-data-text: #6fdccd;   /* Target and the output it is aiming at */
+  --p-thr: #f2b84b; --p-thr-text: #f2c46a;     /* Threshold */
+  --p-resp: #7fb2ff; --p-resp-text: #9cc3ff;   /* Response */
+  --p-rng: #f08cc0; --p-rng-text: #f4a6cf;     /* Range */
+  --p-ceil: #ff7a6b; --p-ceil-text: #ff8f82;   /* Ceiling */
+  --p-in: rgba(170, 190, 215, .45);            /* input trace: a cool grey that stays behind the output */
+  --p-m-safe: #4cd787; --p-m-warn: #f2c24b; --p-m-hot: #ff5f52;   /* meters: up to -18, -18 to -6, above -6 dBFS */
+  --p-boost: #7fb2ff; --p-cut: #ff9a6b;        /* applied gain: lifting / lowering */
+}
+.unit[data-ptheme="light"] {
+  --p-bg: #f2f2f4; --p-ink: #1d1d1f; --p-label: #48484c; --p-muted: #6e6e73;
+  --p-accent: #1d1d1f; --p-accent-text: #1d1d1f; --p-green: #8e8e93; --p-green-text: #48484c; --p-red: #b8483e;
+  --p-trace: rgba(60, 60, 67, .3); --p-out: rgba(29, 29, 31, .86); --p-meter: rgba(29, 29, 31, .55); --p-grid: rgba(0, 0, 0, .05);
+  --p-glass: rgba(255, 255, 255, .45); --p-glass-strong: rgba(255, 255, 255, .75);
+  --p-rim: rgba(255, 255, 255, .95); --p-rim-soft: rgba(0, 0, 0, .06); --p-shade: rgba(0, 0, 0, .08);
+  --p-bloom-a: rgba(255, 255, 255, .7); --p-bloom-b: rgba(255, 255, 255, .5); --p-bloom-c: rgba(255, 255, 255, 0);
+  --p-meter-off: rgba(0, 0, 0, .07); --p-on: rgba(0, 0, 0, .08);
+  --p-data: #149483; --p-data-text: #0f7a6c;
+  --p-thr: #e09a12; --p-thr-text: #8f5c00;
+  --p-resp: #2f74e0; --p-resp-text: #1f5cc0;
+  --p-rng: #d0468f; --p-rng-text: #a3306d;
+  --p-ceil: #e0483a; --p-ceil-text: #b2352a;
+  --p-in: rgba(70, 90, 120, .38);
+  --p-m-safe: #2fb562; --p-m-warn: #e3a51b; --p-m-hot: #e5392c;
+  --p-boost: #1f5cc0; --p-cut: #b8501f;
+}
+
+html, body { background: var(--page); color: var(--page-ink); }
+body { font-family: var(--font-ui); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 24px; }
+header.page { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+header.page h1 { margin: 0; font-size: 22px; font-weight: 600; text-wrap: balance; }
+header.page p { margin: 0; color: var(--page-muted); max-width: 62ch; line-height: 1.5; }
+.narrow-note { display: none; margin: 0; color: var(--page-muted); font-size: 13px; }
+.stage { min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; }
+.unit { display: grid; min-width: 0; }
+@media (max-width: 760px) { .unit { min-width: 760px; } .narrow-note { display: block; } }
+.plugin { container-type: inline-size; --u: calc(100cqw / 1120); position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 22px; overflow: hidden; background: var(--p-bg); box-shadow: 0 24px 70px var(--p-shade); z-index: 1; }
+.plugin canvas { display: block; width: 100%; height: 100%; touch-action: manipulation; }
+
+/* analysis panel: a glass sheet that slides out under the window in Hold */
+.drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .36s cubic-bezier(.2, .8, .2, 1); }
+.drawer.open { grid-template-rows: 1fr; }
+.drawer > div { overflow: hidden; min-height: 0; }
+.drawer-body { margin: -22px 18px 0; padding: 36px 18px 18px; display: grid; grid-template-columns: minmax(170px, 200px) 1fr; gap: 18px;
+  background: var(--p-glass-strong); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid var(--p-rim-soft); border-top: 0; border-radius: 0 0 26px 26px;
+  box-shadow: inset 0 -1px 0 var(--p-rim), 0 18px 40px var(--p-shade); color: var(--p-ink); }
+.unit[data-ptheme="dark"] .drawer-body { background: rgba(28, 28, 32, .78); }
+.drawer-side { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.drawer-side .cap { font-size: 15px; font-weight: 600; }
+.readout { font-size: 13px; color: var(--p-muted); line-height: 1.6; font-variant-numeric: tabular-nums; }
+.readout b { color: var(--p-ink); font-weight: 600; }
+.readout .hot { color: var(--p-data-text); font-weight: 600; }
+.wave { min-width: 0; height: 124px; border-radius: 18px; background: rgba(0, 0, 0, .28); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .35), 0 1px 0 var(--p-rim-soft); }
+.unit[data-ptheme="light"] .wave { background: rgba(255, 255, 255, .5); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .1), 0 1px 0 #fff; }
+.wave canvas { display: block; width: 100%; height: 100%; }
+.key { font: 600 14px var(--font-ui); color: var(--p-ink); padding: 11px 18px; border-radius: 999px; cursor: pointer; border: 0;
+  background: var(--p-glass-strong); box-shadow: inset 0 1px 0 var(--p-rim), inset 0 0 0 1px var(--p-rim-soft), 0 6px 16px var(--p-shade);
+  transition: transform .15s, background-color .15s; }
+.key:hover { transform: scale(1.02); }
+.key:active { transform: scale(.97); }
+.key[aria-pressed="true"] { background: var(--p-ink); color: var(--p-bg); box-shadow: 0 4px 12px var(--p-shade); }
+.key:focus-visible, .chip:focus-visible, .sr:focus-visible { outline: 2px solid var(--p-ink, #1d1d1f); outline-offset: 3px; }
+@media (max-width: 640px) { .drawer-body { grid-template-columns: 1fr; } }
+
+.sim { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; color: var(--page-muted); font-size: 14px; }
+.sim .group { display: flex; gap: 6px; }
+.chip { font: 500 14px var(--font-ui); color: var(--page-ink); background: var(--page-card); border: 1px solid var(--page-edge); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--page-ink); color: var(--page); border-color: transparent; }
+.status { min-height: 1.4em; }
+.status::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--dot, #8e8e93); margin-right: 8px; vertical-align: 1px; }
+h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
+.sheet { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 28px; }
+.sheet section { min-width: 0; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.sw { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; font-size: 13px; }
+.sw i { width: 34px; height: 34px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--page-edge); }
+.sw b { display: block; font-weight: 600; }
+.sw span { color: var(--page-muted); font-variant-numeric: tabular-nums; }
+.notes { margin: 0; padding-left: 18px; line-height: 1.6; font-size: 15px; }
+.notes li + li { margin-top: 6px; }
+.dial-edit { position: absolute; transform: translate(-50%, -50%); width: 96px; padding: 5px 8px; border-radius: 10px; border: 0; text-align: center;
+  font: 600 13px var(--font-ui); font-variant-numeric: tabular-nums; color: var(--p-ink); background: var(--p-glass-strong);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: inset 0 1px 0 var(--p-rim), 0 0 0 2px var(--p-data), 0 6px 16px var(--p-shade); z-index: 2; }
+.unit[data-ptheme="dark"] .dial-edit { background: rgba(40, 40, 46, .85); }
+.dial-edit:focus { outline: none; }
+.gpanel { position: absolute; z-index: 3; color: var(--p-ink); font: 500 calc(var(--u) * 13) var(--font-ui);
+  background: var(--p-glass-strong); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6);
+  border-radius: calc(var(--u) * 20); box-shadow: inset 0 1px 0 var(--p-rim), inset 0 0 0 1px var(--p-rim-soft), 0 calc(var(--u) * 14) calc(var(--u) * 34) var(--p-shade); }
+.unit[data-ptheme="dark"] .gpanel { background: rgba(34, 34, 40, .82); }
+.menu { left: calc(var(--u) * 200); top: calc(var(--u) * 58); width: calc(var(--u) * 210); padding: calc(var(--u) * 6); display: grid; }
+.menu button { all: unset; cursor: pointer; padding: calc(var(--u) * 8) calc(var(--u) * 12); border-radius: calc(var(--u) * 12); display: flex; justify-content: space-between; gap: 8px; }
+.menu button:hover, .menu button:focus-visible { background: var(--p-on); }
+.menu button[aria-checked="true"]::after { content: "\2713"; }
+.menu small { color: var(--p-muted); font-size: calc(var(--u) * 11.5); padding: calc(var(--u) * 6) calc(var(--u) * 12) calc(var(--u) * 2); }
+.more { left: calc(var(--u) * 236); bottom: calc(var(--u) * 58); width: calc(var(--u) * 300); padding: calc(var(--u) * 14) calc(var(--u) * 16); display: grid; gap: calc(var(--u) * 10); }
+.more .row { display: grid; grid-template-columns: calc(var(--u) * 78) 1fr calc(var(--u) * 74); align-items: center; gap: calc(var(--u) * 10); }
+.more label { font-weight: 600; }
+.more .hint { color: var(--p-muted); font-size: calc(var(--u) * 11.5); line-height: 1.4; }
+.more input[type=range] { width: 100%; accent-color: var(--p-ink); }
+.more input[type=text] { all: unset; text-align: right; font-variant-numeric: tabular-nums; padding: calc(var(--u) * 4) calc(var(--u) * 8); border-radius: calc(var(--u) * 8); background: var(--p-on); }
+.more input:focus-visible, .menu button:focus-visible, .tip button:focus-visible { outline: 2px solid var(--p-ink); outline-offset: 2px; }
+.tip { left: 50%; top: calc(var(--u) * 70); transform: translateX(-50%); width: calc(var(--u) * 470); padding: calc(var(--u) * 14) calc(var(--u) * 16); display: grid; grid-template-columns: 1fr auto; gap: calc(var(--u) * 12); align-items: center; line-height: 1.45; }
+.tip b { display: block; margin-bottom: 2px; }
+.tip button { all: unset; cursor: pointer; font-weight: 600; padding: calc(var(--u) * 8) calc(var(--u) * 14); border-radius: 999px; background: var(--p-ink); color: var(--p-bg); }
+.drawer-side .shortcut { font-size: 12px; color: var(--p-muted); line-height: 1.45; }
+.drawer-side kbd { font: 600 11px var(--font-ui); padding: 1px 6px; border-radius: 5px; background: var(--p-on); color: var(--p-ink); }
+[hidden] { display: none !important; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .drawer, .key { transition: none; } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+
+<div class="wrap">
+  <header class="page">
+    <h1>Corridor Leveler in Liquid Glass</h1>
+    <p>A working preview for approval. Drag a dial up or down (Shift for fine steps), double-click a dial to type a value, Alt-click to reset it, drag the Target, Threshold and Ceiling lines, and try the sun / moon switch in the header.</p>
+  </header>
+
+  <p class="narrow-note">Corridor is a desktop plugin. Scroll the window sideways to see all of it.</p>
+  <div class="stage">
+  <div class="unit" id="unit" data-ptheme="dark">
+    <div class="plugin" id="plugin">
+      <canvas id="cv" width="1120" height="630" aria-label="Corridor Leveler plugin window preview" role="img"></canvas>
+      <!-- keyboard and screen-reader access to the dials and buttons drawn on the canvas -->
+      <input class="sr" type="range" id="k-thr" aria-label="Threshold" min="-70" max="-20" step="0.5">
+      <input class="sr" type="range" id="k-resp" aria-label="Response" min="0" max="100" step="1">
+      <input class="sr" type="range" id="k-tgt" aria-label="Target" min="-40" max="-6" step="0.5">
+      <input class="sr" type="range" id="k-rng" aria-label="Range" min="0" max="24" step="0.5">
+      <input class="sr" type="range" id="k-ceil" aria-label="Ceiling" min="-12" max="0" step="0.1">
+      <input id="dial-edit" class="dial-edit" type="text" inputmode="decimal" autocomplete="off" hidden>
+      <button class="sr" id="b-preset" aria-haspopup="menu">Preset</button>
+      <button class="sr" id="b-a">Settings A</button>
+      <button class="sr" id="b-b">Settings B</button>
+      <button class="sr" id="b-undo">Undo</button>
+      <button class="sr" id="b-redo">Redo</button>
+      <button class="sr" id="b-more" aria-expanded="false" aria-controls="more">Rise, fall and output trim</button>
+      <button class="sr" id="b-mode">Switch between Ride and Hold</button>
+      <button class="sr" id="b-ease">Return to 0 dB in silence</button>
+      <button class="sr" id="b-theme">Switch the plugin between dark and light</button>
+      <button class="sr" id="b-bypass">Bypass</button>
+      <div class="gpanel menu" id="preset-menu" role="menu" aria-label="Presets" hidden></div>
+      <div class="gpanel more" id="more" role="group" aria-label="Rise, fall and output trim" hidden>
+        <div class="row"><label for="m-rise">Rise</label><input type="range" id="m-rise" min="0" max="1000"><input type="text" id="t-rise" inputmode="decimal" aria-label="Rise in ms"></div>
+        <div class="row"><label for="m-fall">Fall</label><input type="range" id="m-fall" min="0" max="1000"><input type="text" id="t-fall" inputmode="decimal" aria-label="Fall in ms"></div>
+        <div class="row"><label for="m-trim">Output trim</label><input type="range" id="m-trim" min="0" max="1000"><input type="text" id="t-trim" inputmode="decimal" aria-label="Output trim in dB"></div>
+        <div class="hint">Rise: how fast quiet passages are lifted. Fall: how fast loud ones are pulled down. A slow rise and a fast fall suit voice.</div>
+      </div>
+      <div class="gpanel tip" id="tip" role="note" hidden>
+        <div><b>Getting started</b>Set Target where you want your voice. Then lower Threshold until the room noise sits below its dashed line.</div>
+        <button id="tip-ok">Got it</button>
+      </div>
+    </div>
+    <div class="drawer" id="drawer" aria-hidden="true">
+      <div>
+        <div class="drawer-body">
+          <div class="drawer-side">
+            <span class="cap">Analyze &amp; hold</span>
+            <button class="key" id="an-btn" aria-pressed="false" tabindex="-1">Analyze</button>
+            <div class="readout" id="an-read"></div>
+            <div class="shortcut">Shortcut <kbd>A</kbd> analyzes and locks. In the plugin, Analyze and Lock can also be mapped to a hotkey, Stream Deck or MIDI button.</div>
+          </div>
+          <div class="wave"><canvas id="wave" aria-label="Live input waveform"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div class="sim">
+    <span>Preview signal</span>
+    <div class="group" role="group" aria-label="Preview signal">
+      <button class="chip" id="s-voice" aria-pressed="true">Voice</button>
+      <button class="chip" id="s-drums" aria-pressed="false">Drums</button>
+      <button class="chip" id="s-mix" aria-pressed="false">Mix</button>
+    </div>
+    <button class="chip" id="s-pause" aria-pressed="false">Pause</button>
+    <div class="status" id="status"></div>
+    <div class="sr" id="announce" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="sheet">
+    <section>
+      <h2>Palette</h2>
+      <div class="swatches" id="swatches"></div>
+    </section>
+    <section>
+      <h2>What changes</h2>
+      <ul class="notes">
+        <li>Every control is glass: it blurs and slightly magnifies the graph behind it, with a bright rim where the light catches the edge. The rim follows your pointer.</li>
+        <li>The header and the two meters float over a full-bleed graph. The controls have no box: the graph frosts and fades into the window colour under them, so they sit in the graph itself.</li>
+        <li>Dials are clear glass discs with a light value ring and pointer. Ride / Hold is a glass capsule whose selected side is a droplet that slides across.</li>
+        <li>The controls with a line in the graph keep their colour on the dial, value and line: Target teal (and the output it aims at), Threshold amber, Ceiling coral. Response and Range have no line, so they stay grey. The window, glass and text stay neutral. Dark mode uses softer versions; light mode uses deeper ones so their words stay readable.</li>
+        <li>Meters use the standard zones fixed to the scale: green up to −18 dBFS, amber to −6, red above, with a clip light on top and the peak readout in its zone colour. Their ticks and numbers sit at exactly the graph's heights, every 5 dB with a number every 10.</li>
+        <li>Response is a time: 10 ms is the fastest (follows every word), 3000 ms the slowest (rides whole phrases). The dial is marked Fast at the start of its sweep and Slow at the end, and its value says how fast it is, for example "120 ms · Fast". It uses a log scale so the fast end has room.</li>
+        <li>Applied gain reads blue while lifting and orange while lowering, with its sign; the status dot matches. Colour is never the only signal: every state also has words.</li>
+        <li>Presets in the header (Stream voice, Podcast, Music bed, Drums, Quiet room); the name gets "(edited)" once you change something. Next to it, A / B holds two complete settings to compare (B starts as a copy of A), and undo / redo arrows (Ctrl+Z, Ctrl+Shift+Z) step back through every change.</li>
+        <li>"Rise, fall, trim" next to Ride / Hold opens a panel: Rise sets how fast quiet passages are lifted, Fall how fast loud ones are pulled down, Output trim adds a final ± dB after the leveler. Response is now only how long Corridor listens before it judges the level.</li>
+        <li>"From target" at the bottom left says how far the output is from the target ("2.4 dB over", "On target"). Line labels appear only while you point at or drag their line or dial.</li>
+        <li>Each meter shows the left and right channels as two bars, with a balance dot underneath that leans towards the louder side.</li>
+        <li>A first-run tip explains the two settings that matter most, once. In Hold, the A key analyzes and locks; in the plugin these become host parameters you can map to a hotkey, Stream Deck or MIDI.</li>
+        <li>Dark by default; the sun / moon switch turns the plugin light. Hold slides a glass sheet out under the window with the live waveform.</li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+const W = 1120, H = 630;
+const root = document.documentElement, unit = document.getElementById('unit');
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const css = (n, el = unit) => getComputedStyle(el).getPropertyValue(n).trim();
+const FONT = css('--font-ui', root);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const C = {};
+const TOKENS = ['p-bg','p-ink','p-label','p-muted','p-accent','p-accent-text','p-green','p-green-text','p-red','p-trace','p-out','p-meter','p-on','p-data','p-data-text','p-thr','p-thr-text','p-resp','p-resp-text','p-rng','p-rng-text','p-ceil','p-ceil-text','p-in','p-m-safe','p-m-warn','p-m-hot','p-boost','p-cut','p-grid','p-glass','p-glass-strong','p-rim','p-rim-soft','p-shade','p-bloom-a','p-bloom-b','p-bloom-c','p-meter-off'];
+let dark = true;
+function readTokens() {
+  TOKENS.forEach(k => C[k.slice(2)] = css('--' + k));
+  const roles = [['data','Target, output'],['thr','Threshold'],['ceil','Ceiling'],['label','Response, Range'],['in','Input trace'],['m-safe','Meter, up to \u221218'],['m-warn','Meter, \u221218 to \u22126'],['m-hot','Meter, above \u22126'],['boost','Gain lifting'],['cut','Gain lowering'],['bg','Window'],['ink','Values'],['muted','Scale, hints']];
+  document.getElementById('swatches').innerHTML = roles.map(([k, n]) => `<div class="sw"><i style="background:${C[k]}"></i><div><b>${n}</b><span>${C[k]}</span></div></div>`).join('');
+}
+readTokens();
+
+// ---------------- parameters
+const P = { thr: -48, tgt: -20, resp: 400, rng: 12, ceil: -1, rise: 400, fall: 80, trim: 0, hold: false, ease: false, bypass: false };
+const KEYS = ['thr', 'tgt', 'resp', 'rng', 'ceil', 'rise', 'fall', 'trim', 'ease'];
+const PRESETS = [
+  ['Default', { thr: -48, tgt: -20, resp: 400, rng: 12, ceil: -1, rise: 400, fall: 80, trim: 0, ease: false }],
+  ['Stream voice', { thr: -50, tgt: -18, resp: 250, rng: 12, ceil: -1, rise: 350, fall: 50, trim: 0, ease: false }],
+  ['Podcast', { thr: -52, tgt: -19, resp: 600, rng: 10, ceil: -1.5, rise: 700, fall: 120, trim: 0, ease: true }],
+  ['Music bed', { thr: -45, tgt: -24, resp: 1500, rng: 8, ceil: -1, rise: 1500, fall: 600, trim: 0, ease: false }],
+  ['Drums', { thr: -40, tgt: -16, resp: 800, rng: 6, ceil: -1, rise: 800, fall: 300, trim: 0, ease: false }],
+  ['Quiet room', { thr: -58, tgt: -20, resp: 400, rng: 18, ceil: -1, rise: 500, fall: 80, trim: 0, ease: true }],
+];
+let presetName = 'Default';
+const DEF = { ...P };
+const snap = () => Object.fromEntries(KEYS.map(k => [k, P[k]]));
+const same = (a, b) => KEYS.every(k => a[k] === b[k]);
+const fmt = (v, d = 1) => { const s = Math.abs(v).toFixed(d); return (v < 0 && +s !== 0 ? '−' : '') + s; };
+const sgn = (v, d = 1) => (v > 0.05 ? '+' : '') + fmt(v, d);
+const PM = '±';
+const knobs = [
+  { id: 'thr', label: 'Threshold', min: -70, max: -20, x: 290, y: 496, r: 30, val: v => fmt(v) + ' dB', col: 'thr' },
+  { id: 'resp', label: 'Response', min: 10, max: 3000, log: true, x: 400, y: 496, r: 30, val: v => Math.round(v) + ' ms \u00b7 ' + (v < 50 ? 'Very fast' : v < 200 ? 'Fast' : v < 900 ? 'Medium' : 'Slow'), unit: 'ms', ends: ['Fast', 'Slow'], col: 'label' },
+  { id: 'tgt', label: 'Target', min: -40, max: -6, x: 560, y: 478, r: 44, val: v => fmt(v) + ' dB RMS', col: 'data' },
+  { id: 'rng', label: 'Range', min: 0, max: 24, x: 720, y: 496, r: 30, val: v => PM + fmt(v) + ' dB', col: 'label' },
+  { id: 'ceil', label: 'Ceiling', min: -12, max: 0, x: 830, y: 496, r: 30, val: v => fmt(v) + ' dBFS', col: 'ceil' },
+];
+const A0 = -0.75 * Math.PI, A1 = 0.75 * Math.PI;
+const EXTRA = [
+  { id: 'rise', label: 'Rise', min: 20, max: 3000, log: true, val: v => Math.round(v) + ' ms', parse: v => v },
+  { id: 'fall', label: 'Fall', min: 5, max: 2000, log: true, val: v => Math.round(v) + ' ms', parse: v => v },
+  { id: 'trim', label: 'Output trim', min: -12, max: 12, val: v => (v > 0.05 ? '+' : '') + fmt(v) + ' dB', parse: v => v },
+];
+const toNorm = (k, v) => k.log ? Math.log(v / k.min) / Math.log(k.max / k.min) : (v - k.min) / (k.max - k.min);
+const fromNorm = (k, n) => { n = Math.min(1, Math.max(0, n)); return k.log ? k.min * Math.pow(k.max / k.min, n) : k.min + n * (k.max - k.min); };
+
+// ---------------- geometry: a full-bleed graph; header, meters and deck float over it
+const PX0 = 90, PX1 = 1030, GT = 118, GB = 596, RANGE_DB = 80;
+const DECK = { x: 226, y: 408, w: 668, h: 206, r: 30 };
+const HEADER = { x: 12, y: 12, w: W - 24, h: 42, r: 21 };
+const MTR = { y: 64, h: 554, w: 66, r: 24 };
+const yOf = v => GT + Math.min(RANGE_DB, Math.max(0, -v)) / RANGE_DB * (GB - GT);
+const vOf = y => -Math.min(RANGE_DB, Math.max(0, (y - GT) / (GB - GT) * RANGE_DB));
+
+// ---------------- simulated signal and engine (20 ms steps)
+const HIST = 500, dt = 0.02, WAVE = 1200;
+const hist = [], wave = [];
+let src = 'voice', paused = false, t = 0;
+let section = -24, sectionLeft = 0, gapLeft = 0, syl = 0;
+let pw = Math.pow(10, -24 / 10), gain = 0, silent = 0;
+let bal = 0.8, inPk = -120, outPk = -120, inHold = -120, outHold = -120, holdT1 = 0, holdT2 = 0;
+let analyzing = false, anSum = 0, anN = 0, anT = 0, holdGain = 0, holdValid = false, state = 'wait';
+const rnd = (a, b) => a + Math.random() * (b - a);
+function inputLevel() {
+  if ((sectionLeft -= dt) <= 0) {
+    sectionLeft = rnd(3, 7);
+    section = src === 'drums' ? [-30, -24, -18, -14][Math.floor(Math.random() * 4)] : [-38, -32, -26, -20, -14, -11][Math.floor(Math.random() * 6)];
+  }
+  const noise = -66 + rnd(-2, 2);
+  if (src === 'voice') {
+    if (gapLeft > 0) { gapLeft -= dt; return noise; }
+    if (Math.random() < 0.012) { gapLeft = rnd(0.4, 1.6); return noise; }
+    syl += dt * rnd(3, 6) * 2 * Math.PI;
+    return section + 5 * Math.sin(syl) + rnd(-2, 2) - 2;
+  }
+  if (src === 'drums') {
+    const env = Math.exp(-(t % 0.6) / 0.09), accent = Math.floor(t / 0.6) % 2 ? 0 : -2;
+    return Math.max(noise, section + accent - 14 + 16 * env + rnd(-1, 1));
+  }
+  syl += dt * 1.3;
+  return section + 3 * Math.sin(syl) + rnd(-1.5, 1.5);
+}
+function step() {
+  t += dt;
+  const inDb = inputLevel();
+  const ms = P.resp / 1000, win = src === 'drums' ? Math.max(ms, Math.min(0.8, ms * 3)) : ms;  // drums: up to 3x longer, so it follows the groove
+  const active = inDb >= P.thr;
+  if (active) { pw += (Math.pow(10, inDb / 10) - pw) * Math.min(1, dt / win); silent = 0; } else silent += dt;
+  const lvl = 10 * Math.log10(Math.max(pw, 1e-12)), crest = src === 'drums' ? 14 : 10;
+  if (P.hold) {
+    if (analyzing) { anT += dt; if (active) { anSum += Math.pow(10, inDb / 10); anN++; } if (anT >= 20) lockAnalyze(); }
+    gain += ((holdValid ? holdGain : gain) - gain) * 0.1;
+    state = analyzing ? 'analyzing' : 'held';
+  } else if (active) {
+    let want = P.tgt - lvl, lim = '';
+    if (want > P.rng) { want = P.rng; lim = 'range'; }
+    if (want < -P.rng) { want = -P.rng; lim = 'range'; }
+    const room = P.ceil - (lvl + crest);
+    if (want > room) { want = Math.max(-P.rng, room); lim = 'ceiling'; }
+    if (Math.abs(want - gain) > (win < 0.1 ? 0.2 : 0.75) || lim) gain += (want - gain) * Math.min(1, dt / ((want > gain ? P.rise : P.fall) / 1000));
+    state = lim || (Math.abs(P.tgt - (lvl + gain)) < 1 ? 'on' : want > gain ? 'boost' : 'cut');
+  } else if (P.ease && silent > 2) { gain *= 0.97; state = 'return'; } else state = 'wait';
+  const g = P.bypass ? 0 : gain + P.trim;  // output trim comes after the leveler, before the ceiling
+  let outDb = inDb + g;
+  const ip = Math.min(-0.1, inDb + crest * 0.8 + rnd(0, 3));  // digital input never passes 0 dBFS
+  let op = ip + g;
+  if (!P.bypass && op > P.ceil) { outDb -= op - P.ceil; op = P.ceil; }
+  bal = Math.max(-3, Math.min(3, bal * 0.995 + rnd(-0.06, 0.06)));  // dB, + means the left side is louder
+  inPk = Math.max(ip, inPk - 0.9); outPk = Math.max(op, outPk - 0.9);
+  if (ip >= inHold) { inHold = ip; holdT1 = 1.5; } else if ((holdT1 -= dt) < 0) inHold -= 0.3;
+  if (op >= outHold) { outHold = op; holdT2 = 1.5; } else if ((holdT2 -= dt) < 0) outHold -= 0.3;
+  const amp = Math.max(0, (inDb + 66) / 60);
+  for (let s = 0; s < 4; s++) wave.push({ a: Math.min(1, amp * (0.55 + Math.random() * 0.45)), up: Math.random() * .25 + .75, an: analyzing, act: active });
+  while (wave.length > WAVE) wave.shift();
+  hist.push({ i: inDb, o: outDb });
+  if (hist.length > HIST) hist.shift();
+}
+function lockAnalyze() {
+  analyzing = false;
+  if (anN < 25) { holdValid = false; return; }
+  const m = 10 * Math.log10(anSum / anN);
+  holdGain = Math.max(-P.rng, Math.min(P.rng, P.tgt - m, P.ceil - (m + 10)));
+  holdValid = true;
+}
+
+// ---------------- glass
+// The backdrop (background and graph) is drawn first, then captured small and blurred. Every glass
+// shape draws that capture, slightly magnified around its own centre (the lens), under a tint, then a
+// rim lit from the light direction, which follows the pointer.
+const blurC = document.createElement('canvas'), bctx = blurC.getContext('2d');
+const hasFilter = 'filter' in bctx;
+let light = { x: -0.5, y: -1 }, lightTarget = { x: -0.5, y: -1 };
+function captureBackdrop() {
+  const bw = Math.round(W / 6), bh = Math.round(H / 6);
+  if (blurC.width !== bw) { blurC.width = bw; blurC.height = bh; }
+  bctx.filter = hasFilter ? 'blur(3px) saturate(1.5)' : 'none';
+  bctx.clearRect(0, 0, bw, bh);
+  bctx.drawImage(cv, 0, 0, cv.width, cv.height, 0, 0, bw, bh);
+}
+function shape(s) {
+  ctx.beginPath();
+  if (s.circle) ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+  else ctx.roundRect(s.x, s.y, s.w, s.h, s.r);
+}
+function bounds(s) { return s.circle ? { x: s.x - s.r, y: s.y - s.r, w: s.r * 2, h: s.r * 2 } : s; }
+function glass(s, o = {}) {
+  const b = bounds(s), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+  const tint = o.tint || C.glass, lens = o.lens ?? 1.05;
+  // shadow under the glass
+  if (o.shadow !== false) {
+    ctx.save(); shape(s); ctx.shadowColor = C.shade; ctx.shadowBlur = o.shadowBlur ?? 22; ctx.shadowOffsetY = o.shadowY ?? 8;
+    ctx.fillStyle = dark ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.2)'; ctx.fill(); ctx.restore();
+  }
+  ctx.save(); shape(s); ctx.clip();
+  // the blurred backdrop, magnified a little around the shape's centre
+  ctx.translate(cx, cy); ctx.scale(lens, lens); ctx.translate(-cx, -cy);
+  ctx.drawImage(blurC, 0, 0, blurC.width, blurC.height, 0, 0, W, H);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.fillStyle = tint; ctx.fillRect(b.x, b.y, b.w, b.h);
+  // light pooling on the lit side, the far edge darker: the glass has thickness
+  const lx = cx + light.x * b.w * 0.5, ly = cy + light.y * b.h * 0.5;
+  const pool = ctx.createRadialGradient(lx, ly, 0, lx, ly, Math.max(b.w, b.h) * 0.9);
+  pool.addColorStop(0, dark ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.45)'); pool.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = pool; ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.restore();
+  // rim: bright where the light hits, a second softer catch on the opposite edge
+  const rx0 = cx + light.x * b.w * 0.5, ry0 = cy + light.y * b.h * 0.5, rx1 = cx - light.x * b.w * 0.5, ry1 = cy - light.y * b.h * 0.5;
+  const rim = ctx.createLinearGradient(rx0, ry0, rx1, ry1);
+  rim.addColorStop(0, C.rim); rim.addColorStop(0.35, 'rgba(255,255,255,0.04)'); rim.addColorStop(0.7, 'rgba(255,255,255,0.02)'); rim.addColorStop(1, dark ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.8)');
+  ctx.save(); shape(s); ctx.strokeStyle = rim; ctx.lineWidth = o.rimWidth ?? 1.4; ctx.stroke();
+  if (!dark) { shape(s); ctx.strokeStyle = C['rim-soft']; ctx.lineWidth = 0.6; ctx.stroke(); }
+  ctx.restore();
+}
+
+// ---------------- drawing helpers
+function text(s, x, y, size, col, align = 'center', weight = 500) {
+  ctx.font = `${weight} ${size}px ${FONT}`; ctx.fillStyle = col; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
+}
+function measure(s, size, weight = 500) { ctx.font = `${weight} ${size}px ${FONT}`; return ctx.measureText(s).width; }
+
+function drawBackdrop() {
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+  const bloom = (x, y, r, c) => { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); };
+  bloom(160, 40, 520, C['bloom-a']); bloom(1000, 600, 560, C['bloom-b']); bloom(560, 700, 420, C['bloom-c']);
+  // grid, labelled every 10 dB at both edges of the plot
+  for (let v = 0; v >= -80; v -= 5) {
+    const y = Math.round(yOf(v)) + .5;
+    ctx.fillStyle = C.grid; ctx.globalAlpha = v % 10 === 0 ? 1 : 0.5; ctx.fillRect(PX0 - 6, y, PX1 - PX0 + 12, 1); ctx.globalAlpha = 1;
+    // the numbers are on the meters at both edges, at these same heights
+  }
+  const x0 = PX0 + 22, x1 = PX1 - 22, n = hist.length, sx = (x1 - x0) / (HIST - 1), X = k => x1 - (n - 1 - k) * sx;
+  if (n > 1) {
+    ctx.beginPath(); ctx.moveTo(X(0), GB);
+    for (let k = 0; k < n; k++) ctx.lineTo(X(k), yOf(hist[k].i));
+    ctx.lineTo(X(n - 1), GB); ctx.closePath();
+    const f = ctx.createLinearGradient(0, GT, 0, GB); f.addColorStop(0, C.in.replace(/[\d.]+\)$/, '.2)')); f.addColorStop(1, C.in.replace(/[\d.]+\)$/, '0)'));
+    ctx.fillStyle = f; ctx.fill();
+    ctx.beginPath(); for (let k = 0; k < n; k++) { const y = yOf(hist[k].i); k ? ctx.lineTo(X(k), y) : ctx.moveTo(X(k), y); }
+    ctx.strokeStyle = C.in; ctx.lineWidth = 1.3; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.save();
+    ctx.beginPath(); for (let k = 0; k < n; k++) { const y = yOf(hist[k].o); k ? ctx.lineTo(X(k), y) : ctx.moveTo(X(k), y); }
+    ctx.strokeStyle = C.data; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.restore();
+  }
+  if (analyzing) { const span = Math.min(n - 1, anT / dt); ctx.fillStyle = C.data; ctx.globalAlpha = .08; ctx.fillRect(X(n - 1 - span), GT, span * sx, GB - GT); ctx.globalAlpha = 1; }
+  const line = (id, col, dash, w) => {
+    const y = Math.round(yOf(P[id])) + .5, hot = hover === 'line-' + id || drag?.id === 'line-' + id;
+    ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = hot ? 2.6 : w;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]);
+  };
+  line('ceil', C.ceil, [5, 5], 1.3); line('thr', C.thr, [7, 5], 1.4); line('tgt', C.data, [], 2);
+  // legend
+  const lx = PX1 - 330, ly = 80;
+  ctx.fillStyle = C.in; ctx.fillRect(lx, ly - 1, 16, 2); text('Input', lx + 22, ly, 12, C.muted, 'left');
+  ctx.fillStyle = C.data; ctx.fillRect(lx + 76, ly - 1.5, 16, 3); text('Output', lx + 98, ly, 12, C.muted, 'left');
+  text('RMS, last 10 s', PX1 - 22, ly, 12, C.muted, 'right');
+}
+
+function drawMeter(x, pk, hold, isIn) {
+  const s = { x, y: MTR.y, w: MTR.w, h: MTR.h, r: MTR.r };
+  glass(s, { shadowBlur: 18 });
+  const cx = x + MTR.w / 2;
+  const zone = v => v > -6 ? C['m-hot'] : v > -18 ? C['m-warn'] : C['m-safe'];
+  // peak readout in its zone colour; a clip light above it once a peak reaches 0 dBFS
+  const clip = hold > -0.5;
+  ctx.fillStyle = clip ? C['m-hot'] : C['meter-off']; ctx.beginPath(); ctx.roundRect(cx - 12, MTR.y + 8, 24, 5, 2.5); ctx.fill();
+  text(hold > -RANGE_DB ? fmt(hold) : '−∞', cx, MTR.y + 25, 11.5, hold > -RANGE_DB ? zone(hold) : C.muted, 'center', 600);
+  text(isIn ? 'In' : 'Out', cx, MTR.y + 41, 11, C.muted, 'center', 500);
+  // bars on the graph side's far edge, scale between them and the graph: In has numbers on its right, Out on its left
+  const bw = 5, gap = 3, bx = isIn ? x + 12 : x + MTR.w - 12 - bw * 2 - gap;
+  const g = ctx.createLinearGradient(0, GB, 0, GT);
+  const f18 = (RANGE_DB - 18) / RANGE_DB, f6 = (RANGE_DB - 6) / RANGE_DB;
+  g.addColorStop(0, C['m-safe']); g.addColorStop(f18 - .001, C['m-safe']); g.addColorStop(f18, C['m-warn']);
+  g.addColorStop(f6 - .001, C['m-warn']); g.addColorStop(f6, C['m-hot']); g.addColorStop(1, C['m-hot']);
+  for (let ch = 0; ch < 2; ch++) {
+    const xx = bx + ch * (bw + gap);
+    ctx.fillStyle = C['meter-off']; ctx.beginPath(); ctx.roundRect(xx, GT, bw, GB - GT, 2.5); ctx.fill();
+    const p = Math.min(-0.1, pk + (ch === 0 ? bal / 2 : -bal / 2));  // left bar, then right
+    if (p > -RANGE_DB) { const top = yOf(Math.min(0, p)); ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(xx, top, bw, GB - top, 2.5); ctx.fill(); }
+    if (hold > -RANGE_DB) { ctx.fillStyle = zone(hold); ctx.fillRect(xx - 1, yOf(Math.min(0, hold)) - 1, bw + 2, 2); }
+  }
+  // the same marks as the graph: a tick every 5 dB, a number every 10, at the same heights
+  const tickX = isIn ? bx + bw * 2 + gap + 3 : bx - 7;
+  for (let v = 0; v >= -80; v -= 5) {
+    const y = Math.round(yOf(v)) + .5, major = v % 10 === 0;
+    ctx.fillStyle = C.muted; ctx.globalAlpha = major ? .9 : .5; ctx.fillRect(tickX, y, major ? 4 : 3, 1); ctx.globalAlpha = 1;
+    if (major) text(fmt(v, 0), isIn ? tickX + 7 : tickX - 3, y, 11, C.muted, isIn ? 'left' : 'right', 500);
+  }
+  // stereo balance: L and R at the ends of a short track, the dot leans to the louder side
+  const by = GB + 11, half = 15, lean = Math.max(-1, Math.min(1, bal / 4));
+  text('L', cx - half - 7, by, 11, C.muted, 'center', 600); text('R', cx + half + 7, by, 11, C.muted, 'center', 600);
+  ctx.fillStyle = C['meter-off']; ctx.beginPath(); ctx.roundRect(cx - half, by - 1.5, half * 2, 3, 1.5); ctx.fill();
+  ctx.fillStyle = C.muted; ctx.fillRect(cx - .5, by - 4, 1, 8);
+  ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(cx - lean * half, by, 3.5, 0, 7); ctx.fill();
+}
+
+function drawKnob(k) {
+  const v = P[k.id], pos = toNorm(k, v), ang = A0 + pos * (A1 - A0);
+  const { x, y, r } = k, ringR = r + 9, hot = hover === k.id || drag?.id === k.id;
+  const col = k.col ? C[k.col] : C.accent, colText = (k.col && C[k.col + '-text']) || C.ink;
+  const arc = (a0, a1, rad) => { ctx.beginPath(); ctx.arc(x, y, rad, a0 - Math.PI / 2, a1 - Math.PI / 2); };
+  ctx.lineCap = 'round';
+  arc(A0, A1, ringR); ctx.strokeStyle = dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)'; ctx.lineWidth = 6; ctx.stroke();
+  if (pos > 0.003) {
+    ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 0;
+    arc(A0, ang, ringR); ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.stroke(); ctx.restore();
+  }
+  if (k.id === 'tgt' || k.id === 'thr') {
+    const lv = k.id === 'tgt' ? avg('o') : avg('i');
+    if (lv >= k.min && lv <= k.max) {
+      const la = A0 + (lv - k.min) / (k.max - k.min) * (A1 - A0);
+      ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(x + Math.sin(la) * ringR, y - Math.cos(la) * ringR, 2.2, 0, 7); ctx.fill();
+    }
+  }
+  glass({ circle: true, x, y, r }, { tint: hot ? C['glass-strong'] : C.glass, lens: 1.12, shadowBlur: 16, shadowY: 6 });
+  // pointer: a short coloured capsule set into the glass
+  const p0 = r * 0.42, p1 = r * 0.78;
+  ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.lineWidth = Math.max(3, r * 0.1); ctx.shadowColor = col; ctx.shadowBlur = 0;
+  ctx.beginPath(); ctx.moveTo(x + Math.sin(ang) * p0, y - Math.cos(ang) * p0); ctx.lineTo(x + Math.sin(ang) * p1, y - Math.cos(ang) * p1); ctx.stroke(); ctx.restore();
+  if (k.ends) {  // which way is which: the start of the sweep is fast, the end slow
+    const ex = Math.sin(A1) * (ringR + 2), ey = -Math.cos(A1) * (ringR + 2) + 10;
+    text(k.ends[0], x - ex, y + ey, 11, C.muted, 'right', 500);
+    text(k.ends[1], x + ex, y + ey, 11, C.muted, 'left', 500);
+  }
+  if (focusId === k.id) { ctx.beginPath(); ctx.arc(x, y, ringR + 8, 0, 7); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke(); }
+  const ly = y + ringR + 16;
+  text(k.label, x, ly, k.id === 'tgt' ? 15 : 13.5, C.ink, 'center', 600);
+  text(k.val(v), x, ly + 17, 12.5, hot ? colText : C.muted, 'center', 500);
+}
+function avg(f) { const n = Math.min(40, hist.length); let s = 0, c = 0; for (let i = hist.length - n; i < hist.length; i++) if (hist[i].i >= P.thr) { s += Math.pow(10, hist[i][f] / 10); c++; } return c ? 10 * Math.log10(s / c) : -90; }
+
+// Ride / Hold: a glass capsule whose selected side is a brighter droplet that slides across
+const SEG = { x: 560 - 76, y: 578, w: 152, h: 30, r: 15 };
+let thumbX = SEG.x + 2;
+const btn = {};
+function drawSegment() {
+  btn.ride = [SEG.x, SEG.y, SEG.w / 2, SEG.h]; btn.hold = [SEG.x + SEG.w / 2, SEG.y, SEG.w / 2, SEG.h];
+  glass(SEG, { tint: dark ? 'rgba(0,0,0,.18)' : 'rgba(0,0,0,.05)', shadow: false, lens: 1 });
+  const tx = SEG.x + 2 + (P.hold ? SEG.w / 2 - 2 : 0);
+  thumbX = reduced ? tx : thumbX + (tx - thumbX) * 0.25;
+  glass({ x: thumbX, y: SEG.y + 2, w: SEG.w / 2 - 2, h: SEG.h - 4, r: 13 }, { tint: C['glass-strong'], lens: 1.2, shadowBlur: 8, shadowY: 2 });
+  text('Ride', SEG.x + SEG.w / 4, SEG.y + SEG.h / 2 + .5, 13.5, !P.hold ? C.ink : (hover === 'ride' ? C.label : C.muted), 'center', 600);
+  text('Hold', SEG.x + SEG.w * 3 / 4, SEG.y + SEG.h / 2 + .5, 13.5, P.hold ? C.ink : (hover === 'hold' ? C.label : C.muted), 'center', 600);
+  if (focusId === 'mode') { ctx.beginPath(); ctx.roundRect(SEG.x - 4, SEG.y - 4, SEG.w + 8, SEG.h + 8, 19); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke(); }
+}
+
+const FADE_TOP = DECK.y - 44;
+function drawDeckBlend() {
+  // the blurred graph fades in band by band, then the window colour settles over it: no edge, no box
+  const bands = 16, span = H - FADE_TOP;
+  for (let i = 0; i < bands; i++) {
+    const y0 = FADE_TOP + span * i / bands;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, y0, W, span / bands + 1); ctx.clip();
+    ctx.globalAlpha = Math.min(1, Math.pow((i + 1) / bands, 0.8));
+    ctx.drawImage(blurC, 0, 0, blurC.width, blurC.height, 0, 0, W, H);
+    ctx.restore();
+  }
+  const bg = C.bg.replace('#', ''), rgb = [0, 2, 4].map(i => parseInt(bg.substr(i, 2), 16)).join(',');
+  const f = ctx.createLinearGradient(0, FADE_TOP, 0, H);
+  f.addColorStop(0, `rgba(${rgb},0)`); f.addColorStop(.4, `rgba(${rgb},.62)`); f.addColorStop(1, `rgba(${rgb},.9)`);
+  ctx.fillStyle = f; ctx.fillRect(0, FADE_TOP, W, span);
+}
+function drawDeck() {
+  drawDeckBlend();
+  knobs.forEach(drawKnob);
+  drawSegment();
+  // how far the output is from the target, bottom-left; latency under it
+  const lv = avg('o'), active = lv > -89 && !P.hold, d = lv - P.tgt;
+  const fb = { x: DECK.x - 136, y: 548, w: 124, h: 58, r: 22 };
+  glass(fb, { shadowBlur: 18 });
+  text('From target', fb.x + 16, fb.y + 17, 12, C.muted, 'left', 500);
+  const dTxt = !active ? (P.hold ? 'Holding' : 'Waiting') : Math.abs(d) < 1 ? 'On target' : fmt(Math.abs(d)) + (d > 0 ? ' dB over' : ' dB under');
+  text(dTxt, fb.x + fb.w - 16, fb.y + 39, Math.abs(d) < 1 || !active ? 17 : 17, active && Math.abs(d) < 1 ? C['data-text'] : C.ink, 'right', 700);
+  text('Latency 5.0 ms', fb.x + 4, GB + 22, 11, C.muted, 'left');
+  // More: rise, fall and output trim live in a panel above this button
+  btn.more = [DECK.x + 116, SEG.y, 128, SEG.h];
+  glass({ x: btn.more[0], y: SEG.y, w: 128, h: SEG.h, r: 15 }, { tint: moreOpen ? C.on : C.glass, shadow: false, lens: 1.06 });
+  text('Rise, fall, trim', btn.more[0] + 58, SEG.y + SEG.h / 2 + .5, 12.5, hover === 'more' || moreOpen ? C.ink : C.label, 'center', 600);
+  ctx.save(); ctx.strokeStyle = C.label; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const chx = btn.more[0] + 114, chy = SEG.y + SEG.h / 2; ctx.beginPath();
+  if (moreOpen) { ctx.moveTo(chx - 4, chy + 2); ctx.lineTo(chx, chy - 2); ctx.lineTo(chx + 4, chy + 2); } else { ctx.moveTo(chx - 4, chy - 2); ctx.lineTo(chx, chy + 2); ctx.lineTo(chx + 4, chy - 2); }
+  ctx.stroke(); ctx.restore();
+  if (focusId === 'more') { ctx.beginPath(); ctx.roundRect(btn.more[0] - 3, SEG.y - 3, 134, SEG.h + 6, 18); ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.stroke(); }
+  // applied gain, a glass readout bottom-right
+  const g = P.bypass ? 0 : gain, gb = { x: DECK.x + DECK.w + 12, y: 548, w: 124, h: 58, r: 22 };
+  glass(gb, { shadowBlur: 18 });
+  text('Applied gain', gb.x + 16, gb.y + 17, 12, C.muted, 'left', 500);
+  text(sgn(g) + ' dB', gb.x + gb.w - 16, gb.y + 39, 22, g > .05 ? C.boost : g < -.05 ? C.cut : C.ink, 'right', 700);
+}
+
+function powerIcon(cx, cy, col) {
+  ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx, cy + 1, 7, -Math.PI / 2 + .7, 1.5 * Math.PI - .7); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx, cy); ctx.stroke(); ctx.restore();
+}
+function themeIcon(cx, cy, col) {
+  ctx.save(); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  if (dark) {  // moon
+    ctx.beginPath(); ctx.arc(cx, cy, 7, 0, 7); ctx.fill();
+    ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(cx + 4, cy - 3, 6, 0, 7); ctx.fill();
+  } else {     // sun
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, 7); ctx.fill();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 6.5, cy + Math.sin(a) * 6.5); ctx.lineTo(cx + Math.cos(a) * 9, cy + Math.sin(a) * 9); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function drawHeader() {
+  glass(HEADER, { shadowBlur: 20 });
+  // mark: a level held between two walls
+  ctx.fillStyle = C.ink; ctx.beginPath(); ctx.roundRect(30, 22, 20, 3, 1.5); ctx.roundRect(30, 39, 20, 3, 1.5); ctx.fill();
+  ctx.beginPath(); for (let i = 0; i <= 20; i++) { const xx = 30 + i, yy = 32 - Math.sin(i / 20 * 4 * Math.PI) * 4.5 * (1 - i / 28); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
+  ctx.strokeStyle = C.ink; ctx.lineWidth = 1.8; ctx.stroke();
+  text('Corridor', 60, 33, 16, C.ink, 'left', 700);
+  text('Leveler', 60 + measure('Corridor', 16, 700) + 6, 33, 16, C.muted, 'left', 500);
+  // preset menu, A / B, undo and redo
+  btn.preset = [200, 18, 156, 30];
+  const edited = presetEdited();
+  glass({ x: 200, y: 18, w: 156, h: 30, r: 15 }, { tint: menuOpen ? C.on : C.glass, shadow: false, lens: 1.06 });
+  let pn = presetName + (edited ? ' (edited)' : '');
+  while (measure(pn, 13, 600) > 116 && pn.length > 4) pn = pn.slice(0, -2) + '\u2026';
+  text(pn, 214, 33.5, 13, hover === 'preset' ? C.ink : C.label, 'left', 600);
+  ctx.save(); ctx.strokeStyle = C.label; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(336, 31); ctx.lineTo(340, 35); ctx.lineTo(344, 31); ctx.stroke(); ctx.restore();
+  btn.a = [364, 18, 36, 30]; btn.b = [400, 18, 36, 30];
+  glass({ x: 364, y: 18, w: 72, h: 30, r: 15 }, { tint: dark ? 'rgba(0,0,0,.18)' : 'rgba(0,0,0,.05)', shadow: false, lens: 1 });
+  glass({ x: (slot === 'A' ? 364 : 400) + 2, y: 20, w: 32, h: 26, r: 13 }, { tint: C['glass-strong'], shadow: false, lens: 1.15 });
+  text('A', 382, 33.5, 13, slot === 'A' ? C.ink : C.muted, 'center', 700); text('B', 418, 33.5, 13, slot === 'B' ? C.ink : C.muted, 'center', 700);
+  btn.undo = [444, 18, 30, 30]; btn.redo = [478, 18, 30, 30];
+  for (const id of ['undo', 'redo']) {
+    const [bx, by, bw] = btn[id], cx = bx + bw / 2, cy = by + bw / 2, ok = id === 'undo' ? undoStack.length : redoStack.length;
+    glass({ circle: true, x: cx, y: cy, r: bw / 2 }, { shadow: false, lens: 1.1 });
+    ctx.save(); ctx.globalAlpha = ok ? 1 : .35; ctx.strokeStyle = hover === id && ok ? C.ink : C.label; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // a hooked arrow: undo points back (left), redo forward (right)
+    const d = id === 'undo' ? -1 : 1;
+    ctx.beginPath(); ctx.moveTo(cx - d * 5, cy + 5); ctx.quadraticCurveTo(cx - d * 5, cy - 4, cx + d * 5, cy - 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + d * 1.5, cy - 7.5); ctx.lineTo(cx + d * 5, cy - 4); ctx.lineTo(cx + d * 1.5, cy - 0.5); ctx.stroke(); ctx.restore();
+  }
+  // right: return to 0 dB (capsule), theme and bypass (round glass buttons)
+  btn.ease = [HEADER.x + HEADER.w - 296, 18, 206, 30];
+  // status: a dot and a short sentence, centred in the space left between
+  const st = statusText(), sx0 = 520, sx1 = btn.ease[0] - 12, scx = (sx0 + sx1) / 2, sw = Math.min(measure(st, 13.5), sx1 - sx0 - 20);
+  ctx.fillStyle = statusColour(); ctx.beginPath(); ctx.arc(scx - sw / 2 - 9, 33, 4, 0, 7); ctx.fill();
+  text(st, scx + 4, 33.5, 13.5, C.ink, 'center', 500);
+  btn.theme = [HEADER.x + HEADER.w - 80, 18, 30, 30];
+  btn.bypass = [HEADER.x + HEADER.w - 42, 18, 30, 30];
+  const e = { x: btn.ease[0], y: 18, w: 206, h: 30, r: 15 };
+  glass(e, { tint: P.ease ? C.on : C.glass, shadow: false, lens: 1.08 });
+  text('Return to 0 dB in silence', e.x + e.w / 2, 33.5, 13, P.ease ? C['accent-text'] : (hover === 'ease' ? C.ink : C.label), 'center', 600);
+  for (const id of ['theme', 'bypass']) {
+    const [bx, by, bw] = btn[id], c = { circle: true, x: bx + bw / 2, y: by + bw / 2, r: bw / 2 };
+    const on = id === 'bypass' && P.bypass;
+    glass(c, { tint: on ? C.on : C.glass, shadow: false, lens: 1.1 });
+    const col = on ? C.ink : hover === id ? C.ink : C.label;
+    id === 'bypass' ? powerIcon(c.x, c.y, col) : themeIcon(c.x, c.y, col);
+  }
+  if (['ease', 'bypass', 'theme', 'preset', 'a', 'b', 'undo', 'redo'].includes(focusId)) {
+    const [bx, by, bw, bh] = btn[focusId]; ctx.beginPath(); ctx.roundRect(bx - 3, by - 3, bw + 6, bh + 6, (bh + 6) / 2); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+
+function drawTags() {
+  const tags = [['ceil', 'Ceiling', C.ceil, C['ceil-text']], ['thr', 'Threshold', C.thr, C['thr-text']], ['tgt', 'Target', C.data, C['data-text']]];
+  for (const [id, name, col, colText] of tags) {
+    if (!(hover === 'line-' + id || drag?.id === 'line-' + id || hover === id || drag?.id === id || editing?.id === id)) continue;
+    const lineY = yOf(P[id]), under = lineY > FADE_TOP + 24;
+    const y = under ? FADE_TOP + 22 : lineY;
+    const label = name + '  ' + fmt(P[id]), w = measure(label, 12, 600) + (under ? 40 : 28);
+    const s = { x: PX0 + 26, y: y - 12, w, h: 24, r: 12 };
+    glass(s, { shadow: false, lens: 1.06 });
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(s.x + 11, y, 3.5, 0, 7); ctx.fill();
+    text(label, s.x + 20, y + .5, 12, colText, 'left', 600);
+    if (under) { ctx.fillStyle = colText; ctx.beginPath(); const ax = s.x + w - 12; ctx.moveTo(ax - 4, y - 2); ctx.lineTo(ax + 4, y - 2); ctx.lineTo(ax, y + 3); ctx.fill(); }
+  }
+}
+
+const STATES = {
+  on: ['On target', 'data'], boost: ['Boosting', 'boost'], cut: ['Cutting', 'cut'], ceiling: ['Held back by the ceiling', 'ceil'],
+  range: ['At the edge of the range', 'rng'], wait: ['Below the threshold, not adjusting', 'muted'], return: ['Easing back to 0 dB', 'label'],
+  held: ['Holding a fixed gain', 'ink'], analyzing: ['Analyzing', 'ink'],
+};
+function statusText() {
+  if (P.bypass) return 'Bypassed';
+  if (state === 'held') return holdValid ? 'Holding ' + sgn(holdGain) + ' dB' : 'Hold: press Analyze, then play';
+  if (state === 'analyzing') return 'Analyzing ' + anT.toFixed(1) + ' s \u00b7 press Lock';
+  return STATES[state][0] + (state === 'boost' || state === 'cut' ? ' (' + sgn(gain) + ' dB)' : '');
+}
+const statusColour = () => P.bypass ? C.muted : C[(STATES[state] || STATES.wait)[1]];
+
+function draw() {
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  light.x += (lightTarget.x - light.x) * 0.08; light.y += (lightTarget.y - light.y) * 0.08;
+  drawBackdrop();
+  captureBackdrop();
+  drawDeck();
+  drawMeter(12, inPk, inHold, true);
+  drawMeter(W - 12 - MTR.w, P.bypass ? inPk : outPk, P.bypass ? inHold : outHold, false);
+  drawTags();
+  drawHeader();
+}
+
+// ---------------- size
+let scale = 1;
+function fit() { const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1; scale = r.width / W * d; cv.width = Math.round(r.width * d); cv.height = Math.round(r.width * d * H / W); }
+new ResizeObserver(fit).observe(cv); fit();
+
+// ---------------- interaction
+let hover = null, drag = null, focusId = null;
+const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; };
+const inR = ([x, y], r) => r && x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
+function hitTest(p) {
+  for (const k of knobs) if (Math.hypot(p[0] - k.x, p[1] - k.y) < k.r + 14) return k.id;
+  for (const id of ['ride', 'hold', 'more', 'preset', 'a', 'b', 'undo', 'redo', 'ease', 'theme', 'bypass']) if (inR(p, btn[id])) return id;
+  const overDeck = inR(p, [DECK.x, DECK.y, DECK.w, DECK.h]);
+  if (!overDeck && p[0] > PX0 + 22 && p[0] < PX1 - 22 && p[1] > GT - 8 && p[1] < GB + 8) {
+    let best = null, bd = 8;
+    for (const id of ['tgt', 'thr', 'ceil']) { const d = Math.abs(yOf(P[id]) - p[1]); if (d < bd) { bd = d; best = 'line-' + id; } }
+    return best;
+  }
+  return null;
+}
+const lim = (id, v) => { const k = knobs.find(k => k.id === id); return Math.min(k.max, Math.max(k.min, v)); };
+function syncInput(k) { const el = document.getElementById('k-' + k.id); el.min = 0; el.max = 1000; el.step = 1; el.value = Math.round(toNorm(k, P[k.id]) * 1000); el.setAttribute('aria-valuetext', k.val(P[k.id])); }
+function set(id, v) {
+  const k = knobs.find(k => k.id === id) || EXTRA.find(k => k.id === id);
+  P[id] = Math.min(k.max, Math.max(k.min, v));
+  if (knobs.includes(k)) syncInput(k); else syncExtra();
+}
+// ---- undo / redo: a snapshot before every change; A / B: two complete settings to compare
+let undoStack = [], redoStack = [], slot = 'A', slots = { A: null, B: null };
+function pushUndo() { const s0 = snap(); if (!undoStack.length || !same(undoStack[undoStack.length - 1], s0)) { undoStack.push(s0); if (undoStack.length > 100) undoStack.shift(); } redoStack = []; }
+function apply(s0) { KEYS.forEach(k => P[k] = s0[k]); knobs.forEach(syncInput); syncExtra(); }
+function undo() { if (!undoStack.length) return; redoStack.push(snap()); apply(undoStack.pop()); }
+function redo() { if (!redoStack.length) return; undoStack.push(snap()); apply(redoStack.pop()); }
+function switchSlot(to) {
+  if (to === slot) return;
+  pushUndo(); slots[slot] = snap();
+  if (slots[to]) apply(slots[to]); else slots[to] = snap();  // B starts as a copy of A
+  slot = to;
+}
+const presetEdited = () => { const pr = PRESETS.find(p => p[0] === presetName); return pr && !KEYS.every(k => pr[1][k] === P[k]); };
+// ---- preset menu
+const menu = document.getElementById('preset-menu');
+let menuOpen = false;
+menu.innerHTML = '<small>Presets</small>' + PRESETS.map(([n]) => `<button role="menuitemradio" data-p="${n}">${n}</button>`).join('');
+function setMenu(open) {
+  menuOpen = open; menu.hidden = !open;
+  menu.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', b.dataset.p === presetName));
+  if (open) menu.querySelector('[aria-checked="true"]')?.focus();
+}
+menu.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pushUndo(); presetName = b.dataset.p; apply(PRESETS.find(p => p[0] === presetName)[1]); setMenu(false); document.getElementById('b-preset').focus({ preventScroll: true }); });
+menu.addEventListener('keydown', e => {
+  const items = [...menu.querySelectorAll('button')], i = items.indexOf(document.activeElement);
+  if (e.key === 'Escape') { setMenu(false); document.getElementById('b-preset').focus({ preventScroll: true }); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+});
+document.addEventListener('pointerdown', e => { if (menuOpen && !menu.contains(e.target) && !inR(pt(e), btn.preset)) setMenu(false); });
+// ---- rise, fall and output trim panel
+const more = document.getElementById('more');
+let moreOpen = false;
+function setMore(open) { moreOpen = open; more.hidden = !open; document.getElementById('b-more').setAttribute('aria-expanded', open); }
+function syncExtra() {
+  EXTRA.forEach(k => {
+    const r = document.getElementById('m-' + k.id), tx = document.getElementById('t-' + k.id);
+    r.value = Math.round(toNorm(k, P[k.id]) * 1000); r.setAttribute('aria-valuetext', k.val(P[k.id]));
+    if (document.activeElement !== tx) tx.value = k.val(P[k.id]);
+  });
+}
+EXTRA.forEach(k => {
+  const r = document.getElementById('m-' + k.id), tx = document.getElementById('t-' + k.id);
+  r.addEventListener('pointerdown', pushUndo); r.addEventListener('keydown', e => { if (e.key.startsWith('Arrow')) pushUndo(); });
+  r.addEventListener('input', () => set(k.id, fromNorm(k, +r.value / 1000)));
+  const commit = () => { const n = parseFloat(tx.value.replace(',', '.').replace('\u2212', '-')); if (!isNaN(n)) { pushUndo(); set(k.id, n); } syncExtra(); };
+  tx.addEventListener('change', commit); tx.addEventListener('keydown', e => { if (e.key === 'Enter') { commit(); tx.select(); } });
+});
+syncExtra();
+// ---- first-run tip, shown once per browser
+const tip = document.getElementById('tip');
+let seen = false; try { seen = localStorage.getItem('corridor-tip') === '1'; } catch (e) {}
+tip.hidden = seen;
+document.getElementById('tip-ok').addEventListener('click', () => { tip.hidden = true; try { localStorage.setItem('corridor-tip', '1'); } catch (e) {} });
+function setTheme(isDark) { dark = isDark; unit.dataset.ptheme = isDark ? 'dark' : 'light'; readTokens(); }
+function click(id) {
+  if (id === 'ride') { P.hold = false; analyzing = false; }
+  else if (id === 'hold') { if (!P.hold) { P.hold = true; holdGain = gain; holdValid = true; } }
+  else if (id === 'analyze') { if (analyzing) lockAnalyze(); else { analyzing = true; anSum = 0; anN = 0; anT = 0; } }
+  else if (id === 'ease') { pushUndo(); P.ease = !P.ease; }
+  else if (id === 'more') setMore(!moreOpen);
+  else if (id === 'preset') setMenu(!menuOpen);
+  else if (id === 'a' || id === 'b') switchSlot(id.toUpperCase());
+  else if (id === 'undo') undo();
+  else if (id === 'redo') redo();
+  else if (id === 'bypass') P.bypass = !P.bypass;
+  else if (id === 'theme') setTheme(!dark);
+}
+cv.addEventListener('pointermove', e => {
+  const p = pt(e);
+  if (!reduced) lightTarget = { x: Math.max(-1, Math.min(1, (p[0] / W - 0.5) * 2)) * 0.8, y: -0.9 + (p[1] / H) * 0.6 };
+  if (drag) {
+    if (drag.id.startsWith('line-')) set(drag.id.slice(5), vOf(p[1]));
+    else { const k = knobs.find(k => k.id === drag.id); set(k.id, fromNorm(k, toNorm(k, drag.v0) + (drag.y0 - p[1]) / (e.shiftKey ? 900 : 220))); }
+    return;
+  }
+  hover = hitTest(p);
+  cv.style.cursor = !hover ? 'default' : hover.startsWith('line-') || knobs.some(k => k.id === hover) ? 'ns-resize' : 'pointer';
+});
+cv.addEventListener('pointerleave', () => { if (!drag) hover = null; lightTarget = { x: -0.5, y: -1 }; });
+cv.addEventListener('pointerdown', e => {
+  const p = pt(e), id = hitTest(p); if (!id) return;
+  if (e.altKey && knobs.some(k => k.id === id)) { pushUndo(); set(id, DEF[id]); return; }  // Alt-click resets a dial
+  if (knobs.some(k => k.id === id) || id.startsWith('line-')) { pushUndo(); drag = { id, y0: p[1], v0: P[id.replace('line-', '')] }; cv.setPointerCapture(e.pointerId); }
+  else click(id);
+});
+const endDrag = () => { drag = null; };
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => cv.addEventListener(ev, endDrag));
+window.addEventListener('blur', endDrag);
+cv.addEventListener('touchstart', e => { const tp = e.touches[0]; if (tp && hitTest(pt(tp))) e.preventDefault(); }, { passive: false });
+cv.addEventListener('dblclick', e => { const k = knobs.find(k => k.id === hitTest(pt(e))); if (k) { e.preventDefault(); openEditor(k); } });
+// the value editor: a small glass field over the dial's value
+const editor = document.getElementById('dial-edit');
+let editing = null;
+function openEditor(k) {
+  editing = k; drag = null;
+  editor.style.left = (k.x / W * 100) + '%';
+  editor.style.top = ((k.y + k.r + 9 + 37) / H * 100) + '%';
+  editor.value = k.log ? String(Math.round(P[k.id])) : String(+P[k.id].toFixed(1));
+  editor.setAttribute('aria-label', k.label + (k.unit ? ' in ' + k.unit : ''));
+  editor.hidden = false; editor.focus(); editor.select();
+}
+function closeEditor(commit) {
+  if (!editing) return;
+  if (commit) {
+    const raw = editor.value.replace(',', '.').replace('\u2212', '-'), n = parseFloat(raw);
+    if (!isNaN(n)) pushUndo(), set(editing.id, editing.log && /s\s*$/i.test(raw) && !/ms\s*$/i.test(raw) ? n * 1000 : n);  // "0.5 s" works for Response
+  }
+  const k = editing; editing = null; editor.hidden = true;
+  document.getElementById('k-' + k.id).focus({ preventScroll: true });
+}
+editor.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); closeEditor(true); } else if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); } });
+editor.addEventListener('blur', () => closeEditor(true));
+let lastWheel = 0;
+cv.addEventListener('wheel', e => { const k = knobs.find(k => k.id === hitTest(pt(e))); if (!k) return; e.preventDefault(); if (performance.now() - lastWheel > 600) pushUndo(); lastWheel = performance.now(); set(k.id, fromNorm(k, toNorm(k, P[k.id]) - Math.sign(e.deltaY) / 60)); }, { passive: false });
+knobs.forEach(k => {
+  const el = document.getElementById('k-' + k.id); syncInput(k);
+  el.addEventListener('keydown', e => { if (e.key.startsWith('Arrow') || e.key === 'PageUp' || e.key === 'PageDown') pushUndo(); });
+  el.addEventListener('input', () => { P[k.id] = fromNorm(k, +el.value / 1000); el.setAttribute('aria-valuetext', k.val(P[k.id])); });
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); openEditor(k); } });  // Enter types a value
+  el.addEventListener('focus', () => focusId = k.id); el.addEventListener('blur', () => focusId = null);
+});
+[['b-preset', 'preset'], ['b-a', 'a'], ['b-b', 'b'], ['b-undo', 'undo'], ['b-redo', 'redo'], ['b-more', 'more'], ['b-mode', 'mode'], ['b-ease', 'ease'], ['b-theme', 'theme'], ['b-bypass', 'bypass']].forEach(([elId, id]) => {
+  const el = document.getElementById(elId);
+  el.addEventListener('click', () => click(id === 'mode' ? (P.hold ? 'ride' : 'hold') : id));
+  el.addEventListener('focus', () => focusId = id); el.addEventListener('blur', () => focusId = null);
+});
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input[type=text], textarea, [contenteditable]')) return;  // typing a value keeps its own undo
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+  else if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+  else if (!mod && e.key.toLowerCase() === 'a' && P.hold) { e.preventDefault(); click('analyze'); }
+});
+const srcBtns = { voice: 's-voice', drums: 's-drums', mix: 's-mix' };
+Object.entries(srcBtns).forEach(([s, elId]) => document.getElementById(elId).addEventListener('click', () => {
+  src = s; sectionLeft = 0; Object.values(srcBtns).forEach(i => document.getElementById(i).setAttribute('aria-pressed', i === elId));
+}));
+const pauseBtn = document.getElementById('s-pause');
+pauseBtn.addEventListener('click', () => { paused = !paused; pauseBtn.setAttribute('aria-pressed', paused); pauseBtn.textContent = paused ? 'Resume' : 'Pause'; });
+
+// ---------------- analysis panel
+const drawer = document.getElementById('drawer'), anBtn = document.getElementById('an-btn'), anRead = document.getElementById('an-read');
+const wcv = document.getElementById('wave'), wctx = wcv.getContext('2d');
+anBtn.addEventListener('click', () => click('analyze'));
+function fitWave() { const r = wcv.getBoundingClientRect(), d = window.devicePixelRatio || 1; wcv.width = Math.max(1, Math.round(r.width * d)); wcv.height = Math.max(1, Math.round(r.height * d)); }
+new ResizeObserver(fitWave).observe(wcv);
+function drawDrawer() {
+  const open = P.hold;
+  if (drawer.classList.contains('open') !== open) { drawer.classList.toggle('open', open); drawer.setAttribute('aria-hidden', !open); anBtn.tabIndex = open ? 0 : -1; }
+  if (!open) return;
+  anBtn.textContent = analyzing ? 'Lock' : holdValid ? 'Analyze again' : 'Analyze';
+  anBtn.setAttribute('aria-pressed', analyzing);
+  const m = anN ? 10 * Math.log10(anSum / anN) : null;
+  const read = analyzing
+    ? `<span class="hot">Analyzing</span> <b>${anT.toFixed(1)} s</b><br>Above threshold <b>${(anN * dt).toFixed(1)} s</b><br>Measured <b>${m === null ? '–' : fmt(m) + ' dB RMS'}</b><br>Locks by itself at 20 s`
+    : holdValid ? `Holding <span class="hot">${sgn(holdGain)} dB</span><br>Play a typical section and press Analyze again to re-measure.`
+    : 'Press Analyze, then play a typical section.';
+  if (anRead.innerHTML !== read) anRead.innerHTML = read;
+  const w = wcv.width, h = wcv.height, d = window.devicePixelRatio || 1, mid = h / 2;
+  wctx.clearRect(0, 0, w, h);
+  wctx.fillStyle = C.grid; wctx.fillRect(0, Math.round(mid), w, d);
+  const thrA = Math.min(1, Math.max(0, (P.thr + 66) / 60)) * (mid - 8 * d);
+  wctx.setLineDash([4 * d, 4 * d]); wctx.strokeStyle = C.thr; wctx.globalAlpha = .8; wctx.lineWidth = d;
+  [mid - thrA, mid + thrA].forEach(y => { wctx.beginPath(); wctx.moveTo(0, y); wctx.lineTo(w, y); wctx.stroke(); });
+  wctx.setLineDash([]); wctx.globalAlpha = 1;
+  const n = wave.length, stp = w / WAVE;
+  for (let i = 0; i < n; i++) {
+    const s = wave[i], x = w - (n - i) * stp, a = s.a * (mid - 8 * d);
+    wctx.fillStyle = s.an ? C.data : C.in; wctx.globalAlpha = s.act ? 1 : .35;
+    wctx.fillRect(x, mid - a * s.up, Math.max(d, stp * .9), a * s.up + a);
+  }
+  wctx.globalAlpha = 1;
+  wctx.font = `500 ${12 * d}px ${FONT}`; wctx.fillStyle = C.muted; wctx.textBaseline = 'top';
+  wctx.fillText('Input, last 6 s. Dashed: threshold', 12 * d, 9 * d);
+}
+
+// ---------------- loop
+for (let i = 0; i < HIST; i++) step();
+const status = document.getElementById('status'), announce = document.getElementById('announce');
+let acc = 0, last = performance.now(), lastStatus = '', lastSpoken = '', cand = '', candSince = 0;
+function spoken() {
+  if (P.bypass) return 'Bypassed';
+  if (P.hold) return analyzing ? 'Analyzing. Press Lock after a typical section.' : holdValid ? 'Holding ' + sgn(holdGain) + ' dB' : 'Not enough sound above the threshold. Analyze again.';
+  return (STATES[state] || STATES.wait)[0];
+}
+function loop(now) {
+  acc += Math.min(0.25, (now - last) / 1000); last = now;
+  if (!paused) while (acc >= dt) { step(); acc -= dt; } else acc = 0;
+  draw(); drawDrawer();
+  const sp = spoken();
+  if (sp !== cand) { cand = sp; candSince = now; } else if (sp !== lastSpoken && now - candSince > 1500) { lastSpoken = sp; announce.textContent = sp; }
+  const s = statusText();
+  if (s !== lastStatus) { lastStatus = s; status.textContent = s; status.style.setProperty('--dot', statusColour()); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
