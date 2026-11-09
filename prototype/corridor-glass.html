@@ -60,7 +60,7 @@ header.page p { margin: 0; color: var(--page-muted); max-width: 62ch; line-heigh
 .stage { min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; }
 .unit { display: grid; min-width: 0; }
 @media (max-width: 760px) { .unit { min-width: 760px; } .narrow-note { display: block; } }
-.plugin { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 22px; overflow: hidden; background: var(--p-bg); box-shadow: 0 24px 70px var(--p-shade); z-index: 1; }
+.plugin { container-type: inline-size; --u: calc(100cqw / 1120); position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 22px; overflow: hidden; background: var(--p-bg); box-shadow: 0 24px 70px var(--p-shade); z-index: 1; }
 .plugin canvas { display: block; width: 100%; height: 100%; touch-action: manipulation; }
 
 /* analysis panel: a glass sheet that slides out under the window in Hold */
@@ -110,6 +110,28 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: inset 0 1px 0 var(--p-rim), 0 0 0 2px var(--p-data), 0 6px 16px var(--p-shade); z-index: 2; }
 .unit[data-ptheme="dark"] .dial-edit { background: rgba(40, 40, 46, .85); }
 .dial-edit:focus { outline: none; }
+.gpanel { position: absolute; z-index: 3; color: var(--p-ink); font: 500 calc(var(--u) * 13) var(--font-ui);
+  background: var(--p-glass-strong); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6);
+  border-radius: calc(var(--u) * 20); box-shadow: inset 0 1px 0 var(--p-rim), inset 0 0 0 1px var(--p-rim-soft), 0 calc(var(--u) * 14) calc(var(--u) * 34) var(--p-shade); }
+.unit[data-ptheme="dark"] .gpanel { background: rgba(34, 34, 40, .82); }
+.menu { left: calc(var(--u) * 200); top: calc(var(--u) * 58); width: calc(var(--u) * 210); padding: calc(var(--u) * 6); display: grid; }
+.menu button { all: unset; cursor: pointer; padding: calc(var(--u) * 8) calc(var(--u) * 12); border-radius: calc(var(--u) * 12); display: flex; justify-content: space-between; gap: 8px; }
+.menu button:hover, .menu button:focus-visible { background: var(--p-on); }
+.menu button[aria-checked="true"]::after { content: "\2713"; }
+.menu small { color: var(--p-muted); font-size: calc(var(--u) * 11.5); padding: calc(var(--u) * 6) calc(var(--u) * 12) calc(var(--u) * 2); }
+.more { left: calc(var(--u) * 236); bottom: calc(var(--u) * 58); width: calc(var(--u) * 300); padding: calc(var(--u) * 14) calc(var(--u) * 16); display: grid; gap: calc(var(--u) * 10); }
+.more .row { display: grid; grid-template-columns: calc(var(--u) * 78) 1fr calc(var(--u) * 74); align-items: center; gap: calc(var(--u) * 10); }
+.more label { font-weight: 600; }
+.more .hint { color: var(--p-muted); font-size: calc(var(--u) * 11.5); line-height: 1.4; }
+.more input[type=range] { width: 100%; accent-color: var(--p-ink); }
+.more input[type=text] { all: unset; text-align: right; font-variant-numeric: tabular-nums; padding: calc(var(--u) * 4) calc(var(--u) * 8); border-radius: calc(var(--u) * 8); background: var(--p-on); }
+.more input:focus-visible, .menu button:focus-visible, .tip button:focus-visible { outline: 2px solid var(--p-ink); outline-offset: 2px; }
+.tip { left: 50%; top: calc(var(--u) * 70); transform: translateX(-50%); width: calc(var(--u) * 470); padding: calc(var(--u) * 14) calc(var(--u) * 16); display: grid; grid-template-columns: 1fr auto; gap: calc(var(--u) * 12); align-items: center; line-height: 1.45; }
+.tip b { display: block; margin-bottom: 2px; }
+.tip button { all: unset; cursor: pointer; font-weight: 600; padding: calc(var(--u) * 8) calc(var(--u) * 14); border-radius: 999px; background: var(--p-ink); color: var(--p-bg); }
+.drawer-side .shortcut { font-size: 12px; color: var(--p-muted); line-height: 1.45; }
+.drawer-side kbd { font: 600 11px var(--font-ui); padding: 1px 6px; border-radius: 5px; background: var(--p-on); color: var(--p-ink); }
+[hidden] { display: none !important; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .drawer, .key { transition: none; } }
 </style>
@@ -133,10 +155,27 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
       <input class="sr" type="range" id="k-rng" aria-label="Range" min="0" max="24" step="0.5">
       <input class="sr" type="range" id="k-ceil" aria-label="Ceiling" min="-12" max="0" step="0.1">
       <input id="dial-edit" class="dial-edit" type="text" inputmode="decimal" autocomplete="off" hidden>
+      <button class="sr" id="b-preset" aria-haspopup="menu">Preset</button>
+      <button class="sr" id="b-a">Settings A</button>
+      <button class="sr" id="b-b">Settings B</button>
+      <button class="sr" id="b-undo">Undo</button>
+      <button class="sr" id="b-redo">Redo</button>
+      <button class="sr" id="b-more" aria-expanded="false" aria-controls="more">Rise, fall and output trim</button>
       <button class="sr" id="b-mode">Switch between Ride and Hold</button>
-      <button class="sr" id="b-ease">Ease in silence</button>
+      <button class="sr" id="b-ease">Return to 0 dB in silence</button>
       <button class="sr" id="b-theme">Switch the plugin between dark and light</button>
       <button class="sr" id="b-bypass">Bypass</button>
+      <div class="gpanel menu" id="preset-menu" role="menu" aria-label="Presets" hidden></div>
+      <div class="gpanel more" id="more" role="group" aria-label="Rise, fall and output trim" hidden>
+        <div class="row"><label for="m-rise">Rise</label><input type="range" id="m-rise" min="0" max="1000"><input type="text" id="t-rise" inputmode="decimal" aria-label="Rise in ms"></div>
+        <div class="row"><label for="m-fall">Fall</label><input type="range" id="m-fall" min="0" max="1000"><input type="text" id="t-fall" inputmode="decimal" aria-label="Fall in ms"></div>
+        <div class="row"><label for="m-trim">Output trim</label><input type="range" id="m-trim" min="0" max="1000"><input type="text" id="t-trim" inputmode="decimal" aria-label="Output trim in dB"></div>
+        <div class="hint">Rise: how fast quiet passages are lifted. Fall: how fast loud ones are pulled down. A slow rise and a fast fall suit voice.</div>
+      </div>
+      <div class="gpanel tip" id="tip" role="note" hidden>
+        <div><b>Getting started</b>Set Target where you want your voice. Then lower Threshold until the room noise sits below its dashed line.</div>
+        <button id="tip-ok">Got it</button>
+      </div>
     </div>
     <div class="drawer" id="drawer" aria-hidden="true">
       <div>
@@ -145,6 +184,7 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
             <span class="cap">Analyze &amp; hold</span>
             <button class="key" id="an-btn" aria-pressed="false" tabindex="-1">Analyze</button>
             <div class="readout" id="an-read"></div>
+            <div class="shortcut">Shortcut <kbd>A</kbd> analyzes and locks. In the plugin, Analyze and Lock can also be mapped to a hotkey, Stream Deck or MIDI button.</div>
           </div>
           <div class="wave"><canvas id="wave" aria-label="Live input waveform"></canvas></div>
         </div>
@@ -176,10 +216,15 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
         <li>Every control is glass: it blurs and slightly magnifies the graph behind it, with a bright rim where the light catches the edge. The rim follows your pointer.</li>
         <li>The header and the two meters float over a full-bleed graph. The controls have no box: the graph frosts and fades into the window colour under them, so they sit in the graph itself.</li>
         <li>Dials are clear glass discs with a light value ring and pointer. Ride / Hold is a glass capsule whose selected side is a droplet that slides across.</li>
-        <li>Each control has its own colour, used on its dial ring, pointer, value and line in the graph: Target teal (and the output it aims at), Threshold amber, Response blue, Range pink, Ceiling coral. The window, glass and text stay neutral. Dark mode uses softer versions; light mode uses deeper ones so their words stay readable.</li>
+        <li>The controls with a line in the graph keep their colour on the dial, value and line: Target teal (and the output it aims at), Threshold amber, Ceiling coral. Response and Range have no line, so they stay grey. The window, glass and text stay neutral. Dark mode uses softer versions; light mode uses deeper ones so their words stay readable.</li>
         <li>Meters use the standard zones fixed to the scale: green up to −18 dBFS, amber to −6, red above, with a clip light on top and the peak readout in its zone colour. Their ticks and numbers sit at exactly the graph's heights, every 5 dB with a number every 10.</li>
-        <li>Response is a time: 10 ms is the fastest (follows every word), 3000 ms the slowest (rides whole phrases). The dial is marked Fast at the start of its sweep and Slow at the end, and its value says how fast it is, for example "120 ms \u00b7 Fast". It uses a log scale so the fast end has room.</li>
+        <li>Response is a time: 10 ms is the fastest (follows every word), 3000 ms the slowest (rides whole phrases). The dial is marked Fast at the start of its sweep and Slow at the end, and its value says how fast it is, for example "120 ms · Fast". It uses a log scale so the fast end has room.</li>
         <li>Applied gain reads blue while lifting and orange while lowering, with its sign; the status dot matches. Colour is never the only signal: every state also has words.</li>
+        <li>Presets in the header (Stream voice, Podcast, Music bed, Drums, Quiet room); the name gets "(edited)" once you change something. Next to it, A / B holds two complete settings to compare (B starts as a copy of A), and undo / redo arrows (Ctrl+Z, Ctrl+Shift+Z) step back through every change.</li>
+        <li>"Rise, fall, trim" next to Ride / Hold opens a panel: Rise sets how fast quiet passages are lifted, Fall how fast loud ones are pulled down, Output trim adds a final ± dB after the leveler. Response is now only how long Corridor listens before it judges the level.</li>
+        <li>"From target" at the bottom left says how far the output is from the target ("2.4 dB over", "On target"). Line labels appear only while you point at or drag their line or dial.</li>
+        <li>Each meter shows the left and right channels as two bars, with a balance dot underneath that leans towards the louder side.</li>
+        <li>A first-run tip explains the two settings that matter most, once. In Hold, the A key analyzes and locks; in the plugin these become host parameters you can map to a hotkey, Stream Deck or MIDI.</li>
         <li>Dark by default; the sun / moon switch turns the plugin light. Hold slides a glass sheet out under the window with the live waveform.</li>
       </ul>
     </section>
@@ -199,25 +244,42 @@ const TOKENS = ['p-bg','p-ink','p-label','p-muted','p-accent','p-accent-text','p
 let dark = true;
 function readTokens() {
   TOKENS.forEach(k => C[k.slice(2)] = css('--' + k));
-  const roles = [['data','Target, output'],['thr','Threshold'],['resp','Response'],['rng','Range'],['ceil','Ceiling'],['in','Input trace'],['m-safe','Meter, up to \u221218'],['m-warn','Meter, \u221218 to \u22126'],['m-hot','Meter, above \u22126'],['boost','Gain lifting'],['cut','Gain lowering'],['bg','Window'],['ink','Values'],['muted','Scale, hints']];
+  const roles = [['data','Target, output'],['thr','Threshold'],['ceil','Ceiling'],['label','Response, Range'],['in','Input trace'],['m-safe','Meter, up to \u221218'],['m-warn','Meter, \u221218 to \u22126'],['m-hot','Meter, above \u22126'],['boost','Gain lifting'],['cut','Gain lowering'],['bg','Window'],['ink','Values'],['muted','Scale, hints']];
   document.getElementById('swatches').innerHTML = roles.map(([k, n]) => `<div class="sw"><i style="background:${C[k]}"></i><div><b>${n}</b><span>${C[k]}</span></div></div>`).join('');
 }
 readTokens();
 
 // ---------------- parameters
-const P = { thr: -48, tgt: -20, resp: 400, rng: 12, ceil: -1, hold: false, ease: false, bypass: false };
+const P = { thr: -48, tgt: -20, resp: 400, rng: 12, ceil: -1, rise: 400, fall: 80, trim: 0, hold: false, ease: false, bypass: false };
+const KEYS = ['thr', 'tgt', 'resp', 'rng', 'ceil', 'rise', 'fall', 'trim', 'ease'];
+const PRESETS = [
+  ['Default', { thr: -48, tgt: -20, resp: 400, rng: 12, ceil: -1, rise: 400, fall: 80, trim: 0, ease: false }],
+  ['Stream voice', { thr: -50, tgt: -18, resp: 250, rng: 12, ceil: -1, rise: 350, fall: 50, trim: 0, ease: false }],
+  ['Podcast', { thr: -52, tgt: -19, resp: 600, rng: 10, ceil: -1.5, rise: 700, fall: 120, trim: 0, ease: true }],
+  ['Music bed', { thr: -45, tgt: -24, resp: 1500, rng: 8, ceil: -1, rise: 1500, fall: 600, trim: 0, ease: false }],
+  ['Drums', { thr: -40, tgt: -16, resp: 800, rng: 6, ceil: -1, rise: 800, fall: 300, trim: 0, ease: false }],
+  ['Quiet room', { thr: -58, tgt: -20, resp: 400, rng: 18, ceil: -1, rise: 500, fall: 80, trim: 0, ease: true }],
+];
+let presetName = 'Default';
 const DEF = { ...P };
+const snap = () => Object.fromEntries(KEYS.map(k => [k, P[k]]));
+const same = (a, b) => KEYS.every(k => a[k] === b[k]);
 const fmt = (v, d = 1) => { const s = Math.abs(v).toFixed(d); return (v < 0 && +s !== 0 ? '−' : '') + s; };
 const sgn = (v, d = 1) => (v > 0.05 ? '+' : '') + fmt(v, d);
 const PM = '±';
 const knobs = [
   { id: 'thr', label: 'Threshold', min: -70, max: -20, x: 290, y: 496, r: 30, val: v => fmt(v) + ' dB', col: 'thr' },
-  { id: 'resp', label: 'Response', min: 10, max: 3000, log: true, x: 400, y: 496, r: 30, val: v => Math.round(v) + ' ms \u00b7 ' + (v < 50 ? 'Very fast' : v < 200 ? 'Fast' : v < 900 ? 'Medium' : 'Slow'), unit: 'ms', ends: ['Fast', 'Slow'], col: 'resp' },
+  { id: 'resp', label: 'Response', min: 10, max: 3000, log: true, x: 400, y: 496, r: 30, val: v => Math.round(v) + ' ms \u00b7 ' + (v < 50 ? 'Very fast' : v < 200 ? 'Fast' : v < 900 ? 'Medium' : 'Slow'), unit: 'ms', ends: ['Fast', 'Slow'], col: 'label' },
   { id: 'tgt', label: 'Target', min: -40, max: -6, x: 560, y: 478, r: 44, val: v => fmt(v) + ' dB RMS', col: 'data' },
-  { id: 'rng', label: 'Range', min: 0, max: 24, x: 720, y: 496, r: 30, val: v => PM + fmt(v) + ' dB', col: 'rng' },
+  { id: 'rng', label: 'Range', min: 0, max: 24, x: 720, y: 496, r: 30, val: v => PM + fmt(v) + ' dB', col: 'label' },
   { id: 'ceil', label: 'Ceiling', min: -12, max: 0, x: 830, y: 496, r: 30, val: v => fmt(v) + ' dBFS', col: 'ceil' },
 ];
 const A0 = -0.75 * Math.PI, A1 = 0.75 * Math.PI;
+const EXTRA = [
+  { id: 'rise', label: 'Rise', min: 20, max: 3000, log: true, val: v => Math.round(v) + ' ms', parse: v => v },
+  { id: 'fall', label: 'Fall', min: 5, max: 2000, log: true, val: v => Math.round(v) + ' ms', parse: v => v },
+  { id: 'trim', label: 'Output trim', min: -12, max: 12, val: v => (v > 0.05 ? '+' : '') + fmt(v) + ' dB', parse: v => v },
+];
 const toNorm = (k, v) => k.log ? Math.log(v / k.min) / Math.log(k.max / k.min) : (v - k.min) / (k.max - k.min);
 const fromNorm = (k, n) => { n = Math.min(1, Math.max(0, n)); return k.log ? k.min * Math.pow(k.max / k.min, n) : k.min + n * (k.max - k.min); };
 
@@ -235,7 +297,7 @@ const hist = [], wave = [];
 let src = 'voice', paused = false, t = 0;
 let section = -24, sectionLeft = 0, gapLeft = 0, syl = 0;
 let pw = Math.pow(10, -24 / 10), gain = 0, silent = 0;
-let inPk = -120, outPk = -120, inHold = -120, outHold = -120, holdT1 = 0, holdT2 = 0;
+let bal = 0.8, inPk = -120, outPk = -120, inHold = -120, outHold = -120, holdT1 = 0, holdT2 = 0;
 let analyzing = false, anSum = 0, anN = 0, anT = 0, holdGain = 0, holdValid = false, state = 'wait';
 const rnd = (a, b) => a + Math.random() * (b - a);
 function inputLevel() {
@@ -274,14 +336,15 @@ function step() {
     if (want < -P.rng) { want = -P.rng; lim = 'range'; }
     const room = P.ceil - (lvl + crest);
     if (want > room) { want = Math.max(-P.rng, room); lim = 'ceiling'; }
-    if (Math.abs(want - gain) > (win < 0.1 ? 0.2 : 0.75) || lim) gain += (want - gain) * Math.min(1, dt / (win * 0.8));
+    if (Math.abs(want - gain) > (win < 0.1 ? 0.2 : 0.75) || lim) gain += (want - gain) * Math.min(1, dt / ((want > gain ? P.rise : P.fall) / 1000));
     state = lim || (Math.abs(P.tgt - (lvl + gain)) < 1 ? 'on' : want > gain ? 'boost' : 'cut');
   } else if (P.ease && silent > 2) { gain *= 0.97; state = 'return'; } else state = 'wait';
-  const g = P.bypass ? 0 : gain;
+  const g = P.bypass ? 0 : gain + P.trim;  // output trim comes after the leveler, before the ceiling
   let outDb = inDb + g;
   const ip = Math.min(-0.1, inDb + crest * 0.8 + rnd(0, 3));  // digital input never passes 0 dBFS
   let op = ip + g;
   if (!P.bypass && op > P.ceil) { outDb -= op - P.ceil; op = P.ceil; }
+  bal = Math.max(-3, Math.min(3, bal * 0.995 + rnd(-0.06, 0.06)));  // dB, + means the left side is louder
   inPk = Math.max(ip, inPk - 0.9); outPk = Math.max(op, outPk - 0.9);
   if (ip >= inHold) { inHold = ip; holdT1 = 1.5; } else if ((holdT1 -= dt) < 0) inHold -= 0.3;
   if (op >= outHold) { outHold = op; holdT2 = 1.5; } else if ((holdT2 -= dt) < 0) outHold -= 0.3;
@@ -411,7 +474,7 @@ function drawMeter(x, pk, hold, isIn) {
   for (let ch = 0; ch < 2; ch++) {
     const xx = bx + ch * (bw + gap);
     ctx.fillStyle = C['meter-off']; ctx.beginPath(); ctx.roundRect(xx, GT, bw, GB - GT, 2.5); ctx.fill();
-    const p = pk - ch * (0.6 + 0.5 * Math.sin(t * 1.3 + (isIn ? 0 : 2)));
+    const p = Math.min(-0.1, pk + (ch === 0 ? bal / 2 : -bal / 2));  // left bar, then right
     if (p > -RANGE_DB) { const top = yOf(Math.min(0, p)); ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(xx, top, bw, GB - top, 2.5); ctx.fill(); }
     if (hold > -RANGE_DB) { ctx.fillStyle = zone(hold); ctx.fillRect(xx - 1, yOf(Math.min(0, hold)) - 1, bw + 2, 2); }
   }
@@ -422,12 +485,18 @@ function drawMeter(x, pk, hold, isIn) {
     ctx.fillStyle = C.muted; ctx.globalAlpha = major ? .9 : .5; ctx.fillRect(tickX, y, major ? 4 : 3, 1); ctx.globalAlpha = 1;
     if (major) text(fmt(v, 0), isIn ? tickX + 7 : tickX - 3, y, 11, C.muted, isIn ? 'left' : 'right', 500);
   }
+  // stereo balance: L and R at the ends of a short track, the dot leans to the louder side
+  const by = GB + 11, half = 15, lean = Math.max(-1, Math.min(1, bal / 4));
+  text('L', cx - half - 7, by, 11, C.muted, 'center', 600); text('R', cx + half + 7, by, 11, C.muted, 'center', 600);
+  ctx.fillStyle = C['meter-off']; ctx.beginPath(); ctx.roundRect(cx - half, by - 1.5, half * 2, 3, 1.5); ctx.fill();
+  ctx.fillStyle = C.muted; ctx.fillRect(cx - .5, by - 4, 1, 8);
+  ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(cx - lean * half, by, 3.5, 0, 7); ctx.fill();
 }
 
 function drawKnob(k) {
   const v = P[k.id], pos = toNorm(k, v), ang = A0 + pos * (A1 - A0);
   const { x, y, r } = k, ringR = r + 9, hot = hover === k.id || drag?.id === k.id;
-  const col = k.col ? C[k.col] : C.accent, colText = k.col ? C[k.col + '-text'] : C['accent-text'];
+  const col = k.col ? C[k.col] : C.accent, colText = (k.col && C[k.col + '-text']) || C.ink;
   const arc = (a0, a1, rad) => { ctx.beginPath(); ctx.arc(x, y, rad, a0 - Math.PI / 2, a1 - Math.PI / 2); };
   ctx.lineCap = 'round';
   arc(A0, A1, ringR); ctx.strokeStyle = dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)'; ctx.lineWidth = 6; ctx.stroke();
@@ -494,8 +563,24 @@ function drawDeck() {
   drawDeckBlend();
   knobs.forEach(drawKnob);
   drawSegment();
-  // latency, bottom-left; applied gain, a glass readout bottom-right
-  text('Latency 5.0 ms', PX0 + 22, GB + 4, 12, C.muted, 'left');
+  // how far the output is from the target, bottom-left; latency under it
+  const lv = avg('o'), active = lv > -89 && !P.hold, d = lv - P.tgt;
+  const fb = { x: DECK.x - 136, y: 548, w: 124, h: 58, r: 22 };
+  glass(fb, { shadowBlur: 18 });
+  text('From target', fb.x + 16, fb.y + 17, 12, C.muted, 'left', 500);
+  const dTxt = !active ? (P.hold ? 'Holding' : 'Waiting') : Math.abs(d) < 1 ? 'On target' : fmt(Math.abs(d)) + (d > 0 ? ' dB over' : ' dB under');
+  text(dTxt, fb.x + fb.w - 16, fb.y + 39, Math.abs(d) < 1 || !active ? 17 : 17, active && Math.abs(d) < 1 ? C['data-text'] : C.ink, 'right', 700);
+  text('Latency 5.0 ms', fb.x + 4, GB + 22, 11, C.muted, 'left');
+  // More: rise, fall and output trim live in a panel above this button
+  btn.more = [DECK.x + 116, SEG.y, 128, SEG.h];
+  glass({ x: btn.more[0], y: SEG.y, w: 128, h: SEG.h, r: 15 }, { tint: moreOpen ? C.on : C.glass, shadow: false, lens: 1.06 });
+  text('Rise, fall, trim', btn.more[0] + 58, SEG.y + SEG.h / 2 + .5, 12.5, hover === 'more' || moreOpen ? C.ink : C.label, 'center', 600);
+  ctx.save(); ctx.strokeStyle = C.label; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const chx = btn.more[0] + 114, chy = SEG.y + SEG.h / 2; ctx.beginPath();
+  if (moreOpen) { ctx.moveTo(chx - 4, chy + 2); ctx.lineTo(chx, chy - 2); ctx.lineTo(chx + 4, chy + 2); } else { ctx.moveTo(chx - 4, chy - 2); ctx.lineTo(chx, chy + 2); ctx.lineTo(chx + 4, chy - 2); }
+  ctx.stroke(); ctx.restore();
+  if (focusId === 'more') { ctx.beginPath(); ctx.roundRect(btn.more[0] - 3, SEG.y - 3, 134, SEG.h + 6, 18); ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.stroke(); }
+  // applied gain, a glass readout bottom-right
   const g = P.bypass ? 0 : gain, gb = { x: DECK.x + DECK.w + 12, y: 548, w: 124, h: 58, r: 22 };
   glass(gb, { shadowBlur: 18 });
   text('Applied gain', gb.x + 16, gb.y + 17, 12, C.muted, 'left', 500);
@@ -525,17 +610,39 @@ function drawHeader() {
   ctx.strokeStyle = C.ink; ctx.lineWidth = 1.8; ctx.stroke();
   text('Corridor', 60, 33, 16, C.ink, 'left', 700);
   text('Leveler', 60 + measure('Corridor', 16, 700) + 6, 33, 16, C.muted, 'left', 500);
-  // status: a dot and a short sentence, centred
-  const st = statusText(), sw = measure(st, 13.5);
-  ctx.fillStyle = statusColour(); ctx.beginPath(); ctx.arc(W / 2 - sw / 2 - 9, 33, 4, 0, 7); ctx.fill();
-  text(st, W / 2 + 4, 33.5, 13.5, C.ink, 'center', 500);
-  // right: ease (capsule), theme and bypass (round glass buttons)
-  btn.ease = [HEADER.x + HEADER.w - 230, 18, 140, 30];
+  // preset menu, A / B, undo and redo
+  btn.preset = [200, 18, 156, 30];
+  const edited = presetEdited();
+  glass({ x: 200, y: 18, w: 156, h: 30, r: 15 }, { tint: menuOpen ? C.on : C.glass, shadow: false, lens: 1.06 });
+  let pn = presetName + (edited ? ' (edited)' : '');
+  while (measure(pn, 13, 600) > 116 && pn.length > 4) pn = pn.slice(0, -2) + '\u2026';
+  text(pn, 214, 33.5, 13, hover === 'preset' ? C.ink : C.label, 'left', 600);
+  ctx.save(); ctx.strokeStyle = C.label; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(336, 31); ctx.lineTo(340, 35); ctx.lineTo(344, 31); ctx.stroke(); ctx.restore();
+  btn.a = [364, 18, 36, 30]; btn.b = [400, 18, 36, 30];
+  glass({ x: 364, y: 18, w: 72, h: 30, r: 15 }, { tint: dark ? 'rgba(0,0,0,.18)' : 'rgba(0,0,0,.05)', shadow: false, lens: 1 });
+  glass({ x: (slot === 'A' ? 364 : 400) + 2, y: 20, w: 32, h: 26, r: 13 }, { tint: C['glass-strong'], shadow: false, lens: 1.15 });
+  text('A', 382, 33.5, 13, slot === 'A' ? C.ink : C.muted, 'center', 700); text('B', 418, 33.5, 13, slot === 'B' ? C.ink : C.muted, 'center', 700);
+  btn.undo = [444, 18, 30, 30]; btn.redo = [478, 18, 30, 30];
+  for (const id of ['undo', 'redo']) {
+    const [bx, by, bw] = btn[id], cx = bx + bw / 2, cy = by + bw / 2, ok = id === 'undo' ? undoStack.length : redoStack.length;
+    glass({ circle: true, x: cx, y: cy, r: bw / 2 }, { shadow: false, lens: 1.1 });
+    ctx.save(); ctx.globalAlpha = ok ? 1 : .35; ctx.strokeStyle = hover === id && ok ? C.ink : C.label; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // a hooked arrow: undo points back (left), redo forward (right)
+    const d = id === 'undo' ? -1 : 1;
+    ctx.beginPath(); ctx.moveTo(cx - d * 5, cy + 5); ctx.quadraticCurveTo(cx - d * 5, cy - 4, cx + d * 5, cy - 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + d * 1.5, cy - 7.5); ctx.lineTo(cx + d * 5, cy - 4); ctx.lineTo(cx + d * 1.5, cy - 0.5); ctx.stroke(); ctx.restore();
+  }
+  // right: return to 0 dB (capsule), theme and bypass (round glass buttons)
+  btn.ease = [HEADER.x + HEADER.w - 296, 18, 206, 30];
+  // status: a dot and a short sentence, centred in the space left between
+  const st = statusText(), sx0 = 520, sx1 = btn.ease[0] - 12, scx = (sx0 + sx1) / 2, sw = Math.min(measure(st, 13.5), sx1 - sx0 - 20);
+  ctx.fillStyle = statusColour(); ctx.beginPath(); ctx.arc(scx - sw / 2 - 9, 33, 4, 0, 7); ctx.fill();
+  text(st, scx + 4, 33.5, 13.5, C.ink, 'center', 500);
   btn.theme = [HEADER.x + HEADER.w - 80, 18, 30, 30];
   btn.bypass = [HEADER.x + HEADER.w - 42, 18, 30, 30];
-  const e = { x: btn.ease[0], y: 18, w: 140, h: 30, r: 15 };
+  const e = { x: btn.ease[0], y: 18, w: 206, h: 30, r: 15 };
   glass(e, { tint: P.ease ? C.on : C.glass, shadow: false, lens: 1.08 });
-  text('Ease in silence', e.x + e.w / 2, 33.5, 13, P.ease ? C['accent-text'] : (hover === 'ease' ? C.ink : C.label), 'center', 600);
+  text('Return to 0 dB in silence', e.x + e.w / 2, 33.5, 13, P.ease ? C['accent-text'] : (hover === 'ease' ? C.ink : C.label), 'center', 600);
   for (const id of ['theme', 'bypass']) {
     const [bx, by, bw] = btn[id], c = { circle: true, x: bx + bw / 2, y: by + bw / 2, r: bw / 2 };
     const on = id === 'bypass' && P.bypass;
@@ -543,7 +650,7 @@ function drawHeader() {
     const col = on ? C.ink : hover === id ? C.ink : C.label;
     id === 'bypass' ? powerIcon(c.x, c.y, col) : themeIcon(c.x, c.y, col);
   }
-  if (focusId === 'ease' || focusId === 'bypass' || focusId === 'theme') {
+  if (['ease', 'bypass', 'theme', 'preset', 'a', 'b', 'undo', 'redo'].includes(focusId)) {
     const [bx, by, bw, bh] = btn[focusId]; ctx.beginPath(); ctx.roundRect(bx - 3, by - 3, bw + 6, bh + 6, (bh + 6) / 2); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke();
   }
 }
@@ -551,6 +658,7 @@ function drawHeader() {
 function drawTags() {
   const tags = [['ceil', 'Ceiling', C.ceil, C['ceil-text']], ['thr', 'Threshold', C.thr, C['thr-text']], ['tgt', 'Target', C.data, C['data-text']]];
   for (const [id, name, col, colText] of tags) {
+    if (!(hover === 'line-' + id || drag?.id === 'line-' + id || hover === id || drag?.id === id || editing?.id === id)) continue;
     const lineY = yOf(P[id]), under = lineY > FADE_TOP + 24;
     const y = under ? FADE_TOP + 22 : lineY;
     const label = name + '  ' + fmt(P[id]), w = measure(label, 12, 600) + (under ? 40 : 28);
@@ -569,8 +677,8 @@ const STATES = {
 };
 function statusText() {
   if (P.bypass) return 'Bypassed';
-  if (state === 'held') return holdValid ? 'Holding ' + sgn(holdGain) + ' dB' : 'Hold: play a typical section, then press Analyze';
-  if (state === 'analyzing') return 'Analyzing ' + anT.toFixed(1) + ' s. Press Lock after a typical section';
+  if (state === 'held') return holdValid ? 'Holding ' + sgn(holdGain) + ' dB' : 'Hold: press Analyze, then play';
+  if (state === 'analyzing') return 'Analyzing ' + anT.toFixed(1) + ' s \u00b7 press Lock';
   return STATES[state][0] + (state === 'boost' || state === 'cut' ? ' (' + sgn(gain) + ' dB)' : '');
 }
 const statusColour = () => P.bypass ? C.muted : C[(STATES[state] || STATES.wait)[1]];
@@ -599,7 +707,7 @@ const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.l
 const inR = ([x, y], r) => r && x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
 function hitTest(p) {
   for (const k of knobs) if (Math.hypot(p[0] - k.x, p[1] - k.y) < k.r + 14) return k.id;
-  for (const id of ['ride', 'hold', 'ease', 'theme', 'bypass']) if (inR(p, btn[id])) return id;
+  for (const id of ['ride', 'hold', 'more', 'preset', 'a', 'b', 'undo', 'redo', 'ease', 'theme', 'bypass']) if (inR(p, btn[id])) return id;
   const overDeck = inR(p, [DECK.x, DECK.y, DECK.w, DECK.h]);
   if (!overDeck && p[0] > PX0 + 22 && p[0] < PX1 - 22 && p[1] > GT - 8 && p[1] < GB + 8) {
     let best = null, bd = 8;
@@ -610,13 +718,76 @@ function hitTest(p) {
 }
 const lim = (id, v) => { const k = knobs.find(k => k.id === id); return Math.min(k.max, Math.max(k.min, v)); };
 function syncInput(k) { const el = document.getElementById('k-' + k.id); el.min = 0; el.max = 1000; el.step = 1; el.value = Math.round(toNorm(k, P[k.id]) * 1000); el.setAttribute('aria-valuetext', k.val(P[k.id])); }
-function set(id, v) { P[id] = lim(id, v); syncInput(knobs.find(k => k.id === id)); }
+function set(id, v) {
+  const k = knobs.find(k => k.id === id) || EXTRA.find(k => k.id === id);
+  P[id] = Math.min(k.max, Math.max(k.min, v));
+  if (knobs.includes(k)) syncInput(k); else syncExtra();
+}
+// ---- undo / redo: a snapshot before every change; A / B: two complete settings to compare
+let undoStack = [], redoStack = [], slot = 'A', slots = { A: null, B: null };
+function pushUndo() { const s0 = snap(); if (!undoStack.length || !same(undoStack[undoStack.length - 1], s0)) { undoStack.push(s0); if (undoStack.length > 100) undoStack.shift(); } redoStack = []; }
+function apply(s0) { KEYS.forEach(k => P[k] = s0[k]); knobs.forEach(syncInput); syncExtra(); }
+function undo() { if (!undoStack.length) return; redoStack.push(snap()); apply(undoStack.pop()); }
+function redo() { if (!redoStack.length) return; undoStack.push(snap()); apply(redoStack.pop()); }
+function switchSlot(to) {
+  if (to === slot) return;
+  pushUndo(); slots[slot] = snap();
+  if (slots[to]) apply(slots[to]); else slots[to] = snap();  // B starts as a copy of A
+  slot = to;
+}
+const presetEdited = () => { const pr = PRESETS.find(p => p[0] === presetName); return pr && !KEYS.every(k => pr[1][k] === P[k]); };
+// ---- preset menu
+const menu = document.getElementById('preset-menu');
+let menuOpen = false;
+menu.innerHTML = '<small>Presets</small>' + PRESETS.map(([n]) => `<button role="menuitemradio" data-p="${n}">${n}</button>`).join('');
+function setMenu(open) {
+  menuOpen = open; menu.hidden = !open;
+  menu.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', b.dataset.p === presetName));
+  if (open) menu.querySelector('[aria-checked="true"]')?.focus();
+}
+menu.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pushUndo(); presetName = b.dataset.p; apply(PRESETS.find(p => p[0] === presetName)[1]); setMenu(false); document.getElementById('b-preset').focus({ preventScroll: true }); });
+menu.addEventListener('keydown', e => {
+  const items = [...menu.querySelectorAll('button')], i = items.indexOf(document.activeElement);
+  if (e.key === 'Escape') { setMenu(false); document.getElementById('b-preset').focus({ preventScroll: true }); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+});
+document.addEventListener('pointerdown', e => { if (menuOpen && !menu.contains(e.target) && !inR(pt(e), btn.preset)) setMenu(false); });
+// ---- rise, fall and output trim panel
+const more = document.getElementById('more');
+let moreOpen = false;
+function setMore(open) { moreOpen = open; more.hidden = !open; document.getElementById('b-more').setAttribute('aria-expanded', open); }
+function syncExtra() {
+  EXTRA.forEach(k => {
+    const r = document.getElementById('m-' + k.id), tx = document.getElementById('t-' + k.id);
+    r.value = Math.round(toNorm(k, P[k.id]) * 1000); r.setAttribute('aria-valuetext', k.val(P[k.id]));
+    if (document.activeElement !== tx) tx.value = k.val(P[k.id]);
+  });
+}
+EXTRA.forEach(k => {
+  const r = document.getElementById('m-' + k.id), tx = document.getElementById('t-' + k.id);
+  r.addEventListener('pointerdown', pushUndo); r.addEventListener('keydown', e => { if (e.key.startsWith('Arrow')) pushUndo(); });
+  r.addEventListener('input', () => set(k.id, fromNorm(k, +r.value / 1000)));
+  const commit = () => { const n = parseFloat(tx.value.replace(',', '.').replace('\u2212', '-')); if (!isNaN(n)) { pushUndo(); set(k.id, n); } syncExtra(); };
+  tx.addEventListener('change', commit); tx.addEventListener('keydown', e => { if (e.key === 'Enter') { commit(); tx.select(); } });
+});
+syncExtra();
+// ---- first-run tip, shown once per browser
+const tip = document.getElementById('tip');
+let seen = false; try { seen = localStorage.getItem('corridor-tip') === '1'; } catch (e) {}
+tip.hidden = seen;
+document.getElementById('tip-ok').addEventListener('click', () => { tip.hidden = true; try { localStorage.setItem('corridor-tip', '1'); } catch (e) {} });
 function setTheme(isDark) { dark = isDark; unit.dataset.ptheme = isDark ? 'dark' : 'light'; readTokens(); }
 function click(id) {
   if (id === 'ride') { P.hold = false; analyzing = false; }
   else if (id === 'hold') { if (!P.hold) { P.hold = true; holdGain = gain; holdValid = true; } }
   else if (id === 'analyze') { if (analyzing) lockAnalyze(); else { analyzing = true; anSum = 0; anN = 0; anT = 0; } }
-  else if (id === 'ease') P.ease = !P.ease;
+  else if (id === 'ease') { pushUndo(); P.ease = !P.ease; }
+  else if (id === 'more') setMore(!moreOpen);
+  else if (id === 'preset') setMenu(!menuOpen);
+  else if (id === 'a' || id === 'b') switchSlot(id.toUpperCase());
+  else if (id === 'undo') undo();
+  else if (id === 'redo') redo();
   else if (id === 'bypass') P.bypass = !P.bypass;
   else if (id === 'theme') setTheme(!dark);
 }
@@ -634,8 +805,8 @@ cv.addEventListener('pointermove', e => {
 cv.addEventListener('pointerleave', () => { if (!drag) hover = null; lightTarget = { x: -0.5, y: -1 }; });
 cv.addEventListener('pointerdown', e => {
   const p = pt(e), id = hitTest(p); if (!id) return;
-  if (e.altKey && knobs.some(k => k.id === id)) { set(id, DEF[id]); return; }  // Alt-click resets a dial
-  if (knobs.some(k => k.id === id) || id.startsWith('line-')) { drag = { id, y0: p[1], v0: P[id.replace('line-', '')] }; cv.setPointerCapture(e.pointerId); }
+  if (e.altKey && knobs.some(k => k.id === id)) { pushUndo(); set(id, DEF[id]); return; }  // Alt-click resets a dial
+  if (knobs.some(k => k.id === id) || id.startsWith('line-')) { pushUndo(); drag = { id, y0: p[1], v0: P[id.replace('line-', '')] }; cv.setPointerCapture(e.pointerId); }
   else click(id);
 });
 const endDrag = () => { drag = null; };
@@ -658,24 +829,33 @@ function closeEditor(commit) {
   if (!editing) return;
   if (commit) {
     const raw = editor.value.replace(',', '.').replace('\u2212', '-'), n = parseFloat(raw);
-    if (!isNaN(n)) set(editing.id, editing.log && /s\s*$/i.test(raw) && !/ms\s*$/i.test(raw) ? n * 1000 : n);  // "0.5 s" works for Response
+    if (!isNaN(n)) pushUndo(), set(editing.id, editing.log && /s\s*$/i.test(raw) && !/ms\s*$/i.test(raw) ? n * 1000 : n);  // "0.5 s" works for Response
   }
   const k = editing; editing = null; editor.hidden = true;
   document.getElementById('k-' + k.id).focus({ preventScroll: true });
 }
 editor.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); closeEditor(true); } else if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); } });
 editor.addEventListener('blur', () => closeEditor(true));
-cv.addEventListener('wheel', e => { const k = knobs.find(k => k.id === hitTest(pt(e))); if (!k) return; e.preventDefault(); set(k.id, fromNorm(k, toNorm(k, P[k.id]) - Math.sign(e.deltaY) / 60)); }, { passive: false });
+let lastWheel = 0;
+cv.addEventListener('wheel', e => { const k = knobs.find(k => k.id === hitTest(pt(e))); if (!k) return; e.preventDefault(); if (performance.now() - lastWheel > 600) pushUndo(); lastWheel = performance.now(); set(k.id, fromNorm(k, toNorm(k, P[k.id]) - Math.sign(e.deltaY) / 60)); }, { passive: false });
 knobs.forEach(k => {
   const el = document.getElementById('k-' + k.id); syncInput(k);
+  el.addEventListener('keydown', e => { if (e.key.startsWith('Arrow') || e.key === 'PageUp' || e.key === 'PageDown') pushUndo(); });
   el.addEventListener('input', () => { P[k.id] = fromNorm(k, +el.value / 1000); el.setAttribute('aria-valuetext', k.val(P[k.id])); });
   el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); openEditor(k); } });  // Enter types a value
   el.addEventListener('focus', () => focusId = k.id); el.addEventListener('blur', () => focusId = null);
 });
-[['b-mode', 'mode'], ['b-ease', 'ease'], ['b-theme', 'theme'], ['b-bypass', 'bypass']].forEach(([elId, id]) => {
+[['b-preset', 'preset'], ['b-a', 'a'], ['b-b', 'b'], ['b-undo', 'undo'], ['b-redo', 'redo'], ['b-more', 'more'], ['b-mode', 'mode'], ['b-ease', 'ease'], ['b-theme', 'theme'], ['b-bypass', 'bypass']].forEach(([elId, id]) => {
   const el = document.getElementById(elId);
   el.addEventListener('click', () => click(id === 'mode' ? (P.hold ? 'ride' : 'hold') : id));
   el.addEventListener('focus', () => focusId = id); el.addEventListener('blur', () => focusId = null);
+});
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input[type=text], textarea, [contenteditable]')) return;  // typing a value keeps its own undo
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+  else if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+  else if (!mod && e.key.toLowerCase() === 'a' && P.hold) { e.preventDefault(); click('analyze'); }
 });
 const srcBtns = { voice: 's-voice', drums: 's-drums', mix: 's-mix' };
 Object.entries(srcBtns).forEach(([s, elId]) => document.getElementById(elId).addEventListener('click', () => {
