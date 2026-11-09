@@ -9,6 +9,11 @@ on:
 # Every commit on main publishes a GitHub Release with the Windows installer.
 # Version = MAJOR.MINOR from the VERSION file + number of commits on main (e.g. 0.1.23).
 
+# a new push to a branch cancels its older run; main always runs to the end (it publishes releases)
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   linux:
     name: Linux checks
@@ -60,6 +65,7 @@ jobs:
         run: build\Release\corridor_tests.exe
       - name: Load the plugins like a host
         shell: bash
+        timeout-minutes: 15
         run: |
           A="build/plugin/CorridorLeveler_artefacts/Release"
           build/plugin/corridor_plugin_check_artefacts/Release/corridor_plugin_check.exe \

@@ -1106,18 +1106,18 @@ private:
     GlassButton update{"Update"}, ignore{"Ignore"};
 };
 
-// per-user settings (the one-time tip)
-PropertiesFile& settings() {
-    static std::unique_ptr<PropertiesFile> file = [] {
-        PropertiesFile::Options o;
-        o.applicationName = "settings";
-        o.filenameSuffix = "settings";
-        o.folderName = "CorridorLeveler";
-        o.osxLibrarySubFolder = "Application Support";
-        return std::make_unique<PropertiesFile>(o);
-    }();
-    return *file;
+// per-user settings (the one-time tip): opened when needed and closed straight away,
+// so nothing outlives the plugin
+PropertiesFile::Options settingsOptions() {
+    PropertiesFile::Options o;
+    o.applicationName = "settings";
+    o.filenameSuffix = "settings";
+    o.folderName = "CorridorLeveler";
+    o.osxLibrarySubFolder = "Application Support";
+    return o;
 }
+bool tipSeen() { PropertiesFile f(settingsOptions()); return f.getBoolValue("tipSeen", false); }
+void markTipSeen() { PropertiesFile f(settingsOptions()); f.setValue("tipSeen", true); f.saveIfNeeded(); }
 
 }  // namespace
 
@@ -1194,9 +1194,8 @@ public:
         addChildComponent(updateBtn);
 
         // the one-time tip
-        bool seen = settings().getBoolValue("tipSeen", false);
-        tip.setVisible(!seen && !p.tipDismissedThisRun);
-        tip.onDismiss = [this] { tip.setVisible(false); settings().setValue("tipSeen", true); settings().saveIfNeeded(); };
+        tip.setVisible(!p.tipDismissedThisRun && !tipSeen());
+        tip.onDismiss = [this] { tip.setVisible(false); proc.tipDismissedThisRun = true; markTipSeen(); };
         addChildComponent(tip);
 
         addChildComponent(drawer);

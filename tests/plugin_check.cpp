@@ -165,6 +165,7 @@ static void snapshots(const File& dir) {
 }
 
 int main(int argc, char** argv) {
+    std::setvbuf(stdout, nullptr, _IONBF, 0);  // every line reaches the CI log at once, even if a step hangs
     ScopedJuceInitialiser_GUI init;
     setenv_portable();
     String vst3, vst2, snapDir;
