@@ -178,7 +178,7 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
         <li>Dials are clear glass discs with a light value ring and pointer. Ride / Hold is a glass capsule whose selected side is a droplet that slides across.</li>
         <li>Each control has its own colour, used on its dial ring, pointer, value and line in the graph: Target teal (and the output it aims at), Threshold amber, Response blue, Range pink, Ceiling coral. The window, glass and text stay neutral. Dark mode uses softer versions; light mode uses deeper ones so their words stay readable.</li>
         <li>Meters use the standard zones fixed to the scale: green up to −18 dBFS, amber to −6, red above, with a clip light on top and the peak readout in its zone colour. Their ticks and numbers sit at exactly the graph's heights, every 5 dB with a number every 10.</li>
-        <li>Response is a time, from 10 ms (very fast, follows every word) to 3000 ms (slow, rides whole phrases), on a log scale so the fast end has room.</li>
+        <li>Response is a time: 10 ms is the fastest (follows every word), 3000 ms the slowest (rides whole phrases). The dial is marked Fast at the start of its sweep and Slow at the end, and its value says how fast it is, for example "120 ms \u00b7 Fast". It uses a log scale so the fast end has room.</li>
         <li>Applied gain reads blue while lifting and orange while lowering, with its sign; the status dot matches. Colour is never the only signal: every state also has words.</li>
         <li>Dark by default; the sun / moon switch turns the plugin light. Hold slides a glass sheet out under the window with the live waveform.</li>
       </ul>
@@ -212,7 +212,7 @@ const sgn = (v, d = 1) => (v > 0.05 ? '+' : '') + fmt(v, d);
 const PM = '±';
 const knobs = [
   { id: 'thr', label: 'Threshold', min: -70, max: -20, x: 290, y: 496, r: 30, val: v => fmt(v) + ' dB', col: 'thr' },
-  { id: 'resp', label: 'Response', min: 10, max: 3000, log: true, x: 400, y: 496, r: 30, val: v => Math.round(v) + ' ms', unit: 'ms', col: 'resp' },
+  { id: 'resp', label: 'Response', min: 10, max: 3000, log: true, x: 400, y: 496, r: 30, val: v => Math.round(v) + ' ms \u00b7 ' + (v < 50 ? 'Very fast' : v < 200 ? 'Fast' : v < 900 ? 'Medium' : 'Slow'), unit: 'ms', ends: ['Fast', 'Slow'], col: 'resp' },
   { id: 'tgt', label: 'Target', min: -40, max: -6, x: 560, y: 478, r: 44, val: v => fmt(v) + ' dB RMS', col: 'data' },
   { id: 'rng', label: 'Range', min: 0, max: 24, x: 720, y: 496, r: 30, val: v => PM + fmt(v) + ' dB', col: 'rng' },
   { id: 'ceil', label: 'Ceiling', min: -12, max: 0, x: 830, y: 496, r: 30, val: v => fmt(v) + ' dBFS', col: 'ceil' },
@@ -447,6 +447,11 @@ function drawKnob(k) {
   const p0 = r * 0.42, p1 = r * 0.78;
   ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.lineWidth = Math.max(3, r * 0.1); ctx.shadowColor = col; ctx.shadowBlur = 0;
   ctx.beginPath(); ctx.moveTo(x + Math.sin(ang) * p0, y - Math.cos(ang) * p0); ctx.lineTo(x + Math.sin(ang) * p1, y - Math.cos(ang) * p1); ctx.stroke(); ctx.restore();
+  if (k.ends) {  // which way is which: the start of the sweep is fast, the end slow
+    const ex = Math.sin(A1) * (ringR + 2), ey = -Math.cos(A1) * (ringR + 2) + 10;
+    text(k.ends[0], x - ex, y + ey, 11, C.muted, 'right', 500);
+    text(k.ends[1], x + ex, y + ey, 11, C.muted, 'left', 500);
+  }
   if (focusId === k.id) { ctx.beginPath(); ctx.arc(x, y, ringR + 8, 0, 7); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke(); }
   const ly = y + ringR + 16;
   text(k.label, x, ly, k.id === 'tgt' ? 15 : 13.5, C.ink, 'center', 600);
