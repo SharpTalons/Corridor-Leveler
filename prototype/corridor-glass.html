@@ -23,7 +23,14 @@
   --p-rim: rgba(255, 255, 255, .38); --p-rim-soft: rgba(255, 255, 255, .1); --p-shade: rgba(0, 0, 0, .4);
   --p-bloom-a: rgba(255, 255, 255, .035); --p-bloom-b: rgba(255, 255, 255, .025); --p-bloom-c: rgba(255, 255, 255, 0);
   --p-meter-off: rgba(255, 255, 255, .07); --p-on: rgba(255, 255, 255, .2);
-  --p-data: #4fd1bf; --p-data-text: #6fdccd;  /* the one hue: on the output and its target only */
+  --p-data: #4fd1bf; --p-data-text: #6fdccd;   /* Target and the output it is aiming at */
+  --p-thr: #f2b84b; --p-thr-text: #f2c46a;     /* Threshold */
+  --p-resp: #7fb2ff; --p-resp-text: #9cc3ff;   /* Response */
+  --p-rng: #f08cc0; --p-rng-text: #f4a6cf;     /* Range */
+  --p-ceil: #ff7a6b; --p-ceil-text: #ff8f82;   /* Ceiling */
+  --p-in: rgba(170, 190, 215, .45);            /* input trace: a cool grey that stays behind the output */
+  --p-m-safe: #4cd787; --p-m-warn: #f2c24b; --p-m-hot: #ff5f52;   /* meters: up to -18, -18 to -6, above -6 dBFS */
+  --p-boost: #7fb2ff; --p-cut: #ff9a6b;        /* applied gain: lifting / lowering */
 }
 .unit[data-ptheme="light"] {
   --p-bg: #f2f2f4; --p-ink: #1d1d1f; --p-label: #48484c; --p-muted: #6e6e73;
@@ -34,6 +41,13 @@
   --p-bloom-a: rgba(255, 255, 255, .7); --p-bloom-b: rgba(255, 255, 255, .5); --p-bloom-c: rgba(255, 255, 255, 0);
   --p-meter-off: rgba(0, 0, 0, .07); --p-on: rgba(0, 0, 0, .08);
   --p-data: #149483; --p-data-text: #0f7a6c;
+  --p-thr: #e09a12; --p-thr-text: #8f5c00;
+  --p-resp: #2f74e0; --p-resp-text: #1f5cc0;
+  --p-rng: #d0468f; --p-rng-text: #a3306d;
+  --p-ceil: #e0483a; --p-ceil-text: #b2352a;
+  --p-in: rgba(70, 90, 120, .38);
+  --p-m-safe: #2fb562; --p-m-warn: #e3a51b; --p-m-hot: #e5392c;
+  --p-boost: #1f5cc0; --p-cut: #b8501f;
 }
 
 html, body { background: var(--page); color: var(--page-ink); }
@@ -156,7 +170,9 @@ h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
         <li>Every control is glass: it blurs and slightly magnifies the graph behind it, with a bright rim where the light catches the edge. The rim follows your pointer.</li>
         <li>The header and the two meters float over a full-bleed graph. The controls have no box: the graph frosts and fades into the window colour under them, so they sit in the graph itself.</li>
         <li>Dials are clear glass discs with a light value ring and pointer. Ride / Hold is a glass capsule whose selected side is a droplet that slides across.</li>
-        <li>Neutral and quiet: greys and the window colour only. Target is the solid line, Threshold dashed, Ceiling dotted-grey. One calm teal marks what the screen is about: the output line, the Target line and dial, "On target" and the stretch being measured. A muted red appears only for clipping and when the ceiling or range holds the gain back.</li>
+        <li>Each control has its own colour, used on its dial ring, pointer, value and line in the graph: Target teal (and the output it aims at), Threshold amber, Response blue, Range pink, Ceiling coral. The window, glass and text stay neutral. Dark mode uses softer versions; light mode uses deeper ones so their words stay readable.</li>
+        <li>Meters use the standard zones fixed to the scale: green up to −18 dBFS, amber to −6, red above, with a clip light on top and the peak readout in its zone colour. Their ticks and numbers sit at exactly the graph's heights, every 5 dB with a number every 10.</li>
+        <li>Applied gain reads blue while lifting and orange while lowering, with its sign; the status dot matches. Colour is never the only signal: every state also has words.</li>
         <li>Dark by default; the sun / moon switch turns the plugin light. Hold slides a glass sheet out under the window with the live waveform.</li>
       </ul>
     </section>
@@ -172,11 +188,11 @@ const css = (n, el = unit) => getComputedStyle(el).getPropertyValue(n).trim();
 const FONT = css('--font-ui', root);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const C = {};
-const TOKENS = ['p-bg','p-ink','p-label','p-muted','p-accent','p-accent-text','p-green','p-green-text','p-red','p-trace','p-out','p-meter','p-on','p-data','p-data-text','p-grid','p-glass','p-glass-strong','p-rim','p-rim-soft','p-shade','p-bloom-a','p-bloom-b','p-bloom-c','p-meter-off'];
+const TOKENS = ['p-bg','p-ink','p-label','p-muted','p-accent','p-accent-text','p-green','p-green-text','p-red','p-trace','p-out','p-meter','p-on','p-data','p-data-text','p-thr','p-thr-text','p-resp','p-resp-text','p-rng','p-rng-text','p-ceil','p-ceil-text','p-in','p-m-safe','p-m-warn','p-m-hot','p-boost','p-cut','p-grid','p-glass','p-glass-strong','p-rim','p-rim-soft','p-shade','p-bloom-a','p-bloom-b','p-bloom-c','p-meter-off'];
 let dark = true;
 function readTokens() {
   TOKENS.forEach(k => C[k.slice(2)] = css('--' + k));
-  const roles = [['bg','Window'],['ink','Values, dial rings'],['label','Names'],['muted','Scale, hints'],['data','Output, Target (the one hue)'],['trace','Input trace'],['green','Threshold line'],['meter','Meters'],['red','Clipping only'],['glass','Glass tint']];
+  const roles = [['data','Target, output'],['thr','Threshold'],['resp','Response'],['rng','Range'],['ceil','Ceiling'],['in','Input trace'],['m-safe','Meter, up to \u221218'],['m-warn','Meter, \u221218 to \u22126'],['m-hot','Meter, above \u22126'],['boost','Gain lifting'],['cut','Gain lowering'],['bg','Window'],['ink','Values'],['muted','Scale, hints']];
   document.getElementById('swatches').innerHTML = roles.map(([k, n]) => `<div class="sw"><i style="background:${C[k]}"></i><div><b>${n}</b><span>${C[k]}</span></div></div>`).join('');
 }
 readTokens();
@@ -188,19 +204,19 @@ const fmt = (v, d = 1) => { const s = Math.abs(v).toFixed(d); return (v < 0 && +
 const sgn = (v, d = 1) => (v > 0.05 ? '+' : '') + fmt(v, d);
 const PM = '±';
 const knobs = [
-  { id: 'thr', label: 'Threshold', min: -70, max: -20, x: 290, y: 496, r: 30, val: v => fmt(v) + ' dB' },
-  { id: 'resp', label: 'Response', min: 0, max: 100, x: 400, y: 496, r: 30, val: v => (v < 34 ? 'Slow ' : v > 66 ? 'Fast ' : 'Medium ') + Math.round(v) },
+  { id: 'thr', label: 'Threshold', min: -70, max: -20, x: 290, y: 496, r: 30, val: v => fmt(v) + ' dB', col: 'thr' },
+  { id: 'resp', label: 'Response', min: 0, max: 100, x: 400, y: 496, r: 30, val: v => (v < 34 ? 'Slow ' : v > 66 ? 'Fast ' : 'Medium ') + Math.round(v), col: 'resp' },
   { id: 'tgt', label: 'Target', min: -40, max: -6, x: 560, y: 478, r: 44, val: v => fmt(v) + ' dB RMS', col: 'data' },
-  { id: 'rng', label: 'Range', min: 0, max: 24, x: 720, y: 496, r: 30, val: v => PM + fmt(v) + ' dB' },
-  { id: 'ceil', label: 'Ceiling', min: -12, max: 0, x: 830, y: 496, r: 30, val: v => fmt(v) + ' dBFS' },
+  { id: 'rng', label: 'Range', min: 0, max: 24, x: 720, y: 496, r: 30, val: v => PM + fmt(v) + ' dB', col: 'rng' },
+  { id: 'ceil', label: 'Ceiling', min: -12, max: 0, x: 830, y: 496, r: 30, val: v => fmt(v) + ' dBFS', col: 'ceil' },
 ];
 const A0 = -0.75 * Math.PI, A1 = 0.75 * Math.PI;
 
 // ---------------- geometry: a full-bleed graph; header, meters and deck float over it
-const PX0 = 76, PX1 = 1044, GT = 118, GB = 596, RANGE_DB = 80;
+const PX0 = 90, PX1 = 1030, GT = 118, GB = 596, RANGE_DB = 80;
 const DECK = { x: 226, y: 408, w: 668, h: 206, r: 30 };
 const HEADER = { x: 12, y: 12, w: W - 24, h: 42, r: 21 };
-const MTR = { y: 64, h: 554, w: 50, r: 25 };
+const MTR = { y: 64, h: 554, w: 66, r: 24 };
 const yOf = v => GT + Math.min(RANGE_DB, Math.max(0, -v)) / RANGE_DB * (GB - GT);
 const vOf = y => -Math.min(RANGE_DB, Math.max(0, (y - GT) / (GB - GT) * RANGE_DB));
 
@@ -336,18 +352,18 @@ function drawBackdrop() {
   // grid, labelled every 10 dB at both edges of the plot
   for (let v = 0; v >= -80; v -= 5) {
     const y = Math.round(yOf(v)) + .5;
-    ctx.fillStyle = C.grid; ctx.globalAlpha = v % 10 === 0 ? 1 : 0.5; ctx.fillRect(PX0 + 22, y, PX1 - PX0 - 44, 1); ctx.globalAlpha = 1;
-    if (v % 10 === 0) { text(fmt(v, 0), PX0 + 16, y, 11, C.muted, 'right'); text(fmt(v, 0), PX1 - 16, y, 11, C.muted, 'left'); }
+    ctx.fillStyle = C.grid; ctx.globalAlpha = v % 10 === 0 ? 1 : 0.5; ctx.fillRect(PX0 - 6, y, PX1 - PX0 + 12, 1); ctx.globalAlpha = 1;
+    // the numbers are on the meters at both edges, at these same heights
   }
   const x0 = PX0 + 22, x1 = PX1 - 22, n = hist.length, sx = (x1 - x0) / (HIST - 1), X = k => x1 - (n - 1 - k) * sx;
   if (n > 1) {
     ctx.beginPath(); ctx.moveTo(X(0), GB);
     for (let k = 0; k < n; k++) ctx.lineTo(X(k), yOf(hist[k].i));
     ctx.lineTo(X(n - 1), GB); ctx.closePath();
-    const f = ctx.createLinearGradient(0, GT, 0, GB); f.addColorStop(0, C.trace.replace(/[\d.]+\)$/, '.22)')); f.addColorStop(1, C.trace.replace(/[\d.]+\)$/, '0)'));
+    const f = ctx.createLinearGradient(0, GT, 0, GB); f.addColorStop(0, C.in.replace(/[\d.]+\)$/, '.2)')); f.addColorStop(1, C.in.replace(/[\d.]+\)$/, '0)'));
     ctx.fillStyle = f; ctx.fill();
     ctx.beginPath(); for (let k = 0; k < n; k++) { const y = yOf(hist[k].i); k ? ctx.lineTo(X(k), y) : ctx.moveTo(X(k), y); }
-    ctx.strokeStyle = C.trace; ctx.lineWidth = 1.3; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.strokeStyle = C.in; ctx.lineWidth = 1.3; ctx.lineJoin = 'round'; ctx.stroke();
     ctx.save();
     ctx.beginPath(); for (let k = 0; k < n; k++) { const y = yOf(hist[k].o); k ? ctx.lineTo(X(k), y) : ctx.moveTo(X(k), y); }
     ctx.strokeStyle = C.data; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.stroke();
@@ -359,10 +375,10 @@ function drawBackdrop() {
     ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = hot ? 2.6 : w;
     ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]);
   };
-  line('ceil', C.muted, [5, 5], 1.2); line('thr', C.green, [7, 5], 1.4); line('tgt', C.data, [], 2);
+  line('ceil', C.ceil, [5, 5], 1.3); line('thr', C.thr, [7, 5], 1.4); line('tgt', C.data, [], 2);
   // legend
   const lx = PX1 - 330, ly = 80;
-  ctx.fillStyle = C.trace; ctx.fillRect(lx, ly - 1, 16, 2); text('Input', lx + 22, ly, 12, C.muted, 'left');
+  ctx.fillStyle = C.in; ctx.fillRect(lx, ly - 1, 16, 2); text('Input', lx + 22, ly, 12, C.muted, 'left');
   ctx.fillStyle = C.data; ctx.fillRect(lx + 76, ly - 1.5, 16, 3); text('Output', lx + 98, ly, 12, C.muted, 'left');
   text('RMS, last 10 s', PX1 - 22, ly, 12, C.muted, 'right');
 }
@@ -371,22 +387,32 @@ function drawMeter(x, pk, hold, isIn) {
   const s = { x, y: MTR.y, w: MTR.w, h: MTR.h, r: MTR.r };
   glass(s, { shadowBlur: 18 });
   const cx = x + MTR.w / 2;
-  text(hold > -RANGE_DB ? fmt(hold) : '−∞', cx, MTR.y + 18, 11.5, hold > -1 ? C.red : C.ink, 'center', 600);
-  text(isIn ? 'In' : 'Out', cx, MTR.y + 35, 11, C.muted, 'center', 500);
+  const zone = v => v > -6 ? C['m-hot'] : v > -18 ? C['m-warn'] : C['m-safe'];
+  // peak readout in its zone colour; a clip light above it once a peak reaches 0 dBFS
+  const clip = hold > -0.5;
+  ctx.fillStyle = clip ? C['m-hot'] : C['meter-off']; ctx.beginPath(); ctx.roundRect(cx - 12, MTR.y + 8, 24, 5, 2.5); ctx.fill();
+  text(hold > -RANGE_DB ? fmt(hold) : '−∞', cx, MTR.y + 25, 11.5, hold > -RANGE_DB ? zone(hold) : C.muted, 'center', 600);
+  text(isIn ? 'In' : 'Out', cx, MTR.y + 41, 11, C.muted, 'center', 500);
+  // bars on the graph side's far edge, scale between them and the graph: In has numbers on its right, Out on its left
+  const bw = 5, gap = 3, bx = isIn ? x + 12 : x + MTR.w - 12 - bw * 2 - gap;
+  const g = ctx.createLinearGradient(0, GB, 0, GT);
+  const f18 = (RANGE_DB - 18) / RANGE_DB, f6 = (RANGE_DB - 6) / RANGE_DB;
+  g.addColorStop(0, C['m-safe']); g.addColorStop(f18 - .001, C['m-safe']); g.addColorStop(f18, C['m-warn']);
+  g.addColorStop(f6 - .001, C['m-warn']); g.addColorStop(f6, C['m-hot']); g.addColorStop(1, C['m-hot']);
   for (let ch = 0; ch < 2; ch++) {
-    const bx = cx - 7 + ch * 9, bw = 5;
-    ctx.fillStyle = C['meter-off']; ctx.beginPath(); ctx.roundRect(bx, GT, bw, GB - GT, 2.5); ctx.fill();
+    const xx = bx + ch * (bw + gap);
+    ctx.fillStyle = C['meter-off']; ctx.beginPath(); ctx.roundRect(xx, GT, bw, GB - GT, 2.5); ctx.fill();
     const p = pk - ch * (0.6 + 0.5 * Math.sin(t * 1.3 + (isIn ? 0 : 2)));
-    if (p > -RANGE_DB) {
-      const top = yOf(Math.min(0, p));
-      const g = ctx.createLinearGradient(0, GB, 0, GT);
-      g.addColorStop(0, C.meter); g.addColorStop(1 - 1 / RANGE_DB, C.meter); g.addColorStop(1 - 1 / RANGE_DB + .001, C.red); g.addColorStop(1, C.red);
-      ctx.save(); ctx.shadowColor = C.green; ctx.shadowBlur = 0;
-      ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(bx, top, bw, GB - top, 2.5); ctx.fill(); ctx.restore();
-    }
-    if (hold > -RANGE_DB) { ctx.fillStyle = C.ink; ctx.fillRect(bx - 1, yOf(Math.min(0, hold)) - 1, bw + 2, 2); }
+    if (p > -RANGE_DB) { const top = yOf(Math.min(0, p)); ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(xx, top, bw, GB - top, 2.5); ctx.fill(); }
+    if (hold > -RANGE_DB) { ctx.fillStyle = zone(hold); ctx.fillRect(xx - 1, yOf(Math.min(0, hold)) - 1, bw + 2, 2); }
   }
-  for (let v = 0; v >= -80; v -= 10) { ctx.fillStyle = C.muted; ctx.globalAlpha = .6; ctx.fillRect(isIn ? cx + 9 : cx - 13, Math.round(yOf(v)), 4, 1); ctx.globalAlpha = 1; }
+  // the same marks as the graph: a tick every 5 dB, a number every 10, at the same heights
+  const tickX = isIn ? bx + bw * 2 + gap + 3 : bx - 7;
+  for (let v = 0; v >= -80; v -= 5) {
+    const y = Math.round(yOf(v)) + .5, major = v % 10 === 0;
+    ctx.fillStyle = C.muted; ctx.globalAlpha = major ? .9 : .5; ctx.fillRect(tickX, y, major ? 4 : 3, 1); ctx.globalAlpha = 1;
+    if (major) text(fmt(v, 0), isIn ? tickX + 7 : tickX - 3, y, 11, C.muted, isIn ? 'left' : 'right', 500);
+  }
 }
 
 function drawKnob(k) {
@@ -459,7 +485,7 @@ function drawDeck() {
   const g = P.bypass ? 0 : gain, gb = { x: DECK.x + DECK.w + 12, y: 548, w: 124, h: 58, r: 22 };
   glass(gb, { shadowBlur: 18 });
   text('Applied gain', gb.x + 16, gb.y + 17, 12, C.muted, 'left', 500);
-  text(sgn(g) + ' dB', gb.x + gb.w - 16, gb.y + 39, 22, Math.abs(g) < .05 ? C.ink : C['accent-text'], 'right', 700);
+  text(sgn(g) + ' dB', gb.x + gb.w - 16, gb.y + 39, 22, g > .05 ? C.boost : g < -.05 ? C.cut : C.ink, 'right', 700);
 }
 
 function powerIcon(cx, cy, col) {
@@ -509,7 +535,7 @@ function drawHeader() {
 }
 
 function drawTags() {
-  const tags = [['ceil', 'Ceiling', C.muted, C.label], ['thr', 'Threshold', C.green, C['green-text']], ['tgt', 'Target', C.data, C['data-text']]];
+  const tags = [['ceil', 'Ceiling', C.ceil, C['ceil-text']], ['thr', 'Threshold', C.thr, C['thr-text']], ['tgt', 'Target', C.data, C['data-text']]];
   for (const [id, name, col, colText] of tags) {
     const lineY = yOf(P[id]), under = lineY > FADE_TOP + 24;
     const y = under ? FADE_TOP + 22 : lineY;
@@ -523,8 +549,8 @@ function drawTags() {
 }
 
 const STATES = {
-  on: ['On target', 'data'], boost: ['Boosting', 'label'], cut: ['Cutting', 'label'], ceiling: ['Held back by the ceiling', 'red'],
-  range: ['At the edge of the range', 'red'], wait: ['Below the threshold, not adjusting', 'muted'], return: ['Easing back to 0 dB', 'label'],
+  on: ['On target', 'data'], boost: ['Boosting', 'boost'], cut: ['Cutting', 'cut'], ceiling: ['Held back by the ceiling', 'ceil'],
+  range: ['At the edge of the range', 'rng'], wait: ['Below the threshold, not adjusting', 'muted'], return: ['Easing back to 0 dB', 'label'],
   held: ['Holding a fixed gain', 'ink'], analyzing: ['Analyzing', 'ink'],
 };
 function statusText() {
@@ -642,13 +668,13 @@ function drawDrawer() {
   wctx.clearRect(0, 0, w, h);
   wctx.fillStyle = C.grid; wctx.fillRect(0, Math.round(mid), w, d);
   const thrA = Math.min(1, Math.max(0, (P.thr + 66) / 60)) * (mid - 8 * d);
-  wctx.setLineDash([4 * d, 4 * d]); wctx.strokeStyle = C.green; wctx.globalAlpha = .7; wctx.lineWidth = d;
+  wctx.setLineDash([4 * d, 4 * d]); wctx.strokeStyle = C.thr; wctx.globalAlpha = .8; wctx.lineWidth = d;
   [mid - thrA, mid + thrA].forEach(y => { wctx.beginPath(); wctx.moveTo(0, y); wctx.lineTo(w, y); wctx.stroke(); });
   wctx.setLineDash([]); wctx.globalAlpha = 1;
   const n = wave.length, stp = w / WAVE;
   for (let i = 0; i < n; i++) {
     const s = wave[i], x = w - (n - i) * stp, a = s.a * (mid - 8 * d);
-    wctx.fillStyle = s.an ? C.data : C.trace; wctx.globalAlpha = s.act ? 1 : .35;
+    wctx.fillStyle = s.an ? C.data : C.in; wctx.globalAlpha = s.act ? 1 : .35;
     wctx.fillRect(x, mid - a * s.up, Math.max(d, stp * .9), a * s.up + a);
   }
   wctx.globalAlpha = 1;
