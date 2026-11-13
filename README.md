@@ -22,14 +22,19 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
   press **Lock** (or it locks after 20 s). One fixed correction is then held. Analyze / Lock is also a host
   parameter, so a hotkey, Stream Deck or MIDI button can press it: each press analyzes, the next locks.
 - **Threshold** (dB RMS): below this it stops adjusting, so silence, breaths and noise never trigger a boost.
-- **Target** (dB RMS): the level you want. The default is −18.
+- **Target**: the level you want, −40 to −3 dB. The default is −18. The level settles on the target itself,
+  then holds still inside a small dead band so it never fidgets.
+- **RMS / Peak** (the switch right of Ride / Hold): what the target measures. **RMS** puts the average loudness
+  on the target (dB RMS, the usual choice for voice). **Peak** puts the highest peaks on the target (dBFS peak),
+  and the graph then draws peaks to match.
 - **Response** (ms): how long Corridor listens before it judges the level. 10 ms is the fastest and follows
   almost every word; 3000 ms is the slowest and rides whole phrases. The dial is marked Fast and Slow and
   runs on a log scale. Drums are detected and stretch it up to 3x (at most 0.8 s), so the gain follows the
   groove, not each hit. Below about 50 ms the leveler starts to shape the sound itself, like a compressor.
 - **Range** (dB): the most it may boost or cut.
-- **Ceiling** (dBFS, −60 to 0): the highest peak allowed. Boosts stop short of it and a 5 ms look-ahead
-  brick-wall limiter catches the rest. Half the dial covers −12 to 0, where it is usually set.
+- **Ceiling** (dBFS, −60 to 0): the highest peak allowed, enforced by a 5 ms look-ahead brick-wall limiter.
+  To reach the target, boosts may push short peaks (consonants, plosives) up to 6 dB into that limiter; a boost
+  that would need more is held back. Half the dial covers −12 to 0, where it is usually set.
 - **Rise, fall, trim** (the button next to Ride / Hold opens them):
   - **Rise** (ms): how fast quiet passages are lifted.
   - **Fall** (ms): how fast loud passages are pulled down. A slow rise and a fast fall suit voice.
@@ -50,8 +55,8 @@ same heights as the meters' scales. The colours are tuned for contrast on bright
 text is set in IBM Plex Sans. The window can be resized from 720 to 2240 px wide and keeps its shape. Every
 on/off button shows its state the same way: off is plain glass with a grey dot, on is filled solid (red for
 Bypass) and the dot lights. The meters show left and right with a balance dot and the peak level on top, in
-green, amber and red zones. The bottom corners show how far the output is from the target and the applied
-gain; the latency is under them (5 ms at every sample rate). A one-time tip explains the two settings that matter most.
+green, amber and red zones. The legend bar above the graph shows how far the output is from the target and the
+applied gain; the latency is under the graph (5 ms at every sample rate). A one-time tip explains the two settings that matter most.
 
 ![Hold mode with the analysis sheet open](docs/window-hold.png)
 

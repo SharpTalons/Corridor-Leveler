@@ -15,6 +15,7 @@ CorridorAudioProcessor::CorridorAudioProcessor()
     pRange = apvts.getRawParameterValue(ids::range);
     pCeiling = apvts.getRawParameterValue(ids::ceiling);
     pMode = apvts.getRawParameterValue(ids::mode);
+    pDetect = apvts.getRawParameterValue(ids::detect);
     pEase = apvts.getRawParameterValue(ids::ease);
     pBypass = apvts.getRawParameterValue(ids::bypass);
     pRise = apvts.getRawParameterValue(ids::rise);
@@ -33,7 +34,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout CorridorAudioProcessor::crea
             [dec](float v, int) { return String(v, dec); });
     };
     l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::threshold, 1}, "Threshold", NormalisableRange<float>(-70.f, -20.f, 0.5f), -48.f, db("dB RMS", 1)));
-    l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::target, 1}, "Target", NormalisableRange<float>(-40.f, -6.f, 0.5f), -18.f, db("dB RMS", 1)));
+    l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::target, 1}, "Target", NormalisableRange<float>(-40.f, -3.f, 0.5f), -18.f, db("dB", 1)));
+    l.add(std::make_unique<AudioParameterChoice>(ParameterID{ids::detect, 1}, "Target measures", StringArray{"RMS", "Peak"}, 0));
     // times run on a log taper, so the fast end of the dial has room
     auto logRange = [](float lo, float hi) {
         return NormalisableRange<float>(lo, hi,
@@ -76,6 +78,7 @@ void CorridorAudioProcessor::run(juce::AudioBuffer<float>& buffer, bool forceByp
     corridor::Params p;
     p.threshold = pThreshold->load();
     p.target = pTarget->load();
+    p.peakDetect = pDetect->load() > 0.5f;
     p.responseMs = pResponse->load();
     p.riseMs = pRise->load();
     p.fallMs = pFall->load();

@@ -34,8 +34,8 @@ const char* stateText(State s) {
 // ---------------------------------------------------------------- meter
 void Processor::Meter::reset(int blockLen) {
     block = std::max(1, blockLen);
-    n = 0; accSq = 0.0; peak = 0.f; ring.fill(0.0); ri = 0;
-    blockMs = 0.0; blockPeak = 0.f; rmsDb = peakDb = holdDb = -120.f; holdCount = 0;
+    n = 0; accSq = 0.0; peak = 0.f; ring.fill(0.0); pring.fill(0.f); ri = 0;
+    blockMs = 0.0; blockPeak = 0.f; rmsDb = peakDb = holdDb = pk300Db = -120.f; holdCount = 0;
 }
 
 bool Processor::Meter::push(double meanSq, float absPeak) {
@@ -44,10 +44,13 @@ bool Processor::Meter::push(double meanSq, float absPeak) {
     if (++n < block) return false;
     blockMs = accSq / n; blockPeak = peak;
     accSq = 0.0; peak = 0.f; n = 0;
-    ring[ri] = blockMs; ri = (ri + 1) % int(ring.size());
+    ring[ri] = blockMs; pring[ri] = blockPeak; ri = (ri + 1) % int(ring.size());
     double s = 0.0;
     for (double v : ring) s += v;
     rmsDb = msToDb(s / double(ring.size()));
+    float pm = 0.f;
+    for (float v : pring) pm = std::max(pm, v);
+    pk300Db = linToDb(pm);
     const float pd = linToDb(blockPeak);
     peakDb = pd > peakDb ? pd : std::max(-120.f, peakDb - 0.35f);  // ~35 dB/s fall
     if (pd > holdDb) { holdDb = pd; holdCount = 150; }              // 1.5 s hold
@@ -207,13 +210,14 @@ void Processor::controlBlock() {
     // Percussive material stretches it up to 3x (at most 0.8 s), so the gain follows the groove, not each hit.
     int win = clampv(int(std::lround(double(p_.responseMs) / 10.0)), 1, N);
     if (perc_) win = std::max(win, std::min(80, win * 3));
-    double sum = 0.0; int count = 0;
+    double sum = 0.0; int count = 0; float wpk = 0.f;
     for (int k = 0; k < win; ++k) {
         const int j = (i - k + N) % N;
-        if (act_[size_t(j)]) { ++count; sum += ms_[size_t(j)]; }
+        if (act_[size_t(j)]) { ++count; sum += ms_[size_t(j)]; wpk = std::max(wpk, pk_[size_t(j)]); }
     }
     const bool lValid = count >= std::min(10, win);
-    const float L = lValid ? msToDb(sum / count) : -120.f;
+    // the level the target is compared with: RMS, or with Peak detection the highest peak in the window
+    const float L = !lValid ? -120.f : p_.peakDetect ? linToDb(wpk) : msToDb(sum / count);
     li_ = (i + 1) % N;
 
     // Analyze (Hold mode)
@@ -232,7 +236,7 @@ void Processor::controlBlock() {
         target = holdG_; tau = 0.08f;
         st = an_.on ? State::Analyzing : (t_.holdValid.load() ? State::Held : State::Unset);
     } else if (!active) {
-        activeT_ = 0.f; silentT_ += dt;
+        activeT_ = 0.f; silentT_ += dt; correcting_ = true;
         if (p_.easeInSilence && silentT_ > float(kEaseDelaySeconds) && std::fabs(g) > 0.01f) {
             target = 0.f; tau = 1.0f; st = State::Returning;
         } else {
@@ -244,16 +248,20 @@ void Processor::controlBlock() {
             st = State::Waiting;
         } else {
             const float outLvl = L + g, d = std::fabs(outLvl - p_.target);
-            // within a small dead band of the target it holds still, so it never fidgets
-            // (0.75 dB normally, 0.2 dB at very fast settings, where the user wants it tight)
+            // Once on target it holds still inside a small dead band, so it never fidgets (0.75 dB normally,
+            // 0.2 dB at very fast settings). But when it moves, it goes all the way to the target, not just to
+            // the edge of the band, so the level settles on the target instead of short of it.
             const float band = p_.responseMs < 100.f ? 0.2f : 0.75f;
-            target = d < band ? g : p_.target - L;
+            if (d > band) correcting_ = true;
+            else if (d < 0.1f) correcting_ = false;
+            target = correcting_ ? p_.target - L : g;
             tau = (target > g ? p_.riseMs : p_.fallMs) / 1000.f;
             if (perc_) tau = std::max(tau, std::min(0.6f, tau * 3.f));  // drums: follow the groove, not each hit
             st = d < band ? State::OnTarget : (outLvl < p_.target ? State::Boosting : State::Cutting);
         }
-        // ceiling: never boost peaks past it
-        const float gC = p_.ceiling - pk1;
+        // ceiling: boosts may push the loudest peaks up to kPeakLimitDb into the look-ahead limiter, so a voice
+        // with sharp consonants still reaches the target; beyond that the boost is held back
+        const float gC = p_.ceiling + kPeakLimitDb - pk1;
         if (target > gC) {
             target = gC;
             if (st == State::Boosting || st == State::OnTarget || g > gC + 0.1f) st = State::Ceiling;
@@ -269,6 +277,7 @@ void Processor::controlBlock() {
 
     // telemetry
     t_.inRms.store(in_.rmsDb); t_.outRms.store(out_.rmsDb);
+    t_.inPk.store(in_.pk300Db); t_.outPk.store(out_.pk300Db);
     t_.inPeak.store(in_.peakDb); t_.inPeakHold.store(in_.holdDb);
     t_.outPeak.store(out_.peakDb); t_.outPeakHold.store(out_.holdDb);
     t_.inPeakL.store(inCh_.db[0]); t_.inPeakR.store(inCh_.db[1]); t_.inBalance.store(inCh_.bal);
@@ -285,7 +294,8 @@ void Processor::controlBlock() {
     slotPeak_ = std::max(slotPeak_, in_.blockPeak);
     if (++blocks_ % 2 == 0) {
         const int w = histCount_.load(std::memory_order_relaxed);
-        hist_[size_t(w % kHistorySize)] = Snapshot{in_.rmsDb, out_.rmsDb, p_.bypass ? 0.f : g_, p_.bypass ? 0.f : linToDb(minEnv_), linToDb(slotPeak_), an_.on};
+        hist_[size_t(w % kHistorySize)] = Snapshot{in_.rmsDb, out_.rmsDb, p_.bypass ? 0.f : g_, p_.bypass ? 0.f : linToDb(minEnv_), linToDb(slotPeak_),
+                                            in_.pk300Db, out_.pk300Db, an_.on};
         slotPeak_ = 0.f;
         histCount_.store(w + 1, std::memory_order_release);
         t_.limiterDb.store(linToDb(minEnv_));
@@ -301,10 +311,10 @@ void Processor::lockAnalysis() {
         t_.analyzeFailed.store(true);
         return;
     }
-    const float measured = msToDb(a.sum / a.count);
+    const float measured = p_.peakDetect ? linToDb(a.pk) : msToDb(a.sum / a.count);
     float hg = p_.target - measured;
     HoldLimit lim = HoldLimit::None;
-    const float room = p_.ceiling - linToDb(a.pk);
+    const float room = p_.ceiling + kPeakLimitDb - linToDb(a.pk);
     if (hg > room) { hg = room; lim = HoldLimit::Ceiling; }
     if (std::fabs(hg) > p_.range) { hg = clampv(hg, -p_.range, p_.range); lim = HoldLimit::Range; }
     holdG_ = hg;
