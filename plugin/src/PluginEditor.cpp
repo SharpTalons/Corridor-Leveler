@@ -48,15 +48,17 @@ const Pal kDark{Colour(0xff0a0a0c), Colour(0xffffffff), Colour(0xffdedee3), Colo
                 Colour(0x2bffffff), Colour(0x17ffffff), Colour(0x2effffff), Colour(0x8cffffff), Colour(0x38ffffff), Colour(0x80000000),
                 Colour(0x05ffffff), Colour(0x04ffffff), Colour(0x24ffffff), Colour(0x47ffffff), Colour(0xf51a1a1f)};
 
-// IBM Plex Sans: open, distinct letterforms, tabular figures and a plain zero
+// Inter: a plain, neutral screen face in the manner of studio plugin interfaces. Mostly regular weight; "bold" is
+// SemiBold and kept for names and titles. Every size is drawn 15% larger than the number in the code.
 const Typeface::Ptr& face(bool bold) {
-    static const Typeface::Ptr regular = Typeface::createSystemTypefaceFor(CorridorFonts::IBMPlexSansRegular_ttf,
-                                                                           size_t(CorridorFonts::IBMPlexSansRegular_ttfSize));
-    static const Typeface::Ptr heavy = Typeface::createSystemTypefaceFor(CorridorFonts::IBMPlexSansBold_ttf,
-                                                                         size_t(CorridorFonts::IBMPlexSansBold_ttfSize));
-    return bold ? heavy : regular;
+    static const Typeface::Ptr regular = Typeface::createSystemTypefaceFor(CorridorFonts::InterTabularRegular_ttf,
+                                                                           size_t(CorridorFonts::InterTabularRegular_ttfSize));
+    static const Typeface::Ptr semibold = Typeface::createSystemTypefaceFor(CorridorFonts::InterTabularSemiBold_ttf,
+                                                                            size_t(CorridorFonts::InterTabularSemiBold_ttfSize));
+    return bold ? semibold : regular;
 }
-Font sans(float h, bool bold = false) { return Font(FontOptions(face(bold)).withHeight(h)); }
+constexpr float kTextScale = 1.15f;
+Font sans(float h, bool bold = false) { return Font(FontOptions(face(bold)).withHeight(h * kTextScale)); }
 
 String fmtDb(float v, int dec = 1, bool sign = false) {
     String s = String(std::abs(v), dec);
@@ -303,7 +305,7 @@ public:
         const auto r = b.getLocalBounds().toFloat();
         const String icon = b.getProperties().getWithDefault("icon", "");
         const String trailing = b.getProperties().getWithDefault("trailing", "");
-        const Font f = sans(float(b.getProperties().getWithDefault("fontSize", 13.0)), true);
+        const Font f = sans(float(b.getProperties().getWithDefault("fontSize", 13.0)), kind == "key");
         g.setFont(f);
         if (icon.isNotEmpty() && b.getButtonText().isEmpty()) {
             const float is = jmin(18.f, r.getHeight() * 0.55f);
@@ -523,8 +525,8 @@ public:
         const float sw = r.getWidth() / float(labels.size());
         drawGlass(g, gc, *this, capsule(Rectangle<float>(r.getX() + 2.f + thumb * sw, r.getY() + 2.f, sw - 4.f, r.getHeight() - 4.f)),
                   {c.glassStrong, 1.2f, true, 8.f, 2.f, 1.2f});
-        g.setFont(sans(fontSize, true));
         for (int i = 0; i < labels.size(); ++i) {
+            g.setFont(sans(fontSize, i == selected));
             g.setColour(i == selected ? c.ink : (hoverIndex == i ? c.label : c.muted));
             g.drawText(labels[i], Rectangle<float>(r.getX() + float(i) * sw, r.getY(), sw, r.getHeight()), Justification::centred);
         }
@@ -671,7 +673,7 @@ public:
     void drawScale(Graphics& g) {
         const Pal& c = *gc.pal;
         const float x0 = PX0 + 22.f, x1 = PX1 - 22.f;
-        g.setFont(sans(12.f, true));
+        g.setFont(sans(12.f));
         for (int v = 0; v >= -int(kDbRange); v -= 10) {
             const float y = std::round(yOf(float(v)));
             g.setColour(c.grid.withMultipliedAlpha(y > kFadeTop ? 0.7f : 1.f));
@@ -733,8 +735,8 @@ public:
         auto zone = [&](float v) { return v > -6.f ? c.mHot : v > -18.f ? c.mWarn : c.mSafe; };
         // clip light, peak readout in its zone colour, name
         g.setColour(hold > -0.5f ? c.mHot : c.meterOff); g.fillRoundedRectangle(cx - 12.f, 8.f, 24.f, 5.f, 2.5f);
-        g.setFont(sans(11.5f, true)); g.setColour(hold > -kDbRange ? zone(hold) : c.muted);
-        g.drawText(hold > -kDbRange ? fmtDb(hold) : String(CharPointer_UTF8("\xe2\x80\x93")), Rectangle<float>(0.f, 17.f, w, 16.f), Justification::centred);
+        g.setFont(sans(11.5f)); g.setColour(hold > -kDbRange ? zone(hold) : c.muted);
+        g.drawText(hold > -kDbRange ? fmtDb(hold) : String(CharPointer_UTF8("\xe2\x88\x92\xe2\x88\x9e")), Rectangle<float>(0.f, 17.f, w, 16.f), Justification::centred);
         g.setFont(sans(11.f)); g.setColour(c.muted);
         g.drawText(input ? "In peak" : "Out peak", Rectangle<float>(0.f, 33.f, w, 16.f), Justification::centred);  // a target may be RMS; say this is not
         // left and right bars in fixed zones: green up to -18 dBFS, amber to -6, red above

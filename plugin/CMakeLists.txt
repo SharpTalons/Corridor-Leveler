@@ -48,9 +48,9 @@ juce_add_plugin(CorridorLeveler
   VST2_CATEGORY kPlugCategEffect
   COPY_PLUGIN_AFTER_BUILD FALSE)
 
-# the interface typeface: IBM Plex Sans (SIL OFL 1.1, see fonts/OFL.txt), unmodified. Its figures are tabular,
-# so live numbers don't shift as they change, and its zero is plain, so it never reads as an 8 at small sizes.
-juce_add_binary_data(corridor_fonts NAMESPACE CorridorFonts SOURCES fonts/IBMPlexSans-Regular.ttf fonts/IBMPlexSans-Bold.ttf)
+# the interface typeface: Inter (SIL OFL 1.1, see fonts/OFL.txt), Regular and SemiBold, with Inter's own tabular
+# figures made the default (renamed "Inter Tabular") so live numbers don't shift as they change
+juce_add_binary_data(corridor_fonts NAMESPACE CorridorFonts SOURCES fonts/InterTabular-Regular.ttf fonts/InterTabular-SemiBold.ttf)
 
 target_sources(CorridorLeveler PRIVATE src/PluginProcessor.cpp src/PluginEditor.cpp src/Updates.cpp)
 target_compile_definitions(CorridorLeveler PRIVATE CORRIDOR_VERSION_STRING="${PROJECT_VERSION}")
