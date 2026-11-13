@@ -21,7 +21,7 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
   press **Analyze** (or the **A** key), play a typical section while the live input waveform lights up, then
   press **Lock** (or it locks after 20 s). One fixed correction is then held. Analyze / Lock is also a host
   parameter, so a hotkey, Stream Deck or MIDI button can press it: each press analyzes, the next locks.
-- **Threshold** (dB RMS): below this it stops adjusting, so silence, breaths and noise never trigger a boost.
+- **Threshold** (dB RMS, −70 to 0): below this it stops adjusting, so silence, breaths and noise never trigger a boost.
 - **Target**: the level you want, −40 to −3 dB. The default is −18. The level settles on the target itself,
   then holds still inside a small dead band so it never fidgets.
 - **RMS / Peak** (the switch right of Ride / Hold): what the target measures. **RMS** puts the average loudness
