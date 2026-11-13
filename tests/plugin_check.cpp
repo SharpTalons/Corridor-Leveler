@@ -121,7 +121,7 @@ static void snapshots(const File& dir) {
         PNGImageFormat().writeImageToStream(img, os);
         std::printf("  wrote %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
     };
-    for (int w : {1120, 960, 480}) {
+    for (int w : {1120, 960, 720}) {
         proc.editorWidth = w;
         std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
         static_cast<CorridorEditor*>(ed.get())->refreshNow();

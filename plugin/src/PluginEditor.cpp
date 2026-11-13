@@ -9,6 +9,7 @@
 #include "PluginEditor.h"
 
 #include "Updates.h"
+#include "BinaryData.h"
 
 #include <cmath>
 #include <map>
@@ -39,13 +40,23 @@ struct Pal {
     Colour mSafe, mWarn, mHot, boost, cut;
     Colour grid, glass, glassStrong, rim, rimSoft, shade, bloomA, bloomB, meterOff, on, panel;
 };
-const Pal kDark{Colour(0xff0f0f11), Colour(0xffededef), Colour(0xffb4b4b9), Colour(0xff8b8b90),
-                Colour(0xff4fd1bf), Colour(0xff6fdccd), Colour(0xfff2b84b), Colour(0xfff2c46a), Colour(0xffff7a6b), Colour(0xffff8f82), Colour(0x73aabed7),
-                Colour(0xff4cd787), Colour(0xfff2c24b), Colour(0xffff5f52), Colour(0xff7fb2ff), Colour(0xffff9a6b),
-                Colour(0x0dffffff), Colour(0x0fffffff), Colour(0x21ffffff), Colour(0x61ffffff), Colour(0x1affffff), Colour(0x66000000),
-                Colour(0x09ffffff), Colour(0x06ffffff), Colour(0x12ffffff), Colour(0x33ffffff), Colour(0xe6222228)};
+// Tuned for readability under glare: near-black ground, white ink, every text grey at 9:1 or more,
+// brighter data hues and grid, and more opaque glass so text never sits on a busy backdrop.
+const Pal kDark{Colour(0xff0a0a0c), Colour(0xffffffff), Colour(0xffdedee3), Colour(0xffb9b9c0),
+                Colour(0xff5ee8d4), Colour(0xff7ff0df), Colour(0xffffc65a), Colour(0xffffd27a), Colour(0xffff8676), Colour(0xffff9d90), Colour(0xccc4d4e8),
+                Colour(0xff4fe08d), Colour(0xffffcc4d), Colour(0xffff6656), Colour(0xff8cbcff), Colour(0xffffa678),
+                Colour(0x2bffffff), Colour(0x17ffffff), Colour(0x2effffff), Colour(0x8cffffff), Colour(0x38ffffff), Colour(0x80000000),
+                Colour(0x05ffffff), Colour(0x04ffffff), Colour(0x24ffffff), Colour(0x47ffffff), Colour(0xf51a1a1f)};
 
-Font sans(float h, bool bold = false) { return Font(FontOptions(h, bold ? Font::bold : Font::plain)); }
+// IBM Plex Sans: open, distinct letterforms, tabular figures and a plain zero
+const Typeface::Ptr& face(bool bold) {
+    static const Typeface::Ptr regular = Typeface::createSystemTypefaceFor(CorridorFonts::IBMPlexSansRegular_ttf,
+                                                                           size_t(CorridorFonts::IBMPlexSansRegular_ttfSize));
+    static const Typeface::Ptr heavy = Typeface::createSystemTypefaceFor(CorridorFonts::IBMPlexSansBold_ttf,
+                                                                         size_t(CorridorFonts::IBMPlexSansBold_ttfSize));
+    return bold ? heavy : regular;
+}
+Font sans(float h, bool bold = false) { return Font(FontOptions(face(bold)).withHeight(h)); }
 
 String fmtDb(float v, int dec = 1, bool sign = false) {
     String s = String(std::abs(v), dec);
@@ -158,6 +169,9 @@ public:
     GlassContext* gc = nullptr;
     const Pal& p() const { return *gc->pal; }
 
+    // every font JUCE makes for us (tooltips, menus, editors) uses the interface typeface too
+    Typeface::Ptr getTypefaceForFont(const Font& f) override { return face(f.isBold()); }
+
     void apply() {
         const Pal& c = p();
         setColour(Label::textColourId, c.muted);
@@ -240,7 +254,8 @@ public:
     //   capsule - a glass capsule (Update, panel actions)
     //   circle  - a round glass button with an icon (undo, redo)
     // A capsule with property "toggle" is an on/off switch (Bypass, Return to 0 dB, Rise / fall / trim): off it is
-    // plain glass with a grey dot; on it fills with solid colour (red for "danger") and the dot lights.
+    // plain glass with a grey dot; on it fills with solid ink (red for "danger") and the dot lights. The fill is
+    // neutral on purpose: teal belongs to the output and the target, so a switch never reads as data.
     //   key     - the large Analyze / Lock key; filled with ink while analyzing
     //   plain   - text only (Got it, links in panels)
     void drawButtonBackground(Graphics& g, Button& b, const Colour&, bool over, bool down) override {
@@ -254,8 +269,7 @@ public:
             if (on) { DropShadow(c.shade, 12, {0, 4}).drawForPath(g, shape); g.setColour(c.ink); g.fillPath(shape); }
             else drawGlass(g, *gc, b, shape, {c.glassStrong, 1.05f, true, 14.f, 5.f, 1.4f});
         } else if (isToggle(b) && on) {
-            const Colour fill = b.getProperties().getWithDefault("danger", false) ? c.ceil : c.data;
-            DropShadow(fill.withAlpha(0.35f), 10, {0, 2}).drawForPath(g, shape);
+            const Colour fill = b.getProperties().getWithDefault("danger", false) ? c.ceil : c.ink;
             g.setColour(over || down ? fill.brighter(0.15f) : fill); g.fillPath(shape);
         } else if (kind != "plain") {
             drawGlass(g, *gc, b, shape, {over || down ? c.glassStrong : Colour(), 1.08f, false, 0.f, 0.f, 1.3f});
@@ -267,11 +281,11 @@ public:
 
     static bool isToggle(const Button& b) { return b.getProperties().getWithDefault("toggle", false); }
 
-    // the indicator light on a toggle: a dark dot with a bright ring when on, a grey dot when off
+    // the indicator light on a toggle: a dark dot on the light fill when on, a grey dot on glass when off
     static void drawToggleDot(Graphics& g, const Pal& c, Point<float> centre, bool on) {
         const float d = 8.f;
         const auto dot = Rectangle<float>(d, d).withCentre(centre);
-        if (on) { g.setColour(c.bg); g.fillEllipse(dot); g.setColour(Colours::white.withAlpha(0.55f)); g.drawEllipse(dot.expanded(1.5f), 1.5f); }
+        if (on) { g.setColour(c.bg); g.fillEllipse(dot); }
         else { g.setColour(c.muted.withAlpha(0.6f)); g.fillEllipse(dot); }
     }
 
@@ -478,7 +492,24 @@ public:
     int selected = 0;
     float thumb = 0.f;  // animated position of the droplet, in segments
     float fontSize = 13.5f;
-    void setSelected(int s) { selected = s; }
+    void setSelected(int s) {
+        if (s == selected) return;
+        selected = s;
+        if (auto* h = getAccessibilityHandler()) h->notifyAccessibilityEvent(AccessibilityEvent::valueChanged);
+    }
+    std::unique_ptr<AccessibilityHandler> createAccessibilityHandler() override {
+        struct Value : AccessibilityTextValueInterface {
+            explicit Value(Segmented& o) : owner(o) {}
+            bool isReadOnly() const override { return false; }
+            String getCurrentValueAsString() const override { return owner.labels[owner.selected]; }
+            void setValueAsString(const String& v) override { if (const int i = owner.labels.indexOf(v, true); i >= 0) owner.choose(i); }
+            Segmented& owner;
+        };
+        return std::make_unique<AccessibilityHandler>(
+            *this, AccessibilityRole::comboBox,
+            AccessibilityActions().addAction(AccessibilityActionType::press, [this] { choose((selected + 1) % labels.size()); }),
+            AccessibilityHandler::Interfaces{std::make_unique<Value>(*this)});
+    }
     void advance() { const float to = float(selected); thumb = std::abs(to - thumb) < 0.01f ? to : thumb + (to - thumb) * 0.3f; }
     void paint(Graphics& g) override {
         const Pal& c = *gc.pal;
@@ -517,6 +548,7 @@ class Scene : public Component {
 public:
     Scene(CorridorAudioProcessor& p, GlassContext& g_) : proc(p), gc(g_) { hist.reserve(kHist); }
     std::vector<corridor::Snapshot> hist;
+    int histWritten = 0;  // the engine's running count of history entries, so a redraw is skipped only when nothing moved
     bool analyzing = false;
     float analyzeSeconds = 0.f;
     const char* hover = nullptr;
@@ -531,9 +563,9 @@ public:
             g.fillRect(0, 0, W, H);
         };
         bloom(160.f, 40.f, 520.f, c.bloomA); bloom(1000.f, 600.f, 560.f, c.bloomB);
-        for (int v = 0; v >= -80; v -= 5) {  // the numbers are on the meters, at these same heights
-            g.setColour(c.grid.withMultipliedAlpha(v % 10 == 0 ? 1.f : 0.5f));
-            g.fillRect(PX0 - 6.f, std::round(yOf(float(v))), PX1 - PX0 + 12.f, 1.f);
+        for (int v = -5; v >= -80; v -= 10) {  // the 5 dB lines, faint; drawScale draws and labels every 10 dB
+            g.setColour(c.grid.withMultipliedAlpha(0.45f));
+            g.fillRect(PX0 + 22.f, std::round(yOf(float(v))), PX1 - PX0 - 44.f, 1.f);
         }
         const float x0 = PX0 + 22.f, x1 = PX1 - 22.f;
         const int n = int(hist.size());
@@ -572,8 +604,10 @@ public:
         line(ids::target, c.data, 0.f, 0.f, 2.f);
     }
 
-    // a small blurred copy of the backdrop for the glass, made once per frame
+    // a small blurred copy of the backdrop for the glass, remade only when something behind the glass changed
     void renderBlur() {
+        if (const auto key = backdropKey(); gc.blur.isValid() && key == lastKey) return;
+        else lastKey = key;
         constexpr int bw = W / 5, bh = H / 5;
         if (!blurSrc.isValid()) blurSrc = Image(Image::ARGB, bw, bh, true);
         {
@@ -584,6 +618,17 @@ public:
         if (!gc.blur.isValid()) gc.blur = Image(Image::ARGB, bw, bh, true);
         if (!kernelReady) { kernel.createGaussianBlur(2.6f); kernelReady = true; }
         kernel.applyToImage(gc.blur, blurSrc, blurSrc.getBounds());
+    }
+
+    // everything drawBackdrop reads, folded into one number
+    uint64 backdropKey() const {
+        uint64 h = 1469598103934665603ull;
+        auto mix = [&h](const void* p, size_t n) { for (size_t k = 0; k < n; ++k) { h ^= static_cast<const uint8*>(p)[k]; h *= 1099511628211ull; } };
+        mix(&histWritten, sizeof histWritten);
+        mix(&analyzing, sizeof analyzing); mix(&analyzeSeconds, sizeof analyzeSeconds);
+        mix(&hover, sizeof hover); mix(&dragId, sizeof dragId);
+        for (const char* id : {ids::ceiling, ids::threshold, ids::target}) { const float v = proc.state().getRawParameterValue(id)->load(); mix(&v, sizeof v); }
+        return h;
     }
 
     void paint(Graphics& g) override {
@@ -611,6 +656,25 @@ public:
         ColourGradient f(c.bg.withAlpha(0.f), 0.f, kFadeTop, c.bg.withAlpha(0.9f), 0.f, float(H), false);
         f.addColour(0.4, c.bg.withAlpha(0.62f));
         g.setGradientFill(f); g.fillRect(0.f, kFadeTop, float(W), float(H) - kFadeTop);
+        drawScale(g);
+    }
+
+    // The graph's own dB scale, drawn crisp over everything: a line every 10 dB at exactly the heights the meters
+    // mark, labelled at both edges. Labels skip the two readout boxes in the bottom corners.
+    void drawScale(Graphics& g) {
+        const Pal& c = *gc.pal;
+        const float x0 = PX0 + 22.f, x1 = PX1 - 22.f;
+        g.setFont(sans(12.f, true));
+        for (int v = 0; v >= -int(kDbRange); v -= 10) {
+            const float y = std::round(yOf(float(v)));
+            g.setColour(c.grid.withMultipliedAlpha(y > kFadeTop ? 0.7f : 1.f));
+            g.fillRect(x0, y, x1 - x0, 1.f);
+            if (y > 540.f) continue;  // the "From target" and "Applied gain" boxes sit here
+            g.setColour(c.label);
+            const String t = fmtDb(float(v), 0);
+            g.drawText(t, Rectangle<float>(PX0 - 14.f, y - 8.f, 30.f, 16.f), Justification::centredRight);  // ends before the traces begin
+            g.drawText(t, Rectangle<float>(PX1 - 14.f, y - 8.f, 30.f, 16.f), Justification::centredLeft);
+        }
     }
 
     // drag the Target, Threshold and Ceiling lines (above the controls)
@@ -646,6 +710,7 @@ private:
     Image blurSrc;
     ImageConvolutionKernel kernel{7};
     bool kernelReady = false;
+    uint64 lastKey = 0;
 };
 
 // ---------------------------------------------------------------- a meter: a glass capsule with L and R bars
@@ -663,9 +728,9 @@ public:
         // clip light, peak readout in its zone colour, name
         g.setColour(hold > -0.5f ? c.mHot : c.meterOff); g.fillRoundedRectangle(cx - 12.f, 8.f, 24.f, 5.f, 2.5f);
         g.setFont(sans(11.5f, true)); g.setColour(hold > -kDbRange ? zone(hold) : c.muted);
-        g.drawText(hold > -kDbRange ? fmtDb(hold) : String(CharPointer_UTF8("\xe2\x88\x92\xe2\x88\x9e")), Rectangle<float>(0.f, 17.f, w, 16.f), Justification::centred);
+        g.drawText(hold > -kDbRange ? fmtDb(hold) : String(CharPointer_UTF8("\xe2\x80\x93")), Rectangle<float>(0.f, 17.f, w, 16.f), Justification::centred);
         g.setFont(sans(11.f)); g.setColour(c.muted);
-        g.drawText(input ? "In" : "Out", Rectangle<float>(0.f, 33.f, w, 16.f), Justification::centred);
+        g.drawText(input ? "In peak" : "Out peak", Rectangle<float>(0.f, 33.f, w, 16.f), Justification::centred);  // the target is RMS; say this is not
         // left and right bars in fixed zones: green up to -18 dBFS, amber to -6, red above
         const float bw = 5.f, gap = 3.f, bx = input ? 12.f : w - 12.f - bw * 2.f - gap;
         const double f18 = (kDbRange - 18.0) / kDbRange, f6 = (kDbRange - 6.0) / kDbRange;
@@ -717,7 +782,6 @@ public:
     explicit Readouts(GlassContext& g_) : gc(g_) { setInterceptsMouseClicks(false, false); }
     String fromTarget = "Waiting", gainText = "0.0", latency;
     bool onTarget = false;
-    int gainSign = 0;
     void paint(Graphics& g) override {
         const Pal& c = *gc.pal;
         auto box = [&](Rectangle<float> r, const String& name, const String& value, Colour col, float size) {
@@ -728,7 +792,7 @@ public:
             g.drawFittedText(value, r.reduced(14.f, 6.f).withTrimmedTop(20.f).toNearestInt(), Justification::centredRight, 1, 0.8f);
         };
         box({90.f, 548.f, 124.f, 58.f}, "From target", fromTarget, onTarget ? c.dataText : c.ink, 17.f);
-        box({kDeck.getRight() + 12.f, 548.f, 124.f, 58.f}, "Applied gain", gainText + " dB", gainSign > 0 ? c.boost : gainSign < 0 ? c.cut : c.ink, 22.f);
+        box({kDeck.getRight() + 12.f, 548.f, 124.f, 58.f}, "Applied gain", gainText + " dB", c.ink, 22.f);  // the sign says boost or cut
         g.setFont(sans(11.f)); g.setColour(c.muted);
         g.drawText(latency, Rectangle<float>(94.f, GB + 14.f, 300.f, 16.f), Justification::centredLeft);
     }
@@ -1282,6 +1346,7 @@ public:
     void tick() {
         auto& dsp = proc.core();
         const auto& t = dsp.telemetry();
+        scene.histWritten = dsp.historyWritten();
         const int n = dsp.copyHistory(scratch, kHist);
         scene.hist.assign(scratch, scratch + n);
         scene.analyzing = t.analyzing.load();
@@ -1321,7 +1386,6 @@ public:
         // readouts
         const float g = byp ? 0.f : t.gain.load();
         readouts.gainText = fmtDb(g, 1, true);
-        readouts.gainSign = g > 0.05f ? 1 : g < -0.05f ? -1 : 0;
         const float tgt = proc.state().getRawParameterValue(ids::target)->load();
         const float out = t.outRms.load(), thr = proc.state().getRawParameterValue(ids::threshold)->load();
         const bool active = !holdMode && !byp && t.inRms.load() >= thr;
@@ -1483,7 +1547,7 @@ void CorridorEditor::applyDrawer(bool open) {
     drawerOpen = open;
     const double ratio = double(designW) / double(contentHeight());
     const int w = getWidth() > 0 ? getWidth() : width0;
-    setResizeLimits(minW, int(std::round(minW / ratio)), maxW, int(std::round(maxW / ratio)));  // the whole layout scales; at 480 px it is drawn at 43%
+    setResizeLimits(minW, int(std::round(minW / ratio)), maxW, int(std::round(maxW / ratio)));  // the whole layout scales; at 720 px it is drawn at 64%
     if (auto* c = getConstrainer()) c->setFixedAspectRatio(ratio);
     setSize(w, int(std::round(w / ratio)));
     resized();

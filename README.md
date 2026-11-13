@@ -45,11 +45,13 @@ settings to compare; B starts as a copy of A, and both are saved with the sessio
 Alt-click resets it.
 
 The window is a full-bleed level graph with the header, meters and readouts floating over it as glass, and
-the controls sitting in the graph where it frosts over. It can be resized from 480 to 2240 px wide and keeps
-its shape. Every on/off button shows its state the same way: off is plain glass with a grey dot, on is filled
-with colour and the dot lights. The meters show left and right with a balance dot, in green, amber and red
-zones, marked at the graph's heights. The bottom corners show how far the output is from the target and the applied gain; the latency is under them
-(5 ms at every sample rate). A one-time tip explains the two settings that matter most.
+the controls sitting in the graph where it frosts over. The graph is marked every 10 dB on both edges, at the
+same heights as the meters' scales. The colours are tuned for contrast on bright or glare-prone screens, and the
+text is set in IBM Plex Sans. The window can be resized from 720 to 2240 px wide and keeps its shape. Every
+on/off button shows its state the same way: off is plain glass with a grey dot, on is filled solid (red for
+Bypass) and the dot lights. The meters show left and right with a balance dot and the peak level on top, in
+green, amber and red zones. The bottom corners show how far the output is from the target and the applied
+gain; the latency is under them (5 ms at every sample rate). A one-time tip explains the two settings that matter most.
 
 ![Hold mode with the analysis sheet open](docs/window-hold.png)
 
@@ -109,6 +111,8 @@ Tests:
 Corridor Leveler is licensed under the **GNU AGPL v3 or later** (see `LICENSE`).
 
 - [JUCE](https://juce.com) is used under its AGPLv3 open-source licence.
+- [IBM Plex Sans](https://github.com/IBM/plex) is embedded unmodified under the SIL Open Font License 1.1
+  (see `plugin/fonts/OFL.txt`).
 - The 2.x plugin is built with [FST](https://git.iem.at/zmoelnig/FST) (GPLv3 or later), an independent
   reimplementation of the 2.x plugin headers, because Steinberg no longer distributes that SDK.
   "VST" is a Steinberg trademark. FST's authors ask that plugins built with FST not be called "VST"

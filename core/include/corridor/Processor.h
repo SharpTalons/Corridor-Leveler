@@ -102,6 +102,7 @@ public:
     const Telemetry& telemetry() const { return t_; }
     // Copies up to maxCount most recent snapshots, oldest first. Returns the count.
     int copyHistory(Snapshot* out, int maxCount) const;
+    int historyWritten() const { return histCount_.load(std::memory_order_acquire); }  // goes up by one per entry
 
     static constexpr float kNoHold = -1000.f;
 
