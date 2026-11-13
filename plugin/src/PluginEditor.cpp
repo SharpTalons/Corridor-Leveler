@@ -1259,10 +1259,10 @@ public:
         ab.setBounds(364, 18, 72, 30);
         undoBtn.setBounds(444, 18, 30, 30);
         redoBtn.setBounds(478, 18, 30, 30);
-        bypassBtn.setBounds(W - 24 - 112, 18, 112, 30);
-        easeBtn.setBounds(bypassBtn.getX() - 8 - 220, 18, 220, 30);
+        bypassBtn.setBounds(W - 24 - 108, 18, 108, 30);
+        easeBtn.setBounds(bypassBtn.getX() - 8 - 208, 18, 208, 30);
         int statusRight = easeBtn.getX() - 12;
-        if (updateBtn.isVisible()) { updateBtn.setBounds(easeBtn.getX() - 12 - 150, 18, 150, 30); statusRight = updateBtn.getX() - 8; }
+        if (updateBtn.isVisible()) { updateBtn.setBounds(easeBtn.getX() - 8 - 136, 18, 136, 30); statusRight = updateBtn.getX() - 8; }
         header.statusArea = Rectangle<float>(520.f - kHeader.getX(), 0.f, float(statusRight - 520), 42.f);
         // controls: Threshold and Response left, Target in the middle with Ride / Hold under it, Range and Ceiling right
         threshold.placeAt({290, 496});
