@@ -32,24 +32,18 @@ constexpr float kFadeTop = 408.f - 44.f;
 float yOf(float v) { return GT + jlimit(0.f, kDbRange, -v) / kDbRange * (GB - GT); }
 float vOf(float y) { return -jlimit(0.f, kDbRange, (y - GT) / (GB - GT) * kDbRange); }
 
-// ---------------------------------------------------------------- palette (dark and light)
+// ---------------------------------------------------------------- palette
 struct Pal {
-    bool dark;
     Colour bg, ink, label, muted;
     Colour data, dataText, thr, thrText, ceil, ceilText, in;
     Colour mSafe, mWarn, mHot, boost, cut;
     Colour grid, glass, glassStrong, rim, rimSoft, shade, bloomA, bloomB, meterOff, on, panel;
 };
-const Pal kDark{true, Colour(0xff0f0f11), Colour(0xffededef), Colour(0xffb4b4b9), Colour(0xff8b8b90),
+const Pal kDark{Colour(0xff0f0f11), Colour(0xffededef), Colour(0xffb4b4b9), Colour(0xff8b8b90),
                 Colour(0xff4fd1bf), Colour(0xff6fdccd), Colour(0xfff2b84b), Colour(0xfff2c46a), Colour(0xffff7a6b), Colour(0xffff8f82), Colour(0x73aabed7),
                 Colour(0xff4cd787), Colour(0xfff2c24b), Colour(0xffff5f52), Colour(0xff7fb2ff), Colour(0xffff9a6b),
                 Colour(0x0dffffff), Colour(0x0fffffff), Colour(0x21ffffff), Colour(0x61ffffff), Colour(0x1affffff), Colour(0x66000000),
                 Colour(0x09ffffff), Colour(0x06ffffff), Colour(0x12ffffff), Colour(0x33ffffff), Colour(0xe6222228)};
-const Pal kLight{false, Colour(0xfff2f2f4), Colour(0xff1d1d1f), Colour(0xff48484c), Colour(0xff6e6e73),
-                 Colour(0xff149483), Colour(0xff0f7a6c), Colour(0xffe09a12), Colour(0xff8f5c00), Colour(0xffe0483a), Colour(0xffb2352a), Colour(0x61465a78),
-                 Colour(0xff2fb562), Colour(0xffe3a51b), Colour(0xffe5392c), Colour(0xff1f5cc0), Colour(0xffb8501f),
-                 Colour(0x0d000000), Colour(0x73ffffff), Colour(0xbfffffff), Colour(0xf2ffffff), Colour(0x0f000000), Colour(0x14000000),
-                 Colour(0xb3ffffff), Colour(0x80ffffff), Colour(0x12000000), Colour(0x14000000), Colour(0xf2fbfbfc)};
 
 Font sans(float h, bool bold = false) { return Font(FontOptions(h, bold ? Font::bold : Font::plain)); }
 
@@ -66,36 +60,14 @@ const String kDot = String(CharPointer_UTF8(" \xc2\xb7 "));
 String speedWord(double ms) { return ms < 50 ? "Very fast" : ms < 200 ? "Fast" : ms < 900 ? "Medium" : "Slow"; }
 
 // ---------------------------------------------------------------- icons
-void drawIcon(Graphics& g, const String& name, Rectangle<float> a, Colour col, bool dark = true) {
+void drawIcon(Graphics& g, const String& name, Rectangle<float> a, Colour col) {
     const float s = jmin(a.getWidth(), a.getHeight());
     const auto b = a.withSizeKeepingCentre(s, s);
     const float cx = b.getCentreX(), cy = b.getCentreY(), x = b.getX(), y = b.getY();
     const PathStrokeType st(jmax(1.5f, s * 0.1f), PathStrokeType::curved, PathStrokeType::rounded);
     g.setColour(col);
     Path p;
-    if (name == "power") {
-        p.addCentredArc(cx, cy + s * 0.05f, s * 0.36f, s * 0.36f, 0.f, 0.7f, 2.f * kPi - 0.7f, true);
-        p.startNewSubPath(cx, y + s * 0.06f); p.lineTo(cx, cy);
-        g.strokePath(p, st);
-    } else if (name == "theme") {
-        if (dark) {  // moon
-            Path m; m.addEllipse(cx - s * 0.36f, cy - s * 0.36f, s * 0.72f, s * 0.72f);
-            m.addEllipse(cx - s * 0.08f, cy - s * 0.58f, s * 0.68f, s * 0.68f);
-            m.setUsingNonZeroWinding(false);
-            Graphics::ScopedSaveState ss(g);
-            Path clip; clip.addEllipse(cx - s * 0.36f, cy - s * 0.36f, s * 0.72f, s * 0.72f);
-            g.reduceClipRegion(clip);
-            g.fillPath(m);
-        } else {     // sun
-            g.fillEllipse(cx - s * 0.2f, cy - s * 0.2f, s * 0.4f, s * 0.4f);
-            for (int k = 0; k < 8; ++k) {
-                const float an = float(k) * kPi / 4.f;
-                p.startNewSubPath(cx + std::cos(an) * s * 0.32f, cy + std::sin(an) * s * 0.32f);
-                p.lineTo(cx + std::cos(an) * s * 0.46f, cy + std::sin(an) * s * 0.46f);
-            }
-            g.strokePath(p, st);
-        }
-    } else if (name == "undo" || name == "redo") {  // a hooked arrow: undo points back, redo forward
+    if (name == "undo" || name == "redo") {  // a hooked arrow: undo points back, redo forward
         const float d = name == "undo" ? -1.f : 1.f;
         p.startNewSubPath(cx - d * s * 0.3f, cy + s * 0.3f);
         p.quadraticTo(cx - d * s * 0.3f, cy - s * 0.24f, cx + d * s * 0.3f, cy - s * 0.24f);
@@ -127,7 +99,7 @@ void drawIcon(Graphics& g, const String& name, Rectangle<float> a, Colour col, b
 }
 
 // ---------------------------------------------------------------- glass
-// The shared state every glass piece draws from: the theme, the blurred graph and where the light is.
+// The shared state every glass piece draws from: the palette, the blurred graph and where the light is.
 struct GlassContext {
     const Pal* pal = &kDark;
     Image blur;                 // the graph, drawn small and blurred; maps onto the whole 1120 x 630 design
@@ -136,7 +108,7 @@ struct GlassContext {
 };
 
 struct GlassOpts {
-    Colour tint;              // transparent = the theme's glass tint
+    Colour tint;              // transparent = the palette's glass tint
     float lens = 1.05f;       // how much the backdrop is magnified under the glass
     bool shadow = true;
     float shadowRadius = 20.f, shadowY = 7.f;
@@ -164,19 +136,18 @@ void drawGlass(Graphics& g, const GlassContext& gc, Component& comp, const Path&
         g.fillRect(b);
         // light pooling on the lit side: the glass has thickness
         const float lx = b.getCentreX() + gc.light.x * b.getWidth() * 0.5f, ly = b.getCentreY() + gc.light.y * b.getHeight() * 0.5f;
-        g.setGradientFill(ColourGradient(Colours::white.withAlpha(p.dark ? 0.10f : 0.45f), lx, ly, Colours::white.withAlpha(0.f),
+        g.setGradientFill(ColourGradient(Colours::white.withAlpha(0.10f), lx, ly, Colours::white.withAlpha(0.f),
                                          lx + jmax(b.getWidth(), b.getHeight()) * 0.9f, ly, true));
         g.fillRect(b);
     }
     // rim: bright where the light catches the edge, a softer catch on the far side
     const float rx0 = b.getCentreX() + gc.light.x * b.getWidth() * 0.5f, ry0 = b.getCentreY() + gc.light.y * b.getHeight() * 0.5f;
     const float rx1 = b.getCentreX() - gc.light.x * b.getWidth() * 0.5f, ry1 = b.getCentreY() - gc.light.y * b.getHeight() * 0.5f;
-    ColourGradient rim(p.rim, rx0, ry0, Colours::white.withAlpha(p.dark ? 0.28f : 0.8f), rx1, ry1, false);
+    ColourGradient rim(p.rim, rx0, ry0, Colours::white.withAlpha(0.28f), rx1, ry1, false);
     rim.addColour(0.35, Colours::white.withAlpha(0.04f));
     rim.addColour(0.7, Colours::white.withAlpha(0.02f));
     g.setGradientFill(rim);
     g.strokePath(shape, PathStrokeType(o.rimWidth));
-    if (!p.dark) { g.setColour(p.rimSoft); g.strokePath(shape, PathStrokeType(0.6f)); }
 }
 Path capsule(Rectangle<float> r, float rad = -1.f) { Path p; p.addRoundedRectangle(r, rad < 0.f ? r.getHeight() * 0.5f : rad); return p; }
 Path circle(Rectangle<float> r) { Path p; p.addEllipse(r); return p; }
@@ -228,7 +199,7 @@ public:
         const Colour col = roleColour(role);
         const PathStrokeType ring(6.f, PathStrokeType::curved, PathStrokeType::rounded);
         Path track; track.addCentredArc(cx, cy, ringR, ringR, 0.f, a0, a1, true);
-        g.setColour(c.dark ? Colours::white.withAlpha(0.12f) : Colours::black.withAlpha(0.08f));
+        g.setColour(Colours::white.withAlpha(0.12f));
         g.strokePath(track, ring);
         if (pos > 0.003f) {
             Path val; val.addCentredArc(cx, cy, ringR, ringR, 0.f, a0, ang, true);
@@ -266,8 +237,10 @@ public:
     }
 
     // Buttons, by property "kind":
-    //   capsule - a glass capsule; when on, a stronger tint (Return to 0 dB, Rise / fall / trim, Update)
-    //   circle  - a round glass button with an icon (theme, bypass, undo, redo)
+    //   capsule - a glass capsule (Update, panel actions)
+    //   circle  - a round glass button with an icon (undo, redo)
+    // A capsule with property "toggle" is an on/off switch (Bypass, Return to 0 dB, Rise / fall / trim): off it is
+    // plain glass with a grey dot; on it fills with solid colour (red for "danger") and the dot lights.
     //   key     - the large Analyze / Lock key; filled with ink while analyzing
     //   plain   - text only (Got it, links in panels)
     void drawButtonBackground(Graphics& g, Button& b, const Colour&, bool over, bool down) override {
@@ -280,23 +253,36 @@ public:
         if (kind == "key") {
             if (on) { DropShadow(c.shade, 12, {0, 4}).drawForPath(g, shape); g.setColour(c.ink); g.fillPath(shape); }
             else drawGlass(g, *gc, b, shape, {c.glassStrong, 1.05f, true, 14.f, 5.f, 1.4f});
+        } else if (isToggle(b) && on) {
+            const Colour fill = b.getProperties().getWithDefault("danger", false) ? c.ceil : c.data;
+            DropShadow(fill.withAlpha(0.35f), 10, {0, 2}).drawForPath(g, shape);
+            g.setColour(over || down ? fill.brighter(0.15f) : fill); g.fillPath(shape);
         } else if (kind != "plain") {
-            const bool red = b.getProperties().getWithDefault("danger", false) && on;
-            Colour tint = on ? (red ? c.ceil.withAlpha(c.dark ? 0.35f : 0.28f) : c.on) : (over || down ? c.glassStrong : Colour());
-            drawGlass(g, *gc, b, shape, {tint, 1.08f, false, 0.f, 0.f, 1.3f});
+            drawGlass(g, *gc, b, shape, {over || down ? c.glassStrong : Colour(), 1.08f, false, 0.f, 0.f, 1.3f});
         } else if (over) {
             g.setColour(c.on); g.fillPath(shape);
         }
         if (b.hasKeyboardFocus(false)) { g.setColour(c.ink); g.strokePath(kind == "circle" ? circle(r.expanded(3.f)) : capsule(r.expanded(3.f)), PathStrokeType(2.f)); }
     }
 
+    static bool isToggle(const Button& b) { return b.getProperties().getWithDefault("toggle", false); }
+
+    // the indicator light on a toggle: a dark dot with a bright ring when on, a grey dot when off
+    static void drawToggleDot(Graphics& g, const Pal& c, Point<float> centre, bool on) {
+        const float d = 8.f;
+        const auto dot = Rectangle<float>(d, d).withCentre(centre);
+        if (on) { g.setColour(c.bg); g.fillEllipse(dot); g.setColour(Colours::white.withAlpha(0.55f)); g.drawEllipse(dot.expanded(1.5f), 1.5f); }
+        else { g.setColour(c.muted.withAlpha(0.6f)); g.fillEllipse(dot); }
+    }
+
     void drawButtonText(Graphics& g, TextButton& b, bool over, bool) override {
         const Pal& c = p();
         const String kind = b.getProperties().getWithDefault("kind", "capsule");
-        const bool on = b.getToggleState();
+        const bool on = b.getToggleState(), tog = isToggle(b);
         const Colour col = !b.isEnabled() ? c.muted.withAlpha(0.5f)
-                         : (kind == "key" && on) || bool(b.getProperties().getWithDefault("inverse", false)) ? c.bg
+                         : (kind == "key" && on) || (tog && on) || bool(b.getProperties().getWithDefault("inverse", false)) ? c.bg
                          : on || over ? c.ink : c.label;
+        constexpr float dotW = 8.f, dotGap = 7.f;
         const auto r = b.getLocalBounds().toFloat();
         const String icon = b.getProperties().getWithDefault("icon", "");
         const String trailing = b.getProperties().getWithDefault("trailing", "");
@@ -304,19 +290,30 @@ public:
         g.setFont(f);
         if (icon.isNotEmpty() && b.getButtonText().isEmpty()) {
             const float is = jmin(18.f, r.getHeight() * 0.55f);
-            drawIcon(g, icon, r.withSizeKeepingCentre(is, is), col, p().dark);
+            drawIcon(g, icon, r.withSizeKeepingCentre(is, is), col);
             return;
         }
         if (trailing.isNotEmpty()) {  // text on the left, a chevron on the right
+            auto tr = r.reduced(14.f, 0.f).withTrimmedRight(16.f);
+            if (tog) { drawToggleDot(g, c, {tr.getX() + dotW * 0.5f, r.getCentreY()}, on); tr.removeFromLeft(dotW + dotGap); }
             g.setColour(col);
-            g.drawFittedText(b.getButtonText(), r.reduced(14.f, 0.f).withTrimmedRight(16.f).toNearestInt(), Justification::centredLeft, 1, 0.9f);
-            drawIcon(g, trailing, Rectangle<float>(r.getRight() - 26.f, r.getCentreY() - 7.f, 14.f, 14.f), c.label);
+            g.drawFittedText(b.getButtonText(), tr.toNearestInt(), Justification::centredLeft, 1, 0.9f);
+            drawIcon(g, trailing, Rectangle<float>(r.getRight() - 26.f, r.getCentreY() - 7.f, 14.f, 14.f), tog && on ? c.bg : c.label);
+            return;
+        }
+        if (tog) {  // the dot and the label, centred together
+            const float tw = jmin(r.getWidth() - 28.f - dotW - dotGap, GlyphArrangement::getStringWidth(f, b.getButtonText()));
+            const float x0 = r.getCentreX() - (dotW + dotGap + tw) * 0.5f;
+            drawToggleDot(g, c, {x0 + dotW * 0.5f, r.getCentreY()}, on);
+            g.setColour(col);
+            g.drawFittedText(b.getButtonText(), Rectangle<float>(x0 + dotW + dotGap, r.getY(), tw + 2.f, r.getHeight()).toNearestInt(),
+                             Justification::centredLeft, 1, 0.9f);
             return;
         }
         if (icon.isNotEmpty()) {
             const float is = 15.f, tw = GlyphArrangement::getStringWidth(f, b.getButtonText());
             const float x0 = r.getCentreX() - (is + 7.f + tw) * 0.5f;
-            drawIcon(g, icon, Rectangle<float>(x0, r.getCentreY() - is * 0.5f, is, is), col, p().dark);
+            drawIcon(g, icon, Rectangle<float>(x0, r.getCentreY() - is * 0.5f, is, is), col);
             g.setColour(col);
             g.drawText(b.getButtonText(), Rectangle<float>(x0 + is + 7.f, r.getY(), tw + 4.f, r.getHeight()), Justification::centredLeft);
             return;
@@ -486,7 +483,7 @@ public:
     void paint(Graphics& g) override {
         const Pal& c = *gc.pal;
         const auto r = getLocalBounds().toFloat().reduced(1.f);
-        drawGlass(g, gc, *this, capsule(r), {c.dark ? Colours::black.withAlpha(0.18f) : Colours::black.withAlpha(0.05f), 1.f, false, 0.f, 0.f, 1.2f});
+        drawGlass(g, gc, *this, capsule(r), {Colours::black.withAlpha(0.18f), 1.f, false, 0.f, 0.f, 1.2f});
         const float sw = r.getWidth() / float(labels.size());
         drawGlass(g, gc, *this, capsule(Rectangle<float>(r.getX() + 2.f + thumb * sw, r.getY() + 2.f, sw - 4.f, r.getHeight() - 4.f)),
                   {c.glassStrong, 1.2f, true, 8.f, 2.f, 1.2f});
@@ -964,7 +961,7 @@ public:
         g.drawText("Shortcut A: analyze, then lock", Rectangle<float>(36.f, h - 24.f, 220.f, 14.f), Justification::centredLeft);
         // waveform: input peaks above the centre line, RMS below; the measured stretch in the data colour
         const auto wr = Rectangle<float>(262.f, 14.f, w - 262.f - 36.f, h - 40.f);
-        g.setColour(c.dark ? Colours::black.withAlpha(0.28f) : Colours::white.withAlpha(0.5f));
+        g.setColour(Colours::black.withAlpha(0.28f));
         g.fillRoundedRectangle(wr, 18.f);
         g.setColour(c.rimSoft); g.drawRoundedRectangle(wr, 18.f, 1.f);
         const float mid = wr.getCentreY(), half = wr.getHeight() * 0.5f - 8.f;
@@ -1132,7 +1129,6 @@ public:
           range(p, ids::range, "Range", [](double v) { return kPlusMinus + fmtDb(float(v)) + " dB"; }, 30.f, ""),
           ceiling(p, ids::ceiling, "Ceiling", [](double v) { return fmtDb(float(v)) + " dBFS"; }, 30.f, "ceil"),
           rideHold(gc, {"Ride", "Hold"}), ab(gc, {"A", "B"}), more(p, gc), tip(gc), drawer(p, gc), about(*checker, gc), prompt(*checker, gc) {
-        gc.pal = p.darkTheme ? &kDark : &kLight;
         gc.root = this;
         look.gc = &gc;
         look.apply();
@@ -1147,6 +1143,7 @@ public:
         rideHold.setTitle("Ride or Hold");
         rideHold.onSelect = [this](int i) { proc.undo.beginNewTransaction(); setParam(ids::mode, float(i)); };
         moreBtn.getProperties().set("trailing", "chevron-down");
+        moreBtn.getProperties().set("toggle", true);
         moreBtn.getProperties().set("fontSize", 12.5);
         moreBtn.setTitle("Rise, fall and output trim");
         moreBtn.onClick = [this] { more.setVisible(!more.isVisible()); if (more.isVisible()) { more.refresh(); more.toFront(false); } };
@@ -1164,19 +1161,19 @@ public:
         ab.setTitle("Settings A or B");
         ab.onSelect = [this](int i) { proc.switchSlot(i); };
         addAndMakeVisible(ab);
-        for (auto* b : {&undoBtn, &redoBtn, &themeBtn, &bypassBtn}) { b->getProperties().set("kind", "circle"); b->setButtonText({}); addAndMakeVisible(*b); }
+        for (auto* b : {&undoBtn, &redoBtn}) { b->getProperties().set("kind", "circle"); b->setButtonText({}); addAndMakeVisible(*b); }
         undoBtn.getProperties().set("icon", "undo"); undoBtn.setTitle("Undo"); undoBtn.setTooltip("Undo (Ctrl+Z)");
         redoBtn.getProperties().set("icon", "redo"); redoBtn.setTitle("Redo"); redoBtn.setTooltip("Redo (Ctrl+Shift+Z)");
         undoBtn.onClick = [this] { proc.undo.undo(); };
         redoBtn.onClick = [this] { proc.undo.redo(); };
-        themeBtn.getProperties().set("icon", "theme"); themeBtn.setTitle("Switch between dark and light"); themeBtn.setTooltip("Dark or light");
-        themeBtn.onClick = [this] { applyTheme(gc.pal != &kDark); };
-        bypassBtn.getProperties().set("icon", "power"); bypassBtn.getProperties().set("danger", true);
+        bypassBtn.getProperties().set("toggle", true); bypassBtn.getProperties().set("danger", true);
         bypassBtn.setTitle("Bypass"); bypassBtn.setTooltip("Bypass (keeps the same latency, so nothing jumps)");
         bypassBtn.setClickingTogglesState(true);
         bypassBtn.onPress = [this] { proc.undo.beginNewTransaction(); };
         bypassAtt = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state(), ids::bypass, bypassBtn);
+        addAndMakeVisible(bypassBtn);
         easeBtn.setClickingTogglesState(true);
+        easeBtn.getProperties().set("toggle", true);
         easeBtn.setTitle("Return to 0 dB in silence");
         easeBtn.setTooltip("Off: the gain freezes below the threshold. On: after 2 s of silence it glides back to 0 dB.");
         easeBtn.onPress = [this] { proc.undo.beginNewTransaction(); };
@@ -1227,14 +1224,6 @@ public:
         resized();
     }
 
-    void applyTheme(bool dark) {
-        proc.darkTheme = dark;
-        gc.pal = dark ? &kDark : &kLight;
-        look.apply();
-        sendLookAndFeelChange();
-        repaint();
-    }
-
     void setParam(const char* id, float v) {
         if (auto* prm = proc.state().getParameter(id)) { prm->beginChangeGesture(); prm->setValueNotifyingHost(prm->convertTo0to1(v)); prm->endChangeGesture(); }
     }
@@ -1264,15 +1253,14 @@ public:
         readouts.setBounds(0, 0, W, H);
         tags.setBounds(0, 0, W, H);
         header.setBounds(kHeader.toNearestInt());
-        // header, left to right: wordmark (About), preset, A / B, undo, redo ... status ... return to 0 dB, theme, bypass
+        // header, left to right: wordmark (About), preset, A / B, undo, redo ... status ... return to 0 dB, bypass
         aboutBtn.setBounds(18, 12, 160, 42);
         presetBtn.setBounds(200, 18, 156, 30);
         ab.setBounds(364, 18, 72, 30);
         undoBtn.setBounds(444, 18, 30, 30);
         redoBtn.setBounds(478, 18, 30, 30);
-        bypassBtn.setBounds(W - 12 - 42, 18, 30, 30);
-        themeBtn.setBounds(W - 12 - 80, 18, 30, 30);
-        easeBtn.setBounds(W - 12 - 296, 18, 206, 30);
+        bypassBtn.setBounds(W - 24 - 112, 18, 112, 30);
+        easeBtn.setBounds(bypassBtn.getX() - 8 - 220, 18, 220, 30);
         int statusRight = easeBtn.getX() - 12;
         if (updateBtn.isVisible()) { updateBtn.setBounds(easeBtn.getX() - 12 - 150, 18, 150, 30); statusRight = updateBtn.getX() - 8; }
         header.statusArea = Rectangle<float>(520.f - kHeader.getX(), 0.f, float(statusRight - 520), 42.f);
@@ -1301,6 +1289,7 @@ public:
         scene.renderBlur();
 
         const bool byp = proc.state().getRawParameterValue(ids::bypass)->load() > 0.5f;
+        bypassBtn.setButtonText(byp ? "Bypassed" : "Bypass");
         meterIn.peakL = t.inPeakL.load(); meterIn.peakR = t.inPeakR.load(); meterIn.hold = t.inPeakHold.load(); meterIn.balance = t.inBalance.load();
         meterOut.peakL = byp ? t.inPeakL.load() : t.outPeakL.load(); meterOut.peakR = byp ? t.inPeakR.load() : t.outPeakR.load();
         meterOut.hold = byp ? t.inPeakHold.load() : t.outPeakHold.load(); meterOut.balance = t.outBalance.load();
@@ -1458,7 +1447,7 @@ private:
     Segmented rideHold, ab;
     GlassButton moreBtn{"Rise, fall, trim"};
     MorePanel more;
-    GlassButton presetBtn{"Default"}, undoBtn{"Undo"}, redoBtn{"Redo"}, themeBtn{"Theme"}, bypassBtn{"Bypass"};
+    GlassButton presetBtn{"Default"}, undoBtn{"Undo"}, redoBtn{"Redo"}, bypassBtn{"Bypass"};
     GlassButton easeBtn{"Return to 0 dB in silence"}, aboutBtn{""}, updateBtn{"Update"};
     Tip tip;
     Drawer drawer;
@@ -1478,7 +1467,7 @@ CorridorEditor::CorridorEditor(CorridorAudioProcessor& p) : AudioProcessorEditor
     addAndMakeVisible(*content);
     setResizable(true, true);
     setWantsKeyboardFocus(false);
-    width0 = jlimit(960, 2240, savedWidth);
+    width0 = jlimit(minW, maxW, savedWidth);
     drawerOpen = p.state().getRawParameterValue(ids::mode)->load() > 0.5f;
     applyDrawer(drawerOpen);
     content->tick();  // fill the window before it is first shown
@@ -1494,13 +1483,13 @@ void CorridorEditor::applyDrawer(bool open) {
     drawerOpen = open;
     const double ratio = double(designW) / double(contentHeight());
     const int w = getWidth() > 0 ? getWidth() : width0;
-    setResizeLimits(960, int(std::round(960 / ratio)), 2240, int(std::round(2240 / ratio)));  // below 960 px the smallest labels fall under ~10 px
+    setResizeLimits(minW, int(std::round(minW / ratio)), maxW, int(std::round(maxW / ratio)));  // the whole layout scales; at 480 px it is drawn at 43%
     if (auto* c = getConstrainer()) c->setFixedAspectRatio(ratio);
     setSize(w, int(std::round(w / ratio)));
     resized();
 }
 
-void CorridorEditor::paint(Graphics& g) { g.fillAll(proc.darkTheme ? Colour(0xff0f0f11) : Colour(0xfff2f2f4)); }
+void CorridorEditor::paint(Graphics& g) { g.fillAll(kDark.bg); }
 
 void CorridorEditor::resized() {
     const float s = float(getWidth()) / float(designW);

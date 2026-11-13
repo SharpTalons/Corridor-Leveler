@@ -20,7 +20,7 @@ constexpr double kEaseDelaySeconds = 2.0;    // silence before "ease back" start
 constexpr int kHistorySize = 1024;           // UI history ring (one entry per 20 ms)
 
 struct Params {
-    float target = -20.f;        // dB RMS
+    float target = -18.f;        // dB RMS
     float threshold = -48.f;     // dB RMS: below this, no adjusting
     float responseMs = 400.f;    // how long it listens before judging the level: 10 (very fast) .. 3000 ms (slow)
     float riseMs = 400.f;        // how fast the gain lifts quiet passages (time constant)
@@ -29,7 +29,7 @@ struct Params {
     float range = 12.f;          // max boost and cut, dB
     float ceiling = -1.f;        // dBFS peak
     bool hold = false;           // false = Ride, true = Hold
-    bool easeInSilence = false;  // glide gain back to 0 dB during long silences
+    bool easeInSilence = true;   // glide gain back to 0 dB during long silences
     bool bypass = false;
 };
 

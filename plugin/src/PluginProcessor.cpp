@@ -33,7 +33,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout CorridorAudioProcessor::crea
             [dec](float v, int) { return String(v, dec); });
     };
     l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::threshold, 1}, "Threshold", NormalisableRange<float>(-70.f, -20.f, 0.5f), -48.f, db("dB RMS", 1)));
-    l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::target, 1}, "Target", NormalisableRange<float>(-40.f, -6.f, 0.5f), -20.f, db("dB RMS", 1)));
+    l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::target, 1}, "Target", NormalisableRange<float>(-40.f, -6.f, 0.5f), -18.f, db("dB RMS", 1)));
     // times run on a log taper, so the fast end of the dial has room
     auto logRange = [](float lo, float hi) {
         return NormalisableRange<float>(lo, hi,
@@ -46,9 +46,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout CorridorAudioProcessor::crea
     l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::fall, 2}, "Fall", logRange(5.f, 2000.f), 80.f, db("ms", 0)));
     l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::trim, 2}, "Output trim", NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f, db("dB", 1)));
     l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::range, 1}, "Range", NormalisableRange<float>(0.f, 24.f, 0.5f), 12.f, db("dB", 1)));
-    l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::ceiling, 1}, "Ceiling", NormalisableRange<float>(-12.f, 0.f, 0.1f), -1.f, db("dBFS", 1)));
+    // the ceiling reaches down to -60 dBFS, but half the dial covers -12 to 0, where it is normally set
+    NormalisableRange<float> ceilingRange(-60.f, 0.f, 0.1f);
+    ceilingRange.setSkewForCentre(-12.f);
+    l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::ceiling, 1}, "Ceiling", ceilingRange, -1.f, db("dBFS", 1)));
     l.add(std::make_unique<AudioParameterChoice>(ParameterID{ids::mode, 1}, "Mode", StringArray{"Ride", "Hold"}, 0));
-    l.add(std::make_unique<AudioParameterBool>(ParameterID{ids::ease, 1}, "Return to 0 dB in silence", false));
+    l.add(std::make_unique<AudioParameterBool>(ParameterID{ids::ease, 1}, "Return to 0 dB in silence", true));
     l.add(std::make_unique<AudioParameterBool>(ParameterID{ids::analyze, 2}, "Analyze / Lock", false));
     l.add(std::make_unique<AudioParameterBool>(ParameterID{ids::bypass, 1}, "Bypass", false));
     return l;
@@ -104,7 +107,6 @@ void CorridorAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     const auto& t = dsp.telemetry();
     st.setProperty("holdValid", t.holdValid.load(), nullptr);
     st.setProperty("holdGain", t.holdGain.load(), nullptr);
-    st.setProperty("darkTheme", darkTheme, nullptr);
     st.setProperty("editorWidth", editorWidth, nullptr);
     st.setProperty("presetName", presetName, nullptr);
     st.setProperty("slot", slot, nullptr);
@@ -130,7 +132,6 @@ void CorridorAudioProcessor::setStateInformation(const void* data, int sizeInByt
         slot = st.getProperty("slot", 0);
         apvts.replaceState(st);
         undo.clearUndoHistory();
-        darkTheme = st.getProperty("darkTheme", true);
         editorWidth = st.getProperty("editorWidth", 1120);
         if (st.getProperty("holdValid", false)) dsp.setStoredHoldGain(true, float(st.getProperty("holdGain", 0.0)));
     }
@@ -142,7 +143,7 @@ static const char* const kValueIds[] = {ids::threshold, ids::target, ids::respon
 const std::vector<CorridorAudioProcessor::Preset>& CorridorAudioProcessor::presets() {
     static const std::vector<Preset> list = {
         //  name            thr    tgt    resp    rng   ceil   rise   fall   trim  return-to-0
-        {"Default",        -48.f, -20.f,  400.f, 12.f, -1.0f,  400.f,  80.f, 0.f, false},
+        {"Default",        -48.f, -18.f,  400.f, 12.f, -1.0f,  400.f,  80.f, 0.f, true},
         {"Stream voice",   -50.f, -18.f,  250.f, 12.f, -1.0f,  350.f,  50.f, 0.f, false},
         {"Podcast",        -52.f, -19.f,  600.f, 10.f, -1.5f,  700.f, 120.f, 0.f, true},
         {"Music bed",      -45.f, -24.f, 1500.f,  8.f, -1.0f, 1500.f, 600.f, 0.f, false},

@@ -91,7 +91,7 @@ static void testStereoLinked() {
 static void testThresholdFreeze() {
     std::printf("below the threshold the gain freezes (no boost of noise)\n");
     const double fs = 48000; Processor p; p.prepare(fs, 2);
-    Params pr; pr.target = -20; pr.threshold = -48; pr.range = 12; p.setParams(pr);
+    Params pr; pr.target = -20; pr.threshold = -48; pr.range = 12; pr.easeInSilence = false; p.setParams(pr);
     run(p, fs, 8.0, sine(-28));                       // gets boosted ~ +8
     const float gBefore = p.telemetry().gain.load();
     run(p, fs, 6.0, sine(-60));                       // "room noise" below threshold
