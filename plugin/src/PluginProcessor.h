@@ -56,7 +56,6 @@ public:
     juce::AudioProcessorValueTreeState& state() { return apvts; }
 
     // UI preferences kept with the session
-    bool darkTheme = true;
     int editorWidth = 1120;
     bool tipDismissedThisRun = false;
 

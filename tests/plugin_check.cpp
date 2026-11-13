@@ -121,7 +121,7 @@ static void snapshots(const File& dir) {
         PNGImageFormat().writeImageToStream(img, os);
         std::printf("  wrote %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
     };
-    for (int w : {1120, 960}) {
+    for (int w : {1120, 960, 720}) {
         proc.editorWidth = w;
         std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
         static_cast<CorridorEditor*>(ed.get())->refreshNow();
@@ -139,13 +139,6 @@ static void snapshots(const File& dir) {
             MessageManager::getInstance()->runDispatchLoopUntil(100);
         }
         save(img, "window-" + String(w) + ".png");
-    }
-    {  // the light theme
-        proc.editorWidth = 1120; proc.darkTheme = false;
-        std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
-        static_cast<CorridorEditor*>(ed.get())->refreshNow();
-        save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-light.png");
-        proc.darkTheme = true;
     }
     // Hold mode: the analysis panel opens under the window while a section is measured
     {
