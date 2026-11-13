@@ -68,6 +68,9 @@ String fmtDb(float v, int dec = 1, bool sign = false) {
 const String kPlusMinus = String(CharPointer_UTF8("\xc2\xb1"));
 const String kDot = String(CharPointer_UTF8(" \xc2\xb7 "));
 
+bool peakMode(CorridorAudioProcessor& p) { return p.state().getRawParameterValue(ids::detect)->load() > 0.5f; }
+String levelUnit(CorridorAudioProcessor& p) { return peakMode(p) ? " dBFS peak" : " dB RMS"; }
+
 String speedWord(double ms) { return ms < 50 ? "Very fast" : ms < 200 ? "Fast" : ms < 900 ? "Medium" : "Slow"; }
 
 // ---------------------------------------------------------------- icons
@@ -485,14 +488,16 @@ private:
 
 // ---------------------------------------------------------------- segmented control (Ride / Hold, A / B)
 // A glass capsule whose selected side is a brighter droplet that slides across.
-class Segmented : public Component {
+class Segmented : public Component, public SettableTooltipClient {
 public:
     Segmented(GlassContext& g_, StringArray labels_) : gc(g_), labels(std::move(labels_)) { setWantsKeyboardFocus(true); }
     std::function<void(int)> onSelect;
     int selected = 0;
     float thumb = 0.f;  // animated position of the droplet, in segments
     float fontSize = 13.5f;
+    bool placed = false;
     void setSelected(int s) {
+        if (!placed) { placed = true; selected = s; thumb = float(s); return; }  // the first state is shown in place, not slid to
         if (s == selected) return;
         selected = s;
         if (auto* h = getAccessibilityHandler()) h->notifyAccessibilityEvent(AccessibilityEvent::valueChanged);
@@ -571,11 +576,13 @@ public:
         const int n = int(hist.size());
         const float sx = (x1 - x0) / float(kHist - 1);
         auto X = [&](int k) { return x1 - float(n - 1 - k) * sx; };
+        const bool peak = peakMode(proc);
         if (n > 1) {
             Path fillP, inP, outP;
             fillP.startNewSubPath(X(0), GB);
             for (int k = 0; k < n; ++k) {
-                const float yi = yOf(hist[size_t(k)].inRms), yo = yOf(hist[size_t(k)].outRms);
+                const auto& h = hist[size_t(k)];
+                const float yi = yOf(peak ? h.inPk : h.inRms), yo = yOf(peak ? h.outPk : h.outRms);
                 fillP.lineTo(X(k), yi);
                 if (k == 0) { inP.startNewSubPath(X(k), yi); outP.startNewSubPath(X(k), yo); }
                 else { inP.lineTo(X(k), yi); outP.lineTo(X(k), yo); }
@@ -627,7 +634,7 @@ public:
         mix(&histWritten, sizeof histWritten);
         mix(&analyzing, sizeof analyzing); mix(&analyzeSeconds, sizeof analyzeSeconds);
         mix(&hover, sizeof hover); mix(&dragId, sizeof dragId);
-        for (const char* id : {ids::ceiling, ids::threshold, ids::target}) { const float v = proc.state().getRawParameterValue(id)->load(); mix(&v, sizeof v); }
+        for (const char* id : {ids::ceiling, ids::threshold, ids::target, ids::detect}) { const float v = proc.state().getRawParameterValue(id)->load(); mix(&v, sizeof v); }
         return h;
     }
 
@@ -641,7 +648,7 @@ public:
         g.setColour(c.muted); g.drawText("Input", Rectangle<float>(lx + 22.f, ly - 8.f, 60.f, 16.f), Justification::centredLeft);
         g.setColour(c.data); g.fillRect(lx + 76.f, ly - 1.5f, 16.f, 3.f);
         g.setColour(c.muted); g.drawText("Output", Rectangle<float>(lx + 98.f, ly - 8.f, 70.f, 16.f), Justification::centredLeft);
-        g.drawText("RMS, last 10 s", Rectangle<float>(PX1 - 222.f, ly - 8.f, 200.f, 16.f), Justification::centredRight);
+        g.drawText(peakMode(proc) ? "Peak, last 10 s" : "RMS, last 10 s", Rectangle<float>(PX1 - 222.f, ly - 8.f, 200.f, 16.f), Justification::centredRight);
         // the controls sit in the graph: below here it frosts over and fades into the window colour
         if (gc.blur.isValid()) {
             constexpr int bands = 16;
@@ -660,7 +667,7 @@ public:
     }
 
     // The graph's own dB scale, drawn crisp over everything: a line every 10 dB at exactly the heights the meters
-    // mark, labelled at both edges. Labels skip the two readout boxes in the bottom corners.
+    // mark, labelled at both edges.
     void drawScale(Graphics& g) {
         const Pal& c = *gc.pal;
         const float x0 = PX0 + 22.f, x1 = PX1 - 22.f;
@@ -669,7 +676,6 @@ public:
             const float y = std::round(yOf(float(v)));
             g.setColour(c.grid.withMultipliedAlpha(y > kFadeTop ? 0.7f : 1.f));
             g.fillRect(x0, y, x1 - x0, 1.f);
-            if (y > 540.f) continue;  // the "From target" and "Applied gain" boxes sit here
             g.setColour(c.label);
             const String t = fmtDb(float(v), 0);
             g.drawText(t, Rectangle<float>(PX0 - 14.f, y - 8.f, 30.f, 16.f), Justification::centredRight);  // ends before the traces begin
@@ -730,7 +736,7 @@ public:
         g.setFont(sans(11.5f, true)); g.setColour(hold > -kDbRange ? zone(hold) : c.muted);
         g.drawText(hold > -kDbRange ? fmtDb(hold) : String(CharPointer_UTF8("\xe2\x80\x93")), Rectangle<float>(0.f, 17.f, w, 16.f), Justification::centred);
         g.setFont(sans(11.f)); g.setColour(c.muted);
-        g.drawText(input ? "In peak" : "Out peak", Rectangle<float>(0.f, 33.f, w, 16.f), Justification::centred);  // the target is RMS; say this is not
+        g.drawText(input ? "In peak" : "Out peak", Rectangle<float>(0.f, 33.f, w, 16.f), Justification::centred);  // a target may be RMS; say this is not
         // left and right bars in fixed zones: green up to -18 dBFS, amber to -6, red above
         const float bw = 5.f, gap = 3.f, bx = input ? 12.f : w - 12.f - bw * 2.f - gap;
         const double f18 = (kDbRange - 18.0) / kDbRange, f6 = (kDbRange - 6.0) / kDbRange;
@@ -784,15 +790,21 @@ public:
     bool onTarget = false;
     void paint(Graphics& g) override {
         const Pal& c = *gc.pal;
-        auto box = [&](Rectangle<float> r, const String& name, const String& value, Colour col, float size) {
-            drawGlass(g, gc, *this, capsule(r, 22.f), {Colour(), 1.05f, true, 18.f, 7.f, 1.4f});
-            g.setFont(sans(12.f)); g.setColour(c.muted);
-            g.drawText(name, r.reduced(16.f, 9.f).withHeight(16.f), Justification::centredLeft);
-            g.setFont(sans(size, true)); g.setColour(col);
-            g.drawFittedText(value, r.reduced(14.f, 6.f).withTrimmedTop(20.f).toNearestInt(), Justification::centredRight, 1, 0.8f);
+        // in the legend bar above the graph, left of the trace legend: a name, then its value
+        float x = PX0 + 22.f;
+        constexpr float ly = 80.f;
+        auto item = [&](const String& name, const String& value, Colour col, float minValueW) {
+            const Font nf = sans(12.f), vf = sans(15.f, true);
+            const float nw = GlyphArrangement::getStringWidth(nf, name);
+            const float vw = jmax(minValueW, GlyphArrangement::getStringWidth(vf, value));
+            g.setFont(nf); g.setColour(c.muted);
+            g.drawText(name, Rectangle<float>(x, ly - 8.f, nw + 2.f, 16.f), Justification::centredLeft);
+            g.setFont(vf); g.setColour(col);
+            g.drawText(value, Rectangle<float>(x + nw + 8.f, ly - 10.f, vw + 2.f, 20.f), Justification::centredLeft);
+            x += nw + 8.f + vw + 28.f;  // fixed value widths keep the second item from shifting as the first changes
         };
-        box({90.f, 548.f, 124.f, 58.f}, "From target", fromTarget, onTarget ? c.dataText : c.ink, 17.f);
-        box({kDeck.getRight() + 12.f, 548.f, 124.f, 58.f}, "Applied gain", gainText + " dB", c.ink, 22.f);  // the sign says boost or cut
+        item("From target", fromTarget, onTarget ? c.dataText : c.ink, 104.f);
+        item("Applied gain", gainText + " dB", c.ink, 72.f);  // the sign says boost or cut
         g.setFont(sans(11.f)); g.setColour(c.muted);
         g.drawText(latency, Rectangle<float>(94.f, GB + 14.f, 300.f, 16.f), Justification::centredLeft);
     }
@@ -1009,7 +1021,7 @@ public:
             lines = {{"Not enough sound above", false}, {"the threshold. Analyze again.", false}};
         } else if (t.holdValid.load()) {
             lines = {{"Holding " + fmtDb(t.holdGain.load(), 1, true) + " dB", true},
-                     {"Measured " + fmtDb(t.holdMeasured.load(), 1) + " dB RMS", false},
+                     {"Measured " + fmtDb(t.holdMeasured.load(), 1) + levelUnit(proc), false},
                      {"over " + String(t.holdSeconds.load(), 1) + " s", false}};
         } else {
             lines = {{"Press Analyze, then play", false}, {"a typical section.", false}};
@@ -1189,10 +1201,10 @@ public:
         : proc(p), scene(p, gc), meterIn(true, gc, p.core()), meterOut(false, gc, p.core()), readouts(gc), tags(p, gc), header(gc),
           threshold(p, ids::threshold, "Threshold", [](double v) { return fmtDb(float(v)) + " dB"; }, 30.f, "thr"),
           response(p, ids::response, "Response", [](double v) { return String(roundToInt(v)) + " ms" + kDot + speedWord(v); }, 30.f, "", {"Fast", "Slow"}),
-          target(p, ids::target, "Target", [](double v) { return fmtDb(float(v)) + " dB RMS"; }, 44.f, "data"),
+          target(p, ids::target, "Target", [&p](double v) { return fmtDb(float(v)) + levelUnit(p); }, 44.f, "data"),
           range(p, ids::range, "Range", [](double v) { return kPlusMinus + fmtDb(float(v)) + " dB"; }, 30.f, ""),
           ceiling(p, ids::ceiling, "Ceiling", [](double v) { return fmtDb(float(v)) + " dBFS"; }, 30.f, "ceil"),
-          rideHold(gc, {"Ride", "Hold"}), ab(gc, {"A", "B"}), more(p, gc), tip(gc), drawer(p, gc), about(*checker, gc), prompt(*checker, gc) {
+          rideHold(gc, {"Ride", "Hold"}), detect(gc, {"RMS", "Peak"}), ab(gc, {"A", "B"}), more(p, gc), tip(gc), drawer(p, gc), about(*checker, gc), prompt(*checker, gc) {
         gc.root = this;
         look.gc = &gc;
         look.apply();
@@ -1206,6 +1218,10 @@ public:
         addAndMakeVisible(rideHold);
         rideHold.setTitle("Ride or Hold");
         rideHold.onSelect = [this](int i) { proc.undo.beginNewTransaction(); setParam(ids::mode, float(i)); };
+        addAndMakeVisible(detect);
+        detect.setTitle("Target measures RMS or peak");
+        detect.setTooltip("RMS: the average loudness lands on the target. Peak: the highest peaks land on the target.");
+        detect.onSelect = [this](int i) { proc.undo.beginNewTransaction(); setParam(ids::detect, float(i)); };
         moreBtn.getProperties().set("trailing", "chevron-down");
         moreBtn.getProperties().set("toggle", true);
         moreBtn.getProperties().set("fontSize", 12.5);
@@ -1335,6 +1351,7 @@ public:
         range.placeAt({720, 496});
         ceiling.placeAt({830, 496});
         rideHold.setBounds(560 - 76, 578, 152, 30);
+        detect.setBounds(int(kDeck.getRight()) - 116 - 128, 578, 128, 30);  // mirrors Rise, fall, trim on the left
         moreBtn.setBounds(int(kDeck.getX()) + 116, 578, 128, 30);
         more.setBounds(236, 572 - 168, 300, 168);
         tip.setBounds(W / 2 - 235, 70, 470, 76);
@@ -1358,12 +1375,17 @@ public:
         meterIn.peakL = t.inPeakL.load(); meterIn.peakR = t.inPeakR.load(); meterIn.hold = t.inPeakHold.load(); meterIn.balance = t.inBalance.load();
         meterOut.peakL = byp ? t.inPeakL.load() : t.outPeakL.load(); meterOut.peakR = byp ? t.inPeakR.load() : t.outPeakR.load();
         meterOut.hold = byp ? t.inPeakHold.load() : t.outPeakHold.load(); meterOut.balance = t.outBalance.load();
-        target.setLive(t.outRms.load());
+        const float steered = t.levelValid.load() ? t.level.load() + (byp ? 0.f : t.gain.load()) : (peakMode(proc) ? t.outPk.load() : t.outRms.load());
+        target.setLive(steered);
         threshold.setLive(t.inRms.load());
 
         const bool holdMode = proc.state().getRawParameterValue(ids::mode)->load() > 0.5f;
         rideHold.setSelected(holdMode ? 1 : 0);
         rideHold.advance();
+        const int det = peakMode(proc) ? 1 : 0;
+        if (det != detect.selected) target.repaint();  // its value shows the unit
+        detect.setSelected(det);
+        detect.advance();
         ab.setSelected(proc.slot);
         ab.advance();
         presetBtn.setButtonText(proc.presetName + (proc.presetEdited() ? " (edited)" : ""));
@@ -1387,7 +1409,7 @@ public:
         const float g = byp ? 0.f : t.gain.load();
         readouts.gainText = fmtDb(g, 1, true);
         const float tgt = proc.state().getRawParameterValue(ids::target)->load();
-        const float out = t.outRms.load(), thr = proc.state().getRawParameterValue(ids::threshold)->load();
+        const float out = steered, thr = proc.state().getRawParameterValue(ids::threshold)->load();
         const bool active = !holdMode && !byp && t.inRms.load() >= thr;
         const float d = out - tgt;
         readouts.onTarget = active && std::abs(d) < 1.f;
@@ -1474,18 +1496,18 @@ public:
             if (t.analyzeFailed.load()) return "Not enough sound above the threshold. Play a louder section, or lower the threshold, and analyze again.";
             if (t.holdValid.load()) {
                 const int lim = t.holdLimit.load();
-                return "Holding " + fmtDb(t.holdGain.load(), 1, true) + " dB. Measured " + fmtDb(t.holdMeasured.load(), 1) + " dB RMS over " +
+                return "Holding " + fmtDb(t.holdGain.load(), 1, true) + " dB. Measured " + fmtDb(t.holdMeasured.load(), 1) + levelUnit(proc) + " over " +
                        String(t.holdSeconds.load(), 1) + " s." + (lim == 1 ? " Limited by the ceiling." : lim == 2 ? " Limited by the range." : "");
             }
             return "Holding " + fmtDb(g, 1, true) + " dB. Play a typical section and press Analyze.";
         }
         switch (corridor::State(t.state.load())) {
             case corridor::State::OnTarget:
-                return "On target: " + fmtDb(L + g, 1) + " dB RMS with " + fmtDb(g, 1, true) + " dB applied." +
+                return "On target: " + fmtDb(L + g, 1) + levelUnit(proc) + " with " + fmtDb(g, 1, true) + " dB applied." +
                        (t.percussive.load() ? " Percussive material: following the groove, not single hits." : "");
-            case corridor::State::Boosting: return "Coming in at " + fmtDb(L, 1) + " dB RMS, below the " + fmtDb(tgt, 1) + " target. Lifting it (" + fmtDb(g, 1, true) + " dB so far).";
-            case corridor::State::Cutting: return "Coming in at " + fmtDb(L, 1) + " dB RMS, above the " + fmtDb(tgt, 1) + " target. Lowering it (" + fmtDb(g, 1, true) + " dB so far).";
-            case corridor::State::Ceiling: return "More boost would push peaks past the " + fmtDb(cei, 1) + " dBFS ceiling. Held at " + fmtDb(g, 1, true) + " dB.";
+            case corridor::State::Boosting: return "Coming in at " + fmtDb(L, 1) + levelUnit(proc) + ", below the " + fmtDb(tgt, 1) + " target. Lifting it (" + fmtDb(g, 1, true) + " dB so far).";
+            case corridor::State::Cutting: return "Coming in at " + fmtDb(L, 1) + levelUnit(proc) + ", above the " + fmtDb(tgt, 1) + " target. Lowering it (" + fmtDb(g, 1, true) + " dB so far).";
+            case corridor::State::Ceiling: return "More boost would push peaks over " + String(int(corridor::kPeakLimitDb)) + " dB into the " + fmtDb(cei, 1) + " dBFS ceiling's limiter. Held at " + fmtDb(g, 1, true) + " dB.";
             case corridor::State::Range: return "It needs more than the " + kPlusMinus + String(rng, 1) + " dB range allows. Held at " + fmtDb(g, 1, true) + " dB.";
             case corridor::State::Returning: return "Silence for over 2 s. Returning to 0 dB (" + fmtDb(g, 1, true) + " dB).";
             case corridor::State::Waiting:
@@ -1508,7 +1530,7 @@ private:
     Tags tags;
     Header header;
     Knob threshold, response, target, range, ceiling;
-    Segmented rideHold, ab;
+    Segmented rideHold, detect, ab;
     GlassButton moreBtn{"Rise, fall, trim"};
     MorePanel more;
     GlassButton presetBtn{"Default"}, undoBtn{"Undo"}, redoBtn{"Redo"}, bypassBtn{"Bypass"};

@@ -17,6 +17,7 @@ inline constexpr const char* analyze = "analyze";      // momentary: each press 
 inline constexpr const char* range = "range";
 inline constexpr const char* ceiling = "ceiling";
 inline constexpr const char* mode = "mode";
+inline constexpr const char* detect = "detect";        // what the target measures: 0 = RMS, 1 = peak
 inline constexpr const char* ease = "ease";
 inline constexpr const char* bypass = "bypass";
 }  // namespace ids
@@ -86,6 +87,7 @@ private:
     std::atomic<float>* pRange = nullptr;
     std::atomic<float>* pCeiling = nullptr;
     std::atomic<float>* pMode = nullptr;
+    std::atomic<float>* pDetect = nullptr;
     std::atomic<float>* pEase = nullptr;
     std::atomic<float>* pBypass = nullptr;
     std::atomic<float>* pRise = nullptr;

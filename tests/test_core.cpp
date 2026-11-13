@@ -270,6 +270,56 @@ static void testBalance() {
     CHECK(std::fabs(tl.outBalance.load() - 6.f) < 0.5f, "output balance %.2f dB (linked gain keeps it)", tl.outBalance.load());
 }
 
+static void testSettlesOnTarget() {
+    std::printf("the level settles on the target, from below and from above (not at the dead band's edge)\n");
+    for (float in : {-24.f, -12.f}) {
+        const double fs = 48000; Processor p; p.prepare(fs, 2);
+        Params pr; pr.target = -18; pr.ceiling = 0; p.setParams(pr);
+        auto o = run(p, fs, 12.0, sine(in));
+        const size_t n = o.l.size();
+        const float out = rmsDb(o.l, n - size_t(fs * 2), n);
+        CHECK(std::fabs(out + 18.f) < 0.25f, "in %.0f: settled at %.2f dB RMS, target -18", in, out);
+    }
+}
+
+static void testPeakDetect() {
+    std::printf("peak detection: the peaks land on the target\n");
+    const double fs = 48000; Processor p; p.prepare(fs, 2);
+    Params pr; pr.peakDetect = true; pr.target = -12; pr.range = 18; pr.ceiling = -1; p.setParams(pr);
+    auto o = run(p, fs, 12.0, sine(-30));  // peaks at -27 dBFS: needs +15
+    const size_t n = o.l.size();
+    const float pk = peakDb(o.l, n - size_t(fs * 2), n);
+    CHECK(std::fabs(pk + 12.f) < 0.3f, "peaks at %.2f dBFS, target -12", pk);
+    CHECK(std::fabs(p.telemetry().outPk.load() + 12.f) < 0.3f, "300 ms peak telemetry %.2f", p.telemetry().outPk.load());
+}
+
+static void testSpeechReachesTarget() {
+    std::printf("speech with sharp peaks still reaches the target; the limiter keeps the peaks under the ceiling\n");
+    const double fs = 48000; Processor p; p.prepare(fs, 2);
+    Params pr; pr.target = -18; pr.ceiling = -1; pr.range = 18; p.setParams(pr);
+    std::mt19937 rng(3); std::normal_distribution<float> nd(0.f, 1.f);
+    float lp = 0.f;
+    // syllables of filtered noise (300 ms on, 150 ms off) with a plosive 14 dB over the voice every 1.7 s
+    auto voice = [&](double t, int c) {
+        if (c == 0) lp += 0.15f * (nd(rng) - lp);
+        const double ph = std::fmod(t, 0.45);
+        const float env = ph < 0.30 ? float(std::sin(M_PI * ph / 0.30)) : 0.f;
+        const float plosive = std::fmod(t, 1.7) < 0.004 ? 5.f : 1.f;
+        return env * lp * plosive * 0.13f;
+    };
+    auto o = run(p, fs, 30.0, voice);
+    // the level the leveler judges: blocks above the threshold
+    double s = 0; long n = 0;
+    for (size_t b = size_t(fs * 15); b + 480 <= o.l.size(); b += 480) {
+        double m = 0; for (size_t k = b; k < b + 480; ++k) m += double(o.l[k]) * o.l[k];
+        m /= 480; if (10 * std::log10(m + 1e-20) > pr.threshold) { s += m; ++n; }
+    }
+    const float out = float(10 * std::log10(s / double(n)));
+    const float pk = peakDb(o.l, size_t(fs * 15), o.l.size());
+    CHECK(std::fabs(out + 18.f) < 1.0f, "voice settled at %.2f dB RMS, target -18", out);
+    CHECK(pk <= -1.f + 0.01f, "peak %.2f dBFS above the -1 ceiling", pk);
+}
+
 int main() {
     testLatency();
     testRideToTarget();
@@ -287,6 +337,9 @@ int main() {
     testRiseSpeed();
     testFastResponse();
     testBalance();
+    testSettlesOnTarget();
+    testPeakDetect();
+    testSpeechReachesTarget();
     if (failures) { std::printf("\n%d check(s) failed\n", failures); return 1; }
     std::printf("\nall checks passed\n");
     return 0;

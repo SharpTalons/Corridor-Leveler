@@ -18,9 +18,11 @@ constexpr double kLookaheadSeconds = 0.005;  // limiter look-ahead = plugin late
 constexpr double kBlockSeconds = 0.010;      // control-rate block
 constexpr double kEaseDelaySeconds = 2.0;    // silence before "ease back" starts
 constexpr int kHistorySize = 1024;           // UI history ring (one entry per 20 ms)
+constexpr float kPeakLimitDb = 6.f;          // how far boosts may push short peaks into the limiter to reach the target
 
 struct Params {
-    float target = -18.f;        // dB RMS
+    float target = -18.f;        // dB RMS, or dBFS peak when peakDetect is on
+    bool peakDetect = false;     // false: the target is an RMS level; true: it is the peak level
     float threshold = -48.f;     // dB RMS: below this, no adjusting
     float responseMs = 400.f;    // how long it listens before judging the level: 10 (very fast) .. 3000 ms (slow)
     float riseMs = 400.f;        // how fast the gain lifts quiet passages (time constant)
@@ -54,6 +56,8 @@ struct Snapshot {
     float gain;       // dB applied by the leveler
     float limiterDb;  // most gain reduction by the limiter in this slot (<= 0)
     float inPeak;     // dBFS, highest input sample in this slot (for the waveform view)
+    float inPk;       // dBFS peak (300 ms), the peak-mode counterpart of inRms
+    float outPk;      // dBFS peak (300 ms)
     bool analyzing;   // Hold mode was measuring during this slot
 };
 
@@ -61,6 +65,7 @@ struct Snapshot {
 struct Telemetry {
     std::atomic<float> inPeak{-120.f}, inPeakHold{-120.f}, outPeak{-120.f}, outPeakHold{-120.f};
     std::atomic<float> inRms{-120.f}, outRms{-120.f};
+    std::atomic<float> inPk{-120.f}, outPk{-120.f};  // highest peak over the last 300 ms (what Peak detection targets)
     // per channel (left, right; mono shows the same on both) and balance in dB, + = left louder
     std::atomic<float> inPeakL{-120.f}, inPeakR{-120.f}, outPeakL{-120.f}, outPeakR{-120.f};
     std::atomic<float> inBalance{0.f}, outBalance{0.f};
@@ -112,11 +117,12 @@ private:
         double accSq = 0.0;      // mean square accumulated (already averaged over channels)
         float peak = 0.f;
         std::array<double, 30> ring{};  // 300 ms of block mean squares
+        std::array<float, 30> pring{};  // and of block peaks
         int ri = 0;
         // results of the last block
         double blockMs = 0.0;
         float blockPeak = 0.f;
-        float rmsDb = -120.f, peakDb = -120.f, holdDb = -120.f;
+        float rmsDb = -120.f, peakDb = -120.f, holdDb = -120.f, pk300Db = -120.f;
         int holdCount = 0;
         void reset(int blockLen);
         bool push(double meanSq, float absPeak);
@@ -147,6 +153,7 @@ private:
     float g_ = 0.f, gCur_ = 0.f, gInc_ = 0.f;
     float activeT_ = 0.f, silentT_ = 10.f, crest_ = 10.f, prevBlockDb_ = -120.f, onsetRate_ = 0.f;
     bool perc_ = false;
+    bool correcting_ = true;  // moving towards the target; stops once it is reached, starts again past the dead band
     float holdG_ = kNoHold;
     struct Analysis { bool on = false; double t = 0, sum = 0; int count = 0; float pk = 0.f; } an_;
 

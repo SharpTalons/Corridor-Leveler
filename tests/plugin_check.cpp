@@ -155,6 +155,19 @@ static void snapshots(const File& dir) {
         save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-hold.png");
         if (auto* m = proc.state().getParameter(ids::mode)) m->setValueNotifyingHost(0.f);
     }
+    // Peak detection: the target is a peak level, and the graph draws peaks to match
+    {
+        proc.editorWidth = 1120;
+        auto set = [&](const char* id, float v) { if (auto* p = proc.state().getParameter(id)) p->setValueNotifyingHost(p->convertTo0to1(v)); };
+        set(ids::detect, 1.f); set(ids::target, -9.f);
+        std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
+        runSine(proc, 48000, -22.f, 8.0, ph);  // peaks at -19 dBFS: needs +10, inside the 12 dB range
+        const float pk = proc.core().telemetry().outPk.load();
+        CHECK(std::abs(pk + 9.f) < 0.5f, "peak mode: output peaks at %.2f dBFS, target -9", pk);
+        static_cast<CorridorEditor*>(ed.get())->refreshNow();
+        save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-peak.png");
+        set(ids::detect, 0.f); set(ids::target, -18.f);
+    }
 }
 
 int main(int argc, char** argv) {
