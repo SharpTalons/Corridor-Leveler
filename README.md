@@ -21,7 +21,7 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
   press **Analyze** (or the **A** key), play a typical section while the live input waveform lights up, then
   press **Lock** (or it locks after 20 s). One fixed correction is then held. Analyze / Lock is also a host
   parameter, so a hotkey, Stream Deck or MIDI button can press it: each press analyzes, the next locks.
-- **Threshold** (dB RMS): below this it stops adjusting, so silence, breaths and noise never trigger a boost.
+- **Threshold** (dB RMS, −70 to 0): below this it stops adjusting, so silence, breaths and noise never trigger a boost.
 - **Target**: the level you want, −40 to −3 dB. The default is −18. The level settles on the target itself,
   then holds still inside a small dead band so it never fidgets.
 - **RMS / Peak** (the switch right of Ride / Hold): what the target measures. **RMS** puts the average loudness
@@ -52,7 +52,7 @@ Alt-click resets it.
 The window is a full-bleed level graph with the header, meters and readouts floating over it as glass, and
 the controls sitting in the graph where it frosts over. The graph is marked every 10 dB on both edges, at the
 same heights as the meters' scales. The colours are tuned for contrast on bright or glare-prone screens, and the
-text is set in IBM Plex Sans. The window can be resized from 720 to 2240 px wide and keeps its shape. Every
+text is set in Inter. The window can be resized from 720 to 2240 px wide and keeps its shape. Every
 on/off button shows its state the same way: off is plain glass with a grey dot, on is filled solid (red for
 Bypass) and the dot lights. The meters show left and right with a balance dot and the peak level on top, in
 green, amber and red zones. The legend bar above the graph shows how far the output is from the target and the
@@ -116,8 +116,8 @@ Tests:
 Corridor Leveler is licensed under the **GNU AGPL v3 or later** (see `LICENSE`).
 
 - [JUCE](https://juce.com) is used under its AGPLv3 open-source licence.
-- [IBM Plex Sans](https://github.com/IBM/plex) is embedded unmodified under the SIL Open Font License 1.1
-  (see `plugin/fonts/OFL.txt`).
+- [Inter](https://rsms.me/inter/) is embedded under the SIL Open Font License 1.1 (see `plugin/fonts/OFL.txt`),
+  with its tabular figures made the default and the family renamed "Inter Tabular".
 - The 2.x plugin is built with [FST](https://git.iem.at/zmoelnig/FST) (GPLv3 or later), an independent
   reimplementation of the 2.x plugin headers, because Steinberg no longer distributes that SDK.
   "VST" is a Steinberg trademark. FST's authors ask that plugins built with FST not be called "VST"

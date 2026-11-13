@@ -33,7 +33,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout CorridorAudioProcessor::crea
         return AudioParameterFloatAttributes().withLabel(suffix).withStringFromValueFunction(
             [dec](float v, int) { return String(v, dec); });
     };
-    l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::threshold, 1}, "Threshold", NormalisableRange<float>(-70.f, -20.f, 0.5f), -48.f, db("dB RMS", 1)));
+    l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::threshold, 1}, "Threshold", NormalisableRange<float>(-70.f, 0.f, 0.5f), -48.f, db("dB RMS", 1)));
     l.add(std::make_unique<AudioParameterFloat>(ParameterID{ids::target, 1}, "Target", NormalisableRange<float>(-40.f, -3.f, 0.5f), -18.f, db("dB", 1)));
     l.add(std::make_unique<AudioParameterChoice>(ParameterID{ids::detect, 1}, "Target measures", StringArray{"RMS", "Peak"}, 0));
     // times run on a log taper, so the fast end of the dial has room
