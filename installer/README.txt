@@ -29,5 +29,4 @@ LATENCY
   automatically.
 
 Licence: GNU AGPL v3 or later. Source code: see the project repository.
-The typefaces Public Sans and IBM Plex Mono are built in under the SIL Open Font Licence 1.1
-(OFL-PublicSans.txt, OFL-IBMPlex.txt).
+The Inter typeface is built in under the SIL Open Font Licence 1.1 (OFL-Inter.txt).

@@ -13,12 +13,12 @@
 //   mode       Ride / Hold, rise, fall, output trim, return to 0 dB in silence
 //
 // Colour goes on data only: the output in the accent, the reference lines in their own colours, the
-// meter zones. Every selection (A / B, Ride / Hold) is one 1px accent line as wide as its label.
-// Text is Public Sans, every figure IBM Plex Mono so the digits hold still while they update.
+// meter zones. Every selection (A / B, Ride / Hold, RMS / Peak) is one 1px accent line as wide as its label.
+// Text is Inter with its tabular figures on by default, so live numbers hold still while they update.
 // In Hold mode an analysis panel (166 px) opens under the window.
 #include "PluginEditor.h"
 
-#include "CorridorFonts.h"
+#include "BinaryData.h"
 #include "Updates.h"
 
 #include <cmath>
@@ -49,7 +49,7 @@ constexpr float kInBarX = 32.f, kOutBarX = 747.f, kBarW = 5.f, kBarGap = 3.f;
 float yOf(float v) { return GT + jlimit(0.f, kDbRange, -v) / kDbRange * (GB - GT); }
 float vOf(float y) { return -jlimit(0.f, kDbRange, (y - GT) / (GB - GT) * kDbRange); }
 
-// ---------------------------------------------------------------- palette (dark and light)
+// ---------------------------------------------------------------- palette (the window is always dark)
 struct Pal {
     bool dark;
     Colour ground, surface, raised, hover, rule, control;
@@ -63,31 +63,24 @@ const Pal kDark{true,
                 Colour(0xffffffff), Colour(0xffbdbdc0), Colour(0xff8a8c92),
                 Colour(0xff4fd1bf), Colour(0xff5fc39c), Colour(0xffe5566f), Colour(0xffd9a441),
                 Colour(0xff6e7076), Colour(0xff25242a), Colour(0xff2f2e33), Colour(0x66000000)};
-// light: white cards with a 1px edge on a pale ground
-const Pal kLight{false,
-                 Colour(0xfff3f3f4), Colour(0xffffffff), Colour(0xfff0f0f1), Colour(0xffe9e9eb), Colour(0xffe6e6e8), Colour(0xffcfd2d6),
-                 Colour(0xff111111), Colour(0xff3f4246), Colour(0xff5f6368),
-                 Colour(0xff0f7a6c), Colour(0xff247b50), Colour(0xffc4242a), Colour(0xff9a6200),
-                 Colour(0xffa0a2a7), Colour(0xffebebed), Colour(0xffe2e2e5), Colour(0x26000000)};
 
-// ---------------------------------------------------------------- type: Public Sans for words, IBM Plex Mono for figures
+// ---------------------------------------------------------------- type: Inter Tabular, Regular and SemiBold
+// Mostly regular weight; SemiBold for names, titles, the chosen option and the answer figure.
 struct FontSet {
-    Typeface::Ptr sans, sansSemi, mono, monoMed;
+    Typeface::Ptr sans, sansSemi;
     FontSet() {
-        sans = Typeface::createSystemTypefaceFor(CorridorFonts::PublicSansRegular_ttf, size_t(CorridorFonts::PublicSansRegular_ttfSize));
-        sansSemi = Typeface::createSystemTypefaceFor(CorridorFonts::PublicSansSemiBold_ttf, size_t(CorridorFonts::PublicSansSemiBold_ttfSize));
-        mono = Typeface::createSystemTypefaceFor(CorridorFonts::IBMPlexMonoRegular_ttf, size_t(CorridorFonts::IBMPlexMonoRegular_ttfSize));
-        monoMed = Typeface::createSystemTypefaceFor(CorridorFonts::IBMPlexMonoMedium_ttf, size_t(CorridorFonts::IBMPlexMonoMedium_ttfSize));
+        sans = Typeface::createSystemTypefaceFor(CorridorFonts::InterTabularRegular_ttf, size_t(CorridorFonts::InterTabularRegular_ttfSize));
+        sansSemi = Typeface::createSystemTypefaceFor(CorridorFonts::InterTabularSemiBold_ttf, size_t(CorridorFonts::InterTabularSemiBold_ttfSize));
     }
 };
 // The window holds one FontSet for its lifetime; this borrows it (or makes it, outside a window).
 FontSet& fonts() { SharedResourcePointer<FontSet> p; return *p; }
 Font face(Typeface::Ptr t, float px) { return t != nullptr ? Font(FontOptions(t).withPointHeight(px)) : Font(FontOptions().withPointHeight(px)); }
 Font text(float px, bool semi = false) { return face(semi ? fonts().sansSemi : fonts().sans, px); }
-Font num(float px, bool medium = false) { return face(medium ? fonts().monoMed : fonts().mono, px); }
+Font num(float px, bool semi = false) { return face(semi ? fonts().sansSemi : fonts().sans, px); }  // figures: the same face, tabular
 float widthOf(const Font& f, const String& s) { return GlyphArrangement::getStringWidth(f, s); }
 
-// Splits "400 ms" into the figure "400" and the unit " ms", so the figure can be set in the figure face.
+// Splits "400 ms" into the figure "400" and the unit " ms", so the unit can be set smaller and in grey.
 std::pair<String, String> splitFigure(const String& s) {
     const String numChars = String(CharPointer_UTF8("0123456789.+\xe2\x88\x92\xc2\xb1-"));
     int i = 0;
@@ -117,8 +110,11 @@ String fmtDb(float v, int dec = 1, bool sign = false) {
 const String kPlusMinus = String(CharPointer_UTF8("\xc2\xb1"));
 const String kDot = String(CharPointer_UTF8(" \xc2\xb7 "));
 const String kDash = String(CharPointer_UTF8("\xe2\x80\x94"));  // a missing value
+const String kMinusInf = String(CharPointer_UTF8("\xe2\x88\x92\xe2\x88\x9e"));  // a silent peak meter
 constexpr float kSilent = -90.f;                                // below this a level reads as no signal
 
+bool peakMode(CorridorAudioProcessor& p) { return p.state().getRawParameterValue(ids::detect)->load() > 0.5f; }
+String levelUnit(CorridorAudioProcessor& p) { return peakMode(p) ? " dBFS peak" : " dB RMS"; }
 String speedWord(double ms) { return ms < 50 ? "Very fast" : ms < 200 ? "Fast" : ms < 900 ? "Medium" : "Slow"; }
 String balanceText(float b) { return std::abs(b) < 0.05f ? String("0.0") : String(std::abs(b), 1) + (b > 0 ? " L" : " R"); }
 
@@ -217,9 +213,11 @@ public:
     const Pal* pal = &kDark;
     const Pal& p() const { return *pal; }
 
+    // every font JUCE makes for us (tooltips, menus, editors) uses the interface typeface too
+    Typeface::Ptr getTypefaceForFont(const Font& f) override { return f.isBold() ? fonts().sansSemi : fonts().sans; }
+
     void apply() {
         const Pal& c = p();
-        setDefaultSansSerifTypeface(fonts().sans);
         setColour(Label::textColourId, c.text);
         setColour(Label::textWhenEditingColourId, c.text);
         setColour(Label::backgroundWhenEditingColourId, c.raised);
@@ -293,10 +291,10 @@ public:
     }
 
     // Buttons, by property "kind":
-    //   control - a pill with a 1px edge (preset, Rise..., Update); on: the edge in ink
+    //   control - a pill with a 1px edge (preset, Update); a toggle fills with ink when on, red for Bypass
     //   icon    - an icon alone; a quiet disc on hover (theme, bypass, undo, redo, close)
     //   primary - the one filled button on a panel: inverted ink (Analyze, Update in the prompt, Got it)
-    //   switch  - a small toggle, on in the positive colour (return to 0 dB in silence)
+    //   switch  - a small toggle that fills with ink when on (return to 0 dB in silence)
     //   plain   - text only
     void drawButtonBackground(Graphics& g, Button& b, const Colour&, bool over, bool down) override {
         const Pal& c = p();
@@ -305,9 +303,9 @@ public:
         const bool on = b.getToggleState();
         if (kind == "switch") {
             const auto t = Rectangle<float>(r.getRight() - 32.f, r.getCentreY() - 9.f, 32.f, 18.f);
-            g.setColour(on ? c.positive : c.track); g.fillRoundedRectangle(t, 9.f);
+            g.setColour(on ? c.text : c.track); g.fillRoundedRectangle(t, 9.f);
             const float kx = on ? t.getRight() - 16.f : t.getX() + 2.f;
-            g.setColour(on && !c.dark ? Colours::white : c.dark ? (on ? c.surface : c.secondary) : Colours::white);
+            g.setColour(on ? c.surface : c.secondary);
             g.fillEllipse(kx, t.getY() + 2.f, 14.f, 14.f);
             if (b.hasKeyboardFocus(false)) { g.setColour(c.accent); g.drawRoundedRectangle(t.expanded(3.f), 12.f, 1.5f); }
             return;
@@ -326,8 +324,12 @@ public:
             g.setColour(!b.isEnabled() ? c.track : over || down ? c.text.withAlpha(0.86f) : c.text);
             g.fillRoundedRectangle(r, rad);
         } else if (kind == "control") {
-            if (over || down) { g.setColour(c.hover); g.fillRoundedRectangle(r, rad); }
-            g.setColour(on ? c.text : c.control); g.drawRoundedRectangle(r, rad, 1.f);
+            const bool danger = b.getProperties().getWithDefault("danger", false);
+            if (on && b.getClickingTogglesState()) { g.setColour(danger ? c.negative : c.text); g.fillRoundedRectangle(r, rad); }
+            else {
+                if (over || down) { g.setColour(c.hover); g.fillRoundedRectangle(r, rad); }
+                g.setColour(c.control); g.drawRoundedRectangle(r, rad, 1.f);
+            }
         } else if (over) {
             g.setColour(c.hover); g.fillRoundedRectangle(r, rad);
         }
@@ -340,8 +342,10 @@ public:
         if (kind == "switch") return;  // its label is drawn by the panel
         const bool on = b.getToggleState();
         const bool alarm = bool(b.getProperties().getWithDefault("danger", false)) && on;
+        const bool filledToggle = kind == "control" && on && b.getClickingTogglesState();
         const Colour col = !b.isEnabled() ? c.muted.withAlpha(0.6f)
                          : kind == "primary" ? c.surface
+                         : filledToggle ? (alarm ? Colours::white : c.surface)
                          : alarm ? c.negative
                          : kind == "icon" ? (over ? c.text : c.secondary)
                          : on || over ? c.text : c.secondary;
@@ -535,7 +539,7 @@ private:
 // ---------------------------------------------------------------- underline tabs (Ride / Hold, A / B)
 // The selected label is in ink with a 1px accent line exactly as wide as it, on the component's bottom
 // edge, which is placed on the nearest existing rule.
-class Tabs : public Component {
+class Tabs : public Component, public SettableTooltipClient {
 public:
     explicit Tabs(StringArray labels_) : labels(std::move(labels_)) { setWantsKeyboardFocus(true); }
     std::function<void(int)> onSelect;
@@ -543,7 +547,25 @@ public:
     float fontSize = 14.f;
     float slotWidth = 0.f;  // 0 = share the width equally
     std::function<const Pal&()> pal;
-    void setSelected(int s) { if (s != selected) { selected = s; repaint(); } }
+    void setSelected(int s) {
+        if (s == selected) return;
+        selected = s;
+        repaint();
+        if (auto* h = getAccessibilityHandler()) h->notifyAccessibilityEvent(AccessibilityEvent::valueChanged);
+    }
+    std::unique_ptr<AccessibilityHandler> createAccessibilityHandler() override {
+        struct Value : AccessibilityTextValueInterface {
+            explicit Value(Tabs& o) : owner(o) {}
+            bool isReadOnly() const override { return false; }
+            String getCurrentValueAsString() const override { return owner.labels[owner.selected]; }
+            void setValueAsString(const String& v) override { if (const int i = owner.labels.indexOf(v, true); i >= 0) owner.choose(i); }
+            Tabs& owner;
+        };
+        return std::make_unique<AccessibilityHandler>(
+            *this, AccessibilityRole::comboBox,
+            AccessibilityActions().addAction(AccessibilityActionType::press, [this] { choose((selected + 1) % labels.size()); }),
+            AccessibilityHandler::Interfaces{std::make_unique<Value>(*this)});
+    }
     Rectangle<float> slot(int i) const {
         const float sw = slotWidth > 0.f ? slotWidth : float(getWidth()) / float(labels.size());
         return {float(i) * sw, 0.f, sw, float(getHeight())};
@@ -624,22 +646,22 @@ public:
                 x -= tw; g.setColour(c.muted); g.drawText(label, Rectangle<float>(x, 80.f, tw + 2.f, 20.f), Justification::centredLeft);
                 x -= 22.f; mark(x); x -= 20.f;
             };
-            item("RMS, last 10 s", [](float) {});
+            item(peakMode(proc) ? "Peak, last 10 s" : "RMS, last 10 s", [](float) {});
             x += 16.f;
             item("Input", [&](float mx) { g.setColour(c.inLine.withAlpha(0.35f)); g.fillRect(mx, 86.f, 14.f, 8.f); g.setColour(c.inLine); g.fillRect(mx, 86.f, 14.f, 1.f); });
             item("Output", [&](float mx) { g.setColour(c.accent); g.fillRect(mx, 89.f, 14.f, 2.f); });
         }
-        // grid: a line and a figure every 20 dB, read by the plot and both meters alike
+        // grid: a line and a figure every 10 dB, read by the plot and both meters alike
         g.setFont(num(11.f));
-        for (int v = 0; v >= -80; v -= 20) {
+        for (int v = 0; v >= -80; v -= 10) {
             const float y = std::round(yOf(float(v)));
             g.setColour(c.grid); g.fillRect(PX0, y, PX1 - PX0, 1.f);
             g.setColour(c.muted);
             g.drawText(fmtDb(float(v), 0), Rectangle<float>(kInBarX + 13.f, y - 7.f, 80.f - (kInBarX + 13.f) - 4.f, 14.f), Justification::centredRight);
             g.drawText(fmtDb(float(v), 0), Rectangle<float>(PX1 + 8.f, y - 7.f, kOutBarX - PX1 - 12.f, 14.f), Justification::centredLeft);
         }
-        paintMeter(g, c, kInBarX, in, "In");
-        paintMeter(g, c, kOutBarX, out, "Out");
+        paintMeter(g, c, kInBarX, in, "In peak");
+        paintMeter(g, c, kOutBarX, out, "Out peak");
 
         const int n = int(hist.size());
         const float x0 = PX0, x1 = PX1, sx = (x1 - x0) / float(kHist - 1);
@@ -650,11 +672,13 @@ public:
             g.setColour(c.accent.withAlpha(c.dark ? 0.08f : 0.07f));
             g.fillRect(Rectangle<float>(ax, GT, x1 - ax, GB - GT));
         }
+        const bool peak = peakMode(proc);  // the graph draws what the target measures
         if (n > 1) {
             Path fillP, inP, outP;
             fillP.startNewSubPath(X(0), GB);
             for (int k = 0; k < n; ++k) {
-                const float yi = yOf(hist[size_t(k)].inRms), yo = yOf(hist[size_t(k)].outRms);
+                const auto& h = hist[size_t(k)];
+                const float yi = yOf(peak ? h.inPk : h.inRms), yo = yOf(peak ? h.outPk : h.outRms);
                 fillP.lineTo(X(k), yi);
                 if (k == 0) { inP.startNewSubPath(X(k), yi); outP.startNewSubPath(X(k), yo); }
                 else { inP.lineTo(X(k), yi); outP.lineTo(X(k), yo); }
@@ -728,7 +752,8 @@ public:
         const float top = yOf(0.f), bot = yOf(-kDbRange);
         const bool clip = m.hold > -0.5f;
         g.setFont(text(12.f, clip)); g.setColour(clip ? c.negative : c.muted);
-        g.drawText(clip ? "Clip" : name, Rectangle<float>(bx - 20.f, 104.f, kBarW * 2.f + kBarGap + 40.f, 16.f), Justification::centred);
+        const float lw = 64.f, lx = bx < kLevelCard.getCentreX() ? kLevelCard.getX() + 12.f : kLevelCard.getRight() - 12.f - lw;
+        g.drawText(clip ? "Clip" : name, Rectangle<float>(lx, 104.f, lw, 16.f), bx < kLevelCard.getCentreX() ? Justification::centredLeft : Justification::centredRight);
         const float pk[2] = {m.peakL, m.peakR};
         auto zone = [&](float v) { return v > -6.f ? c.negative : v > -18.f ? c.warning : c.positive; };
         for (int ch = 0; ch < 2; ++ch) {
@@ -785,7 +810,8 @@ private:
 class Readouts : public Component {
 public:
     explicit Readouts(const Pal*& p) : pal(p) { setInterceptsMouseClicks(false, false); }
-    float outRms = -120.f, gain = 0.f, inRms = -120.f, inHold = -120.f, outHold = -120.f, inBal = 0.f, outBal = 0.f;
+    float outLevel = -120.f, gain = 0.f, inLevel = -120.f, inHold = -120.f, outHold = -120.f, inBal = 0.f, outBal = 0.f;
+    bool peak = false;  // the levels are peaks (dBFS) rather than RMS
     String verdict, latency;
     int verdictTone = 0;  // 1 good (on target), 0 plain, -1 quiet (waiting, bypassed)
     void paint(Graphics& g) override {
@@ -793,17 +819,16 @@ public:
         const float w = float(getWidth()), x0 = 16.f, x1 = w - 16.f;
         g.setFont(text(13.f, true)); g.setColour(c.text);
         g.drawText("Output", Rectangle<float>(x0, 14.f, 120.f, 18.f), Justification::centredLeft);
-        g.setFont(text(12.f)); g.setColour(c.muted);
-        g.drawText("RMS, 300 ms", Rectangle<float>(x1 - 140.f, 14.f, 140.f, 18.f), Justification::centredRight);
-        // the answer figure
-        const bool live = outRms > kSilent;
+        // (the RMS / Peak switch sits at the right of this row)
+        // the answer figure: the output level the engine steers, in what the target measures
+        const bool live = outLevel > kSilent;
         const Font big = num(34.f, true), unit = text(15.f);
-        const String fig = live ? fmtDb(outRms) : kDash;
+        const String fig = live ? fmtDb(outLevel) : kDash;
         g.setFont(big); g.setColour(live ? c.text : c.muted);
         const float fw = widthOf(big, fig);
         g.drawText(fig, Rectangle<float>(x0 - 1.f, 38.f, fw + 4.f, 44.f), Justification::centredLeft);
         g.setFont(unit); g.setColour(c.muted);
-        g.drawText("dB", Rectangle<float>(x0 + fw + 8.f, 50.f, 40.f, 28.f), Justification::centredLeft);
+        g.drawText(peak ? "dBFS peak" : "dB RMS", Rectangle<float>(x0 + fw + 8.f, 50.f, 120.f, 28.f), Justification::centredLeft);
         // how it stands against the target, in words
         g.setFont(text(13.f, verdictTone > 0));
         g.setColour(verdictTone > 0 ? c.positive : verdictTone < 0 ? c.muted : c.text);
@@ -811,9 +836,10 @@ public:
         // the rows: figure right-aligned, unit after it in grey
         struct Row { String name, value, unit; };
         auto lv = [](float v) { return v > kSilent ? fmtDb(v) : kDash; };
+        auto pk = [](float v) { return v > -kDbRange ? fmtDb(v) : kMinusInf; };
         const Row rows[5] = {{"Applied gain", fmtDb(gain, 1, true), "dB"},
-                             {"Input", lv(inRms), "dB"},
-                             {"Peak in" + kDot + "out", lv(inHold) + kDot + lv(outHold), "dBFS"},
+                             {"Input", lv(inLevel), peak ? "dBFS" : "dB"},
+                             {"Peak in" + kDot + "out", pk(inHold) + kDot + pk(outHold), "dBFS"},
                              {"Balance in" + kDot + "out", balanceText(inBal) + kDot + balanceText(outBal), "dB"},
                              {"Latency", latency, "ms"}};
         float y = 114.f;
@@ -1214,13 +1240,13 @@ void markTipSeen() { PropertiesFile f(settingsOptions()); f.setValue("tipSeen", 
 class CorridorContent : public Component, private ChangeListener {
 public:
     explicit CorridorContent(CorridorAudioProcessor& p)
-        : proc(p), pal(p.darkTheme ? &kDark : &kLight), scene(p, pal), readouts(pal), header(pal),
+        : proc(p), pal(&kDark), scene(p, pal), readouts(pal), header(pal),
           threshold(p, ids::threshold, "Threshold", [](double v) { return fmtDb(float(v)) + " dB"; }, "thr"),
           response(p, ids::response, "Response", [](double v) { return String(roundToInt(v)) + " ms" + kDot + speedWord(v); }, "", {"Fast", "Slow"}),
-          target(p, ids::target, "Target", [](double v) { return fmtDb(float(v)) + " dB RMS"; }, "data"),
+          target(p, ids::target, "Target", [&p](double v) { return fmtDb(float(v)) + levelUnit(p); }, "data"),
           range(p, ids::range, "Range", [](double v) { return kPlusMinus + fmtDb(float(v)) + " dB"; }, ""),
           ceiling(p, ids::ceiling, "Ceiling", [](double v) { return fmtDb(float(v)) + " dBFS"; }, "ceil"),
-          ab({"A", "B"}), mode(p, pal), tip(pal), drawer(p, pal), about(*checker, pal), prompt(*checker, pal) {
+          ab({"A", "B"}), detect({"RMS", "Peak"}), mode(p, pal), tip(pal), drawer(p, pal), about(*checker, pal), prompt(*checker, pal) {
         look.pal = pal;
         look.apply();
         setLookAndFeel(&look);
@@ -1242,15 +1268,24 @@ public:
         ab.pal = [this]() -> const Pal& { return *pal; };
         ab.onSelect = [this](int i) { proc.switchSlot(i); };
         addAndMakeVisible(ab);
-        for (auto* b : {&undoBtn, &redoBtn, &themeBtn, &bypassBtn}) { b->getProperties().set("kind", "icon"); b->setButtonText({}); addAndMakeVisible(*b); }
+        detect.setTitle("Target measures RMS or peak");
+        detect.setTooltip("RMS: the average loudness lands on the target. Peak: the highest peaks land on the target.");
+        detect.slotWidth = 50.f;
+        detect.fontSize = 13.f;
+        detect.pal = [this]() -> const Pal& { return *pal; };
+        detect.onSelect = [this](int i) {
+            proc.undo.beginNewTransaction();
+            if (auto* prm = proc.state().getParameter(ids::detect)) { prm->beginChangeGesture(); prm->setValueNotifyingHost(prm->convertTo0to1(float(i))); prm->endChangeGesture(); }
+        };
+        addAndMakeVisible(detect);
+        for (auto* b : {&undoBtn, &redoBtn}) { b->getProperties().set("kind", "icon"); b->setButtonText({}); addAndMakeVisible(*b); }
         undoBtn.getProperties().set("icon", "undo"); undoBtn.setTitle("Undo"); undoBtn.setTooltip("Undo (Ctrl+Z)");
         redoBtn.getProperties().set("icon", "redo"); redoBtn.setTitle("Redo"); redoBtn.setTooltip("Redo (Ctrl+Shift+Z)");
         undoBtn.onClick = [this] { proc.undo.undo(); };
         redoBtn.onClick = [this] { proc.undo.redo(); };
-        themeBtn.getProperties().set("icon", "theme"); themeBtn.setTitle("Switch between dark and light"); themeBtn.setTooltip("Dark or light");
-        themeBtn.onClick = [this] { applyTheme(pal != &kDark); };
-        bypassBtn.getProperties().set("icon", "power"); bypassBtn.getProperties().set("danger", true);
+        bypassBtn.getProperties().set("kind", "control"); bypassBtn.getProperties().set("danger", true);
         bypassBtn.setTitle("Bypass"); bypassBtn.setTooltip("Bypass (keeps the same latency, so nothing jumps)");
+        addAndMakeVisible(bypassBtn);
         bypassBtn.setClickingTogglesState(true);
         bypassBtn.onPress = [this] { proc.undo.beginNewTransaction(); };
         bypassAtt = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment>(p.state(), ids::bypass, bypassBtn);
@@ -1299,16 +1334,6 @@ public:
         resized();
     }
 
-    void applyTheme(bool dark) {
-        proc.darkTheme = dark;
-        pal = dark ? &kDark : &kLight;
-        look.pal = pal;
-        look.apply();
-        sendLookAndFeelChange();
-        if (auto* top = getParentComponent()) top->repaint();
-        repaint();
-    }
-
     void showPresets() {
         PopupMenu m;
         m.addSectionHeader("Presets");
@@ -1338,10 +1363,10 @@ public:
         ab.setBounds(392, 0, 60, int(kTopBar));  // its bottom edge is the top bar's rule
         undoBtn.setBounds(464, 11, 30, 30);
         redoBtn.setBounds(498, 11, 30, 30);
-        bypassBtn.setBounds(W - 16 - 30, 11, 30, 30);
-        themeBtn.setBounds(W - 16 - 30 - 8 - 30, 11, 30, 30);
-        int statusRight = themeBtn.getX() - 16;
-        if (updateBtn.isVisible()) { updateBtn.setBounds(themeBtn.getX() - 12 - 150, 11, 150, 30); statusRight = updateBtn.getX() - 16; }
+        bypassBtn.setBounds(W - 16 - 100, 11, 100, 30);
+        int statusRight = bypassBtn.getX() - 16;
+        if (updateBtn.isVisible()) { updateBtn.setBounds(bypassBtn.getX() - 12 - 150, 11, 150, 30); statusRight = updateBtn.getX() - 16; }
+        detect.setBounds(int(kReadCard.getRight()) - 16 - 100, int(kReadCard.getY()) + 6, 100, 30);  // in the Output panel's title row
         header.statusArea = Rectangle<float>(552.f, 6.f, float(statusRight - 552), kTopBar - 13.f);
         // dials: five equal columns in the dial card
         const float colW = (kDialCard.getWidth() - 32.f) / 5.f;
@@ -1361,15 +1386,22 @@ public:
         const auto& t = dsp.telemetry();
         const int n = dsp.copyHistory(scratch, kHist);
         scene.hist.assign(scratch, scratch + n);
-        scene.analyzing = t.analyzing.load();
+        scene.analyzing = t.analyzing.load() && proc.state().getRawParameterValue(ids::mode)->load() > 0.5f;  // only Hold measures
         scene.analyzeSeconds = t.analyzeSeconds.load();
 
         const bool byp = proc.state().getRawParameterValue(ids::bypass)->load() > 0.5f;
         scene.bypassed = byp;
         scene.in = {t.inPeakL.load(), t.inPeakR.load(), t.inPeakHold.load()};
         scene.out = byp ? scene.in : MeterVals{t.outPeakL.load(), t.outPeakR.load(), t.outPeakHold.load()};
-        target.setLive(t.outRms.load());
+        // the level the engine steers (what From target and the Target dial's live dot compare)
+        const bool pkMode = peakMode(proc);
+        const float steered = t.levelValid.load() ? t.level.load() + (byp ? 0.f : t.gain.load()) : (pkMode ? t.outPk.load() : t.outRms.load());
+        target.setLive(steered);
         threshold.setLive(t.inRms.load());
+        const int det = pkMode ? 1 : 0;
+        if (det != detect.selected) target.repaint();  // its value shows the unit
+        detect.setSelected(det);
+        bypassBtn.setButtonText(byp ? "Bypassed" : "Bypass");
         scene.emphasis = target.inUse() ? ids::target : threshold.inUse() ? ids::threshold : ceiling.inUse() ? ids::ceiling : nullptr;
 
         const bool holdMode = proc.state().getRawParameterValue(ids::mode)->load() > 0.5f;
@@ -1392,17 +1424,18 @@ public:
         // readouts
         const float g = byp ? 0.f : t.gain.load();
         const float tgt = proc.state().getRawParameterValue(ids::target)->load();
-        const float out = t.outRms.load(), thr = proc.state().getRawParameterValue(ids::threshold)->load();
+        const float out = steered, thr = proc.state().getRawParameterValue(ids::threshold)->load();
         const bool active = !holdMode && !byp && t.inRms.load() >= thr;
         const float d = out - tgt;
-        readouts.outRms = out;
+        readouts.peak = pkMode;
+        readouts.outLevel = out;
         readouts.gain = g;
-        readouts.inRms = t.inRms.load();
+        readouts.inLevel = pkMode ? t.inPk.load() : t.inRms.load();
         readouts.inHold = t.inPeakHold.load();
         readouts.outHold = byp ? t.inPeakHold.load() : t.outPeakHold.load();
         readouts.inBal = t.inBalance.load();
         readouts.outBal = t.outBalance.load();
-        const String tgtText = fmtDb(tgt);
+        const String tgtText = fmtDb(tgt) + (pkMode ? " dBFS" : " dB");
         if (byp) { readouts.verdict = "Bypassed, passing through unchanged"; readouts.verdictTone = -1; }
         else if (holdMode) {
             readouts.verdict = t.analyzing.load() ? "Measuring for Hold, " + String(t.analyzeSeconds.load(), 1) + " s"
@@ -1411,8 +1444,8 @@ public:
             readouts.verdictTone = 0;
         }
         else if (!active) { readouts.verdict = "Below the threshold, not adjusting"; readouts.verdictTone = -1; }
-        else if (std::abs(d) < 1.f) { readouts.verdict = "On the " + tgtText + " dB target"; readouts.verdictTone = 1; }
-        else { readouts.verdict = fmtDb(std::abs(d)) + (d > 0 ? " dB over" : " dB under") + " the " + tgtText + " dB target"; readouts.verdictTone = 0; }
+        else if (std::abs(d) < 1.f) { readouts.verdict = "On the " + tgtText + " target"; readouts.verdictTone = 1; }
+        else { readouts.verdict = fmtDb(std::abs(d)) + (d > 0 ? " dB over" : " dB under") + " the " + tgtText + " target"; readouts.verdictTone = 0; }
         const double fs = dsp.sampleRate();
         readouts.latency = String(1000.0 * dsp.latencySamples() / fs, 1);
 
@@ -1448,7 +1481,7 @@ public:
     String sentence(bool byp, bool holdMode) const {
         const auto& t = proc.core().telemetry();
         auto& st = proc.state();
-        const float in = t.inRms.load(), g = t.gain.load();
+        const float in = peakMode(proc) ? t.inPk.load() : t.inRms.load(), g = t.gain.load();
         const float tgt = st.getRawParameterValue(ids::target)->load();
         const float thr = st.getRawParameterValue(ids::threshold)->load();
         const float cei = st.getRawParameterValue(ids::ceiling)->load();
@@ -1470,9 +1503,9 @@ public:
             case corridor::State::OnTarget:
                 return "On target with " + fmtDb(g, 1, true) + " dB applied." +
                        (t.percussive.load() ? " Percussive material: following the groove, not single hits." : "");
-            case corridor::State::Boosting: return "Coming in at " + fmtDb(in, 1) + " dB RMS, below the " + fmtDb(tgt, 1) + " dB target. Lifting it, " + fmtDb(g, 1, true) + " dB so far.";
-            case corridor::State::Cutting: return "Coming in at " + fmtDb(in, 1) + " dB RMS, above the " + fmtDb(tgt, 1) + " dB target. Lowering it, " + fmtDb(g, 1, true) + " dB so far.";
-            case corridor::State::Ceiling: return "More boost would push peaks past the " + fmtDb(cei, 1) + " dBFS ceiling. Held at " + fmtDb(g, 1, true) + " dB.";
+            case corridor::State::Boosting: return "Coming in at " + fmtDb(in, 1) + levelUnit(proc) + ", below the " + fmtDb(tgt, 1) + " dB target. Lifting it, " + fmtDb(g, 1, true) + " dB so far.";
+            case corridor::State::Cutting: return "Coming in at " + fmtDb(in, 1) + levelUnit(proc) + ", above the " + fmtDb(tgt, 1) + " dB target. Lowering it, " + fmtDb(g, 1, true) + " dB so far.";
+            case corridor::State::Ceiling: return "More boost would push peaks over " + String(int(corridor::kPeakLimitDb)) + " dB into the " + fmtDb(cei, 1) + " dBFS ceiling's limiter. Held at " + fmtDb(g, 1, true) + " dB.";
             case corridor::State::Range: return "It needs more than the " + kPlusMinus + String(rng, 1) + " dB range allows. Held at " + fmtDb(g, 1, true) + " dB.";
             case corridor::State::Returning: return "Silent for over 2 s. Returning to 0 dB, now " + fmtDb(g, 1, true) + " dB.";
             case corridor::State::Waiting:
@@ -1480,7 +1513,7 @@ public:
             case corridor::State::Analyzing:
             case corridor::State::Unset:
             default:
-                return in < thr ? "Below the " + fmtDb(thr, 1) + " dB threshold: silence, breaths or noise. Not adjusting; the gain stays at " + fmtDb(g, 1, true) + " dB."
+                return t.inRms.load() < thr ? "Below the " + fmtDb(thr, 1) + " dB threshold: silence, breaths or noise. Not adjusting; the gain stays at " + fmtDb(g, 1, true) + " dB."
                                 : "Sound just started. Measuring it before acting.";
         }
     }
@@ -1494,9 +1527,9 @@ private:
     Readouts readouts;
     Header header;
     Knob threshold, response, target, range, ceiling;
-    Tabs ab;
+    Tabs ab, detect;
     ModePanel mode;
-    PlainButton presetBtn{"Default"}, undoBtn{"Undo"}, redoBtn{"Redo"}, themeBtn{"Theme"}, bypassBtn{"Bypass"};
+    PlainButton presetBtn{"Default"}, undoBtn{"Undo"}, redoBtn{"Redo"}, bypassBtn{"Bypass"};
     PlainButton aboutBtn{""}, updateBtn{"Update"};
     Tip tip;
     Drawer drawer;
@@ -1516,7 +1549,7 @@ CorridorEditor::CorridorEditor(CorridorAudioProcessor& p) : AudioProcessorEditor
     addAndMakeVisible(*content);
     setResizable(true, true);
     setWantsKeyboardFocus(false);
-    width0 = jlimit(960, 2240, savedWidth);
+    width0 = jlimit(minW, maxW, savedWidth);
     drawerOpen = p.state().getRawParameterValue(ids::mode)->load() > 0.5f;
     applyDrawer(drawerOpen);
     content->tick();  // fill the window before it is first shown
@@ -1532,13 +1565,13 @@ void CorridorEditor::applyDrawer(bool open) {
     drawerOpen = open;
     const double ratio = double(designW) / double(contentHeight());
     const int w = getWidth() > 0 ? getWidth() : width0;
-    setResizeLimits(960, int(std::round(960 / ratio)), 2240, int(std::round(2240 / ratio)));  // below 960 px the smallest labels fall under ~10 px
+    setResizeLimits(minW, int(std::round(minW / ratio)), maxW, int(std::round(maxW / ratio)));  // the whole layout scales; at 720 px it is drawn at 64%
     if (auto* c = getConstrainer()) c->setFixedAspectRatio(ratio);
     setSize(w, int(std::round(w / ratio)));
     resized();
 }
 
-void CorridorEditor::paint(Graphics& g) { g.fillAll(proc.darkTheme ? kDark.ground : kLight.ground); }
+void CorridorEditor::paint(Graphics& g) { g.fillAll(kDark.ground); }
 
 void CorridorEditor::resized() {
     const float s = float(getWidth()) / float(designW);
