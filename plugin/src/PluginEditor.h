@@ -10,8 +10,8 @@
 class CorridorContent;
 
 // The window opens at 1120 x 630 and can be resized freely. It is laid out again at every size, never
-// scaled, so the text keeps one size: the graph and the dials take the extra room. In Hold mode it grows
-// by an analysis panel of drawerH under it.
+// scaled, so the text keeps one size: the graph and the dials take the extra room. Below 1000 x 630 it
+// switches to a compact layout. In Hold mode it grows by an analysis panel of drawerH under it.
 class CorridorEditor : public juce::AudioProcessorEditor, private juce::Timer {
 public:
     explicit CorridorEditor(CorridorAudioProcessor&);
@@ -22,9 +22,10 @@ public:
 
     static constexpr int designW = 1120, designH = 630;
     static constexpr int drawerH = 166;  // the analysis panel that opens under the window in Hold mode
-    static constexpr int minW = 1000, maxW = 2560;  // the smallest size that holds every panel with the text at full size
-    static constexpr int minH = 630, maxH = 1600;
+    static constexpr int minW = 720, maxW = 2560;  // the compact layout holds every control down to 720 x 540
+    static constexpr int minH = 540, maxH = 1600;
     void refreshNow() { timerCallback(); }  // used by the snapshot test
+    void openModePanel(bool open);          // compact layout: the mode panel over the window (snapshot test)
 
 private:
     void timerCallback() override;

@@ -38,30 +38,41 @@ constexpr int kWaveEntries = 300;   // 6 s in the analysis panel
 //   columns: 16 + 760 + 16 + 312 + 16 = 1120  (the left column takes any extra width)
 //   rows:    top bar 52, then 12 + 384 + 16 + 150 + 16 = 630 on the left (the level panel takes any extra
 //            height); 12 + 240 + 16 + 278 + 16 on the right (the mode panel takes it)
+// Below 1000 x 630 the window is compact: the level panel and the dials run the full width, the output
+// readouts become one line at the top of the level panel, and the mode panel opens from the top bar.
 constexpr float kTopBar = 52.f;
 constexpr float kRailW = 312.f, kDialH = 150.f, kReadH = 240.f;
+constexpr int kFullW = 1000, kFullH = 630;  // the full layout from here up; compact below
 constexpr float kDbRange = 80.f;
 constexpr float kBarW = 5.f, kBarGap = 3.f;
 struct Geo {
     float w = 1120.f, h = 630.f;
-    Rectangle<float> level, dial, read, mode;
+    bool compact = false;
+    Rectangle<float> level, dial, read, mode, strip;  // strip: the compact readout line in the level panel
     float px0 = 0, px1 = 0;   // plot, left to right (the meters sit either side)
     float gt = 0, gb = 0;     // level plot, 0 to -80 dB
     float lt = 0, lb = 0;     // gain lane
     float inBarX = 0, outBarX = 0;
     void layout(float width, float height) {
         w = width; h = height;
-        const float left = w - 48.f - kRailW;
+        compact = w < float(kFullW) || h < float(kFullH);
+        const float left = compact ? w - 32.f : w - 48.f - kRailW;
         level = {16.f, 64.f, left, h - 64.f - 16.f - kDialH - 16.f};
         dial = {16.f, h - 16.f - kDialH, left, kDialH};
-        read = {left + 32.f, 64.f, kRailW, kReadH};
-        mode = {left + 32.f, 64.f + kReadH + 16.f, kRailW, h - (64.f + kReadH + 16.f) - 16.f};
+        if (compact) {
+            read = {}; strip = {level.getX() + 16.f, level.getY() + 8.f, level.getWidth() - 32.f, 48.f};
+            mode = {w - 16.f - kRailW, kTopBar + 6.f, kRailW, 294.f};  // a panel that opens over the window
+        } else {
+            strip = {};
+            read = {left + 32.f, 64.f, kRailW, kReadH};
+            mode = {left + 32.f, 64.f + kReadH + 16.f, kRailW, h - (64.f + kReadH + 16.f) - 16.f};
+        }
         inBarX = level.getX() + 16.f;
         outBarX = level.getRight() - 16.f - (kBarW * 2.f + kBarGap);
         px0 = level.getX() + 72.f;
         px1 = level.getRight() - 76.f;
         lb = level.getBottom() - 16.f; lt = lb - 60.f;
-        gt = level.getY() + 60.f; gb = lt - 16.f;
+        gt = level.getY() + (compact ? 80.f : 60.f); gb = lt - 16.f;
     }
     float yOf(float v) const { return gt + jlimit(0.f, kDbRange, -v) / kDbRange * (gb - gt); }
     float vOf(float y) const { return -jlimit(0.f, kDbRange, (y - gt) / (gb - gt) * kDbRange); }
@@ -649,7 +660,8 @@ public:
         const Pal& c = *pal;
         g.fillAll(c.ground);
         g.setColour(c.rule); g.fillRect(0.f, kTopBar - 1.f, float(getWidth()), 1.f);
-        card(g, c, G.level); card(g, c, G.dial); card(g, c, G.read); card(g, c, G.mode);
+        card(g, c, G.level); card(g, c, G.dial);
+        if (!G.compact) { card(g, c, G.read); card(g, c, G.mode); }
         // dial card: one column per dial, split by 1px dividers
         const float colW = (G.dial.getWidth() - 32.f) / 5.f;
         g.setColour(c.rule);
@@ -659,7 +671,10 @@ public:
 
     void paintLevel(Graphics& g, const Pal& c) {
         const float cx0 = G.level.getX() + 16.f, cx1 = G.level.getRight() - 16.f;
-        // header: the title, then the two series named by their own marks
+        // header: the title, then the two series named by their own marks (compact: the readout line instead)
+        if (G.compact) {
+            g.setColour(c.rule); g.fillRect(cx0, G.strip.getBottom() + 4.f, cx1 - cx0, 1.f);
+        } else {
         g.setFont(text(16.f, true)); g.setColour(c.text);
         g.drawText("Level", Rectangle<float>(cx0, G.level.getY() + 16.f, 120.f, 20.f), Justification::centredLeft);
         {
@@ -675,6 +690,7 @@ public:
             x += 16.f;
             item("Input", [&](float mx) { g.setColour(c.inLine.withAlpha(0.35f)); g.fillRect(mx, G.level.getY() + 22.f, 14.f, 8.f); g.setColour(c.inLine); g.fillRect(mx, G.level.getY() + 22.f, 14.f, 1.f); });
             item("Output", [&](float mx) { g.setColour(c.accent); g.fillRect(mx, G.level.getY() + 25.f, 14.f, 2.f); });
+        }
         }
         // grid: a line and a figure every 10 dB, read by the plot and both meters alike
         g.setFont(num(11.f));
@@ -840,8 +856,40 @@ public:
     bool peak = false;  // the levels are peaks (dBFS) rather than RMS
     String verdict, latency;
     int verdictTone = 0;  // 1 good (on target), 0 plain, -1 quiet (waiting, bypassed)
+    bool compact = false;  // one line at the top of the level panel
+    static constexpr float kTabsW = 100.f;  // room left for the RMS / Peak switch at the right
+    void paintLine(Graphics& g, const Pal& c) {
+        const float w = float(getWidth()), h = float(getHeight());
+        const bool live = outLevel > kSilent;
+        const Font big = num(26.f, true), unit = text(13.f);
+        const String fig = live ? fmtDb(outLevel) : kDash;
+        g.setFont(big); g.setColour(live ? c.text : c.muted);
+        const float fw = widthOf(big, fig);
+        g.drawText(fig, Rectangle<float>(0.f, 0.f, fw + 4.f, h), Justification::centredLeft);
+        const String u = peak ? "dBFS peak" : "dB RMS";
+        g.setFont(unit); g.setColour(c.muted);
+        const float uw = widthOf(unit, u);
+        g.drawText(u, Rectangle<float>(fw + 6.f, 2.f, uw + 4.f, h), Justification::centredLeft);
+        // applied gain, at the right before the switch
+        const String gv = fmtDb(gain, 1, true);
+        const Font gf = num(15.f, true), lf = text(12.f);
+        const float gx1 = w - kTabsW - 16.f, gvw = widthOf(gf, gv), gdw = widthOf(lf, " dB"), glw = widthOf(lf, "Applied gain ");
+        g.setFont(lf); g.setColour(c.muted);
+        g.drawText(" dB", Rectangle<float>(gx1 - gdw, 2.f, gdw + 2.f, h), Justification::centredLeft);
+        g.setFont(gf); g.setColour(c.text);
+        g.drawText(gv, Rectangle<float>(gx1 - gdw - gvw, 0.f, gvw + 2.f, h), Justification::centredLeft);
+        g.setFont(lf); g.setColour(c.muted);
+        const float glx = gx1 - gdw - gvw - glw;
+        g.drawText("Applied gain", Rectangle<float>(glx, 2.f, glw, h), Justification::centredLeft);
+        // the verdict, between the figure and the gain
+        const float vx = fw + uw + 22.f;
+        g.setFont(text(13.f, verdictTone > 0));
+        g.setColour(verdictTone > 0 ? c.positive : verdictTone < 0 ? c.muted : c.text);
+        g.drawFittedText(verdict, Rectangle<int>(int(vx), 0, int(glx - 20.f - vx), int(h)), Justification::centredLeft, 1, 0.9f);
+    }
     void paint(Graphics& g) override {
         const Pal& c = *pal;
+        if (compact) { paintLine(g, c); return; }
         const float w = float(getWidth()), x0 = 16.f, x1 = w - 16.f;
         g.setFont(text(13.f, true)); g.setColour(c.text);
         g.drawText("Output", Rectangle<float>(x0, 14.f, 120.f, 18.f), Justification::centredLeft);
@@ -957,9 +1005,14 @@ public:
         tabs.setSelected(hold ? 1 : 0);
         repaint();
     }
+    bool floatingPanel = false;  // compact: it opens over the window from the top bar
     void paint(Graphics& g) override {
         const Pal& c = *pal;
         const float w = float(getWidth()), x0 = 16.f, x1 = w - 16.f;
+        if (floatingPanel) {
+            g.setColour(c.raised); g.fillRoundedRectangle(getLocalBounds().toFloat(), 6.f);
+            g.setColour(c.control); g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), 6.f, 1.f);
+        }
         g.setColour(c.rule); g.fillRect(x0, 42.f, x1 - x0, 1.f);
         const bool hold = proc.state().getRawParameterValue(ids::mode)->load() > 0.5f;
         g.setFont(text(12.f)); g.setColour(c.muted);
@@ -1290,6 +1343,11 @@ public:
         presetBtn.getProperties().set("trailing", "chevron-down");
         presetBtn.setTitle("Presets");
         presetBtn.onClick = [this] { showPresets(); };
+        modeBtn.getProperties().set("trailing", "chevron-down");
+        modeBtn.setTitle("Mode and timing");
+        modeBtn.setTooltip("Ride or Hold, rise, fall, output trim and return to 0 dB");
+        modeBtn.onClick = [this] { modeOpen = !modeOpen; resized(); };
+        addChildComponent(modeBtn);
         addAndMakeVisible(presetBtn);
         ab.setTitle("Settings A or B");
         ab.slotWidth = 30.f;
@@ -1342,12 +1400,17 @@ public:
         sendLookAndFeelChange();
         addMouseListener(this, true);  // a click anywhere lets Ctrl+Z and A reach the window
     }
-    void mouseDown(const MouseEvent&) override {
+    void mouseDown(const MouseEvent& e) override {
+        if (modeOpen && e.eventComponent != &modeBtn && !mode.isParentOf(e.eventComponent) && e.eventComponent != &mode) {
+            modeOpen = false;  // a click anywhere else closes the compact mode panel
+            resized();
+        }
         if (auto* f = Component::getCurrentlyFocusedComponent(); f == nullptr || !isParentOf(f)) grabKeyboardFocus();
     }
     ~CorridorContent() override { checker->removeChangeListener(this); setLookAndFeel(nullptr); }
 
     std::function<void(bool)> onDrawerChange;
+    void setModeOpen(bool open) { modeOpen = open; resized(); }
     int drawerSpace = 0;  // the height the Hold panel takes at the bottom, set by the editor
 
     void changeListenerCallback(ChangeBroadcaster*) override {
@@ -1375,6 +1438,7 @@ public:
     bool keyPressed(const KeyPress& k) override {
         const auto mods = k.getModifiers();
         const int code = k.getKeyCode();
+        if (k == KeyPress::escapeKey && modeOpen) { modeOpen = false; resized(); return true; }
         if (mods.isCommandDown() && (code == 'Z' || code == 'z')) { mods.isShiftDown() ? proc.undo.redo() : proc.undo.undo(); return true; }
         if (mods.isCommandDown() && (code == 'Y' || code == 'y')) { proc.undo.redo(); return true; }
         if (!mods.isAnyModifierKeyDown() && (code == 'A' || code == 'a') && drawer.isVisible()) { drawer.analyze.triggerClick(); return true; }
@@ -1386,19 +1450,35 @@ public:
         geo.layout(float(W), float(H));
         scene.setBounds(0, 0, W, H);
         header.setBounds(0, 0, W, int(kTopBar));
-        readouts.setBounds(geo.read.toNearestInt());
+        const bool compact = geo.compact;
+        if (!compact) modeOpen = false;
+        readouts.compact = compact;
+        readouts.setBounds((compact ? geo.strip : geo.read).toNearestInt());
+        mode.floatingPanel = compact;
         mode.setBounds(geo.mode.toNearestInt());
+        mode.setVisible(!compact || modeOpen);
+        if (compact && modeOpen) mode.toFront(false);
         // top bar, left to right: name (About), preset, A / B, undo, redo, the status sentence ... update, theme, bypass
         aboutBtn.setBounds(12, 8, 160, 36);
-        presetBtn.setBounds(196, 11, 172, 30);
-        ab.setBounds(392, 0, 60, int(kTopBar));  // its bottom edge is the top bar's rule
-        undoBtn.setBounds(464, 11, 30, 30);
-        redoBtn.setBounds(498, 11, 30, 30);
+        const int presetW = compact ? 140 : 172, abX = 196 + presetW + 24;  // compact: a narrower preset menu
+        presetBtn.setBounds(196, 11, presetW, 30);
+        ab.setBounds(abX, 0, 60, int(kTopBar));  // its bottom edge is the top bar's rule
+        undoBtn.setBounds(abX + 72, 11, 30, 30);
+        redoBtn.setBounds(abX + 106, 11, 30, 30);
+        const int statusX = abX + 160;
         bypassBtn.setBounds(W - 16 - 100, 11, 100, 30);
         int statusRight = bypassBtn.getX() - 16;
-        if (updateBtn.isVisible()) { updateBtn.setBounds(bypassBtn.getX() - 12 - 150, 11, 150, 30); statusRight = updateBtn.getX() - 16; }
-        detect.setBounds(int(geo.read.getRight()) - 16 - 100, int(geo.read.getY()) + 6, 100, 30);  // in the Output panel's title row
-        header.statusArea = Rectangle<float>(552.f, 6.f, float(statusRight - 552), kTopBar - 13.f);
+        modeBtn.setVisible(compact);
+        modeBtn.setToggleState(modeOpen, dontSendNotification);
+        if (compact) { modeBtn.setBounds(bypassBtn.getX() - 8 - 96, 11, 96, 30); statusRight = modeBtn.getX() - 16; }
+        if (updateBtn.isVisible()) { updateBtn.setBounds(statusRight + 16 - 12 - 150, 11, 150, 30); statusRight = updateBtn.getX() - 16; }
+        if (compact)  // at the right end of the readout line
+            detect.setBounds(int(geo.strip.getRight() - Readouts::kTabsW), int(geo.strip.getCentreY()) - 15, int(Readouts::kTabsW), 30);
+        else          // in the Output panel's title row
+            detect.setBounds(int(geo.read.getRight()) - 16 - 100, int(geo.read.getY()) + 6, 100, 30);
+        // the status sentence, where there is room for it (compact, the readout line says how it stands)
+        header.statusArea = statusRight - statusX >= 220 ? Rectangle<float>(float(statusX), 6.f, float(statusRight - statusX), kTopBar - 13.f)
+                                                         : Rectangle<float>();
         // dials: five equal columns in the dial card
         const float colW = (geo.dial.getWidth() - 32.f) / 5.f;
         int i = 0;
@@ -1441,6 +1521,7 @@ public:
         undoBtn.setEnabled(proc.undo.canUndo());
         redoBtn.setEnabled(proc.undo.canRedo());
         mode.refresh();
+        modeBtn.setButtonText(holdMode ? "Hold" : "Ride");
 
         if (holdMode != drawer.isVisible()) {
             drawer.setVisible(holdMode);
@@ -1561,7 +1642,8 @@ private:
     Knob threshold, response, target, range, ceiling;
     Tabs ab, detect;
     ModePanel mode;
-    PlainButton presetBtn{"Default"}, undoBtn{"Undo"}, redoBtn{"Redo"}, bypassBtn{"Bypass"};
+    PlainButton presetBtn{"Default"}, undoBtn{"Undo"}, redoBtn{"Redo"}, bypassBtn{"Bypass"}, modeBtn{"Ride"};
+    bool modeOpen = false;  // compact: the mode panel is open over the window
     PlainButton aboutBtn{""}, updateBtn{"Update"};
     Tip tip;
     Drawer drawer;
@@ -1612,3 +1694,5 @@ void CorridorEditor::resized() {
 }
 
 void CorridorEditor::timerCallback() { content->tick(); }
+
+void CorridorEditor::openModePanel(bool open) { content->setModeOpen(open); }
