@@ -84,6 +84,9 @@ static void checkBinary(AudioPluginFormatManager& fm, const String& path, const 
 static void checkUpdates() {
     std::printf("update check: version comparison and release parsing\n");
     using updates::isNewer;
+    // the check asks this project's own repository, never an old or other name
+    CHECK(String(updates::kLatestUrl) == "https://api.github.com/repos/SharpTalons/Corridor-Leveler/releases/latest", "update URL %s", updates::kLatestUrl);
+    CHECK(String(updates::kReleasesPage) == "https://github.com/SharpTalons/Corridor-Leveler/releases", "releases page %s", updates::kReleasesPage);
     CHECK(isNewer("0.10.0", "0.9.9"), "0.10.0 > 0.9.9");
     CHECK(!isNewer("1.0.0", "1.0.0"), "equal is not newer");
     CHECK(isNewer("v0.1.23", "0.1.22"), "leading v");

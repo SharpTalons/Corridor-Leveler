@@ -109,7 +109,7 @@ cmake --build build --config Release --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-JUCE and FST are downloaded at configure time. Corridor Leveler ships for Windows only;
+JUCE is downloaded at configure time; FST's one header is kept in `third_party/fst`. Corridor Leveler ships for Windows only;
 the CI also builds on Linux purely to run the tests and render the window screenshots (that needs ALSA, X11,
 FreeType and Fontconfig development libraries). Options: `CORRIDOR_BUILD_PLUGIN`,
 `CORRIDOR_BUILD_VST2`, `CORRIDOR_BUILD_TESTS`.
@@ -128,7 +128,8 @@ Corridor Leveler is licensed under the **GNU AGPL v3 or later** (see `LICENSE`).
 - [JUCE](https://juce.com) is used under its AGPLv3 open-source licence.
 - [Inter](https://rsms.me/inter/) is embedded under the SIL Open Font License 1.1 (see `plugin/fonts/OFL.txt`),
   with its tabular figures made the default and the family renamed "Inter Tabular".
-- The 2.x plugin is built with [FST](https://git.iem.at/zmoelnig/FST) (GPLv3 or later), an independent
+- The 2.x plugin is built with [FST](https://git.iem.at/zmoelnig/FST) (GPLv3 or later; its header is in
+  `third_party/fst` with its licence), an independent
   reimplementation of the 2.x plugin headers, because Steinberg no longer distributes that SDK.
   "VST" is a Steinberg trademark. FST's authors ask that plugins built with FST not be called "VST"
   or "VST compatible", so this project refers to that build as the 2.x plugin.

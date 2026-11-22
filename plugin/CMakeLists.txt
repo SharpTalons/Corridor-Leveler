@@ -4,7 +4,8 @@
 include(FetchContent)
 
 set(CORRIDOR_JUCE_DIR "" CACHE PATH "Use an existing JUCE checkout instead of downloading")
-set(CORRIDOR_FST_DIR "" CACHE PATH "Use an existing FST checkout instead of downloading")
+# FST's one header is kept in third_party/fst (GPLv3), so the build needs no download for it
+set(CORRIDOR_FST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/fst" CACHE PATH "The FST checkout to build the 2.x plugin against")
 option(CORRIDOR_BUILD_VST2 "Build the 2.x plugin (what OBS loads through its built-in VST 2.x filter)" ON)
 
 if(CORRIDOR_JUCE_DIR)
@@ -16,12 +17,8 @@ endif()
 
 set(_formats VST3)
 if(CORRIDOR_BUILD_VST2)
-  if(NOT CORRIDOR_FST_DIR)
-    # download only: SOURCE_SUBDIR has no CMakeLists.txt, so FST's own project is not added
-    FetchContent_Declare(fst GIT_REPOSITORY https://git.iem.at/zmoelnig/FST.git GIT_TAG 647af068765b75867e3a28b4dd8991ab9ed47f7c
-      SOURCE_SUBDIR download-only)
-    FetchContent_MakeAvailable(fst)
-    set(CORRIDOR_FST_DIR "${fst_SOURCE_DIR}")
+  if(NOT EXISTS "${CORRIDOR_FST_DIR}/fst/fst.h")
+    message(FATAL_ERROR "FST not found: ${CORRIDOR_FST_DIR}/fst/fst.h")
   endif()
   # JUCE looks for <pluginterfaces/vst2.x/aeffect.h>; point those names at FST.
   set(_sdk "${CMAKE_CURRENT_BINARY_DIR}/vst2-fst")
