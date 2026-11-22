@@ -25,7 +25,9 @@ GOOD STARTING POINT FOR A STREAM VOICE
   clipping that already happened before OBS.
 
 LATENCY
-  5 ms at every sample rate (shown in the corner of the plugin window). DAWs compensate for it
+  5 ms at every sample rate (shown in the Output panel of the plugin window). DAWs compensate for it
   automatically.
 
 Licence: GNU AGPL v3 or later. Source code: see the project repository.
+The typefaces Public Sans and IBM Plex Mono are built in under the SIL Open Font Licence 1.1
+(OFL-PublicSans.txt, OFL-IBMPlex.txt).

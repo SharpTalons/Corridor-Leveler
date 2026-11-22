@@ -17,7 +17,7 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
 
 ## Controls
 
-- **Ride / Hold**: Ride adjusts the gain continuously. Hold slides an analysis sheet out under the window:
+- **Ride / Hold**: Ride adjusts the gain continuously. Hold opens an analysis panel under the window:
   press **Analyze** (or the **A** key), play a typical section while the live input waveform lights up, then
   press **Lock** (or it locks after 20 s). One fixed correction is then held. Analyze / Lock is also a host
   parameter, so a hotkey, Stream Deck or MIDI button can press it: each press analyzes, the next locks.
@@ -30,7 +30,7 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
 - **Range** (dB): the most it may boost or cut.
 - **Ceiling** (dBFS): the highest peak allowed. Boosts stop short of it and a 5 ms look-ahead
   brick-wall limiter catches the rest.
-- **Rise, fall, trim** (the button next to Ride / Hold opens them):
+- **Rise, fall, trim** (under Ride / Hold, always in view):
   - **Rise** (ms): how fast quiet passages are lifted.
   - **Fall** (ms): how fast loud passages are pulled down. A slow rise and a fast fall suit voice.
   - **Output trim** (dB): a final +/-12 dB after the leveler, still under the ceiling.
@@ -38,19 +38,23 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
   glides back to 0 dB.
 - **Bypass**: click-free, and keeps the same latency so nothing jumps.
 
-Also in the header: **presets** (Stream voice, Podcast, Music bed, Drums, Quiet room), **A / B** (two complete
+Also in the top bar: **presets** (Stream voice, Podcast, Music bed, Drums, Quiet room), **A / B** (two complete
 settings to compare; B starts as a copy of A, and both are saved with the session), and **undo / redo**
 (Ctrl+Z, Ctrl+Shift+Z) for every change. Double-click a dial, or press Enter on it, to type a value;
 Alt-click resets it.
 
-The window is drawn in a Liquid Glass style: a full-bleed level graph with the header, meters and readouts
-floating over it as glass, and the controls sitting in the graph where it frosts over. It is dark by default,
-with a light version on the sun / moon switch, and can be resized freely (it keeps its shape). The meters show
-left and right with a balance dot, in green, amber and red zones, marked at the graph's heights. The bottom
-corners show how far the output is from the target and the applied gain; the latency is under them
-(5 ms at every sample rate). A one-time tip explains the two settings that matter most.
+The window is a flat monitoring screen. The top bar holds the controls above and the live status as one
+plain sentence. The **Level** panel draws the input and output over the last 10 s with the Target, Threshold
+and Ceiling lines (drag them to set them), the left and right meters either side on the same scale (green,
+amber and red zones; click a meter to clear its peak hold), and under it the **gain lane**: how much
+Corridor boosted or cut, moment by moment, with the limiter's catches marked in red. The **Output** panel
+leads with the output level and how far it is from the target, then the applied gain, input, peaks,
+stereo balance and latency (5 ms at every sample rate). Each dial is marked with the line it moves.
+Words are set in Public Sans and every figure in IBM Plex Mono, so numbers hold still while they update.
+It is dark by default, with a light version on the sun / moon switch, and can be resized freely (it keeps
+its shape). A one-time tip explains the two settings that matter most.
 
-![Hold mode with the analysis sheet open](docs/window-hold.png)
+![Hold mode with the analysis panel open](docs/window-hold.png)
 
 ![Light theme](docs/window-light.png)
 
@@ -68,7 +72,7 @@ version exists, it asks once per session, with **Update** and **Ignore**:
 - **Update** downloads the installer with a progress bar and opens it. Close OBS or your DAW when the
   installer asks; settings and sessions are kept.
 - **Ignore** stops the automatic prompt for that version. The next version asks again.
-- The version button in the header opens a panel with the installed version, the last result and
+- Clicking the name in the top bar opens a panel with the installed version, the last result and
   **Check for updates**, which always asks, even about an ignored version.
 - Offline, it uses the last answer it saved.
 
@@ -114,6 +118,9 @@ The `prototype/` folder holds the original browser prototype.
 Corridor Leveler is licensed under the **GNU AGPL v3 or later** (see `LICENSE`).
 
 - [JUCE](https://juce.com) is used under its AGPLv3 open-source licence.
+- The window's typefaces, [Public Sans](https://github.com/uswds/public-sans) and
+  [IBM Plex Mono](https://github.com/IBM/plex), are built into the plugin under the SIL Open Font Licence 1.1
+  (see `plugin/fonts/`).
 - The 2.x plugin is built with [FST](https://git.iem.at/zmoelnig/FST) (GPLv3 or later), an independent
   reimplementation of the 2.x plugin headers, because Steinberg no longer distributes that SDK.
   "VST" is a Steinberg trademark. FST's authors ask that plugins built with FST not be called "VST"

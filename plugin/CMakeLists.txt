@@ -48,6 +48,11 @@ juce_add_plugin(CorridorLeveler
   VST2_CATEGORY kPlugCategEffect
   COPY_PLUGIN_AFTER_BUILD FALSE)
 
+# The window's typefaces (SIL Open Font Licence, see fonts/): Public Sans for words, IBM Plex Mono for figures
+juce_add_binary_data(CorridorFonts HEADER_NAME CorridorFonts.h NAMESPACE CorridorFonts SOURCES
+  fonts/PublicSans-Regular.ttf fonts/PublicSans-SemiBold.ttf fonts/IBMPlexMono-Regular.ttf fonts/IBMPlexMono-Medium.ttf)
+set_target_properties(CorridorFonts PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_sources(CorridorLeveler PRIVATE src/PluginProcessor.cpp src/PluginEditor.cpp src/Updates.cpp)
 target_compile_definitions(CorridorLeveler PRIVATE CORRIDOR_VERSION_STRING="${PROJECT_VERSION}")
 target_compile_definitions(CorridorLeveler PUBLIC
@@ -57,7 +62,7 @@ target_compile_definitions(CorridorLeveler PUBLIC
   JUCE_DISPLAY_SPLASH_SCREEN=0
   JUCE_REPORT_APP_USAGE=0)
 target_link_libraries(CorridorLeveler
-  PRIVATE corridor_core juce::juce_audio_utils juce::juce_audio_processors juce::juce_gui_basics
+  PRIVATE corridor_core CorridorFonts juce::juce_audio_utils juce::juce_audio_processors juce::juce_gui_basics
   PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags)
 
 # Loads the built binaries like a host does and renders the window to PNG (see tests/plugin_check.cpp)
@@ -68,7 +73,7 @@ if(CORRIDOR_BUILD_PLUGIN_CHECK)
   target_compile_definitions(corridor_plugin_check PRIVATE CORRIDOR_VERSION_STRING="${PROJECT_VERSION}")
   target_compile_definitions(corridor_plugin_check PRIVATE
     JUCE_PLUGINHOST_VST3=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1 JUCE_MODAL_LOOPS_PERMITTED=1)
-  target_link_libraries(corridor_plugin_check PRIVATE corridor_core juce::juce_audio_utils juce::juce_audio_processors juce::juce_gui_basics
+  target_link_libraries(corridor_plugin_check PRIVATE corridor_core CorridorFonts juce::juce_audio_utils juce::juce_audio_processors juce::juce_gui_basics
     juce::juce_recommended_config_flags ${CMAKE_DL_LIBS})
   # the 2.x host lives in its own file and sees only FST, never JUCE's 2.x hosting code
   add_library(corridor_vst2_host STATIC ../tests/vst2_host.cpp)

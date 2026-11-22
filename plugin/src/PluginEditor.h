@@ -21,7 +21,7 @@ public:
     void paint(juce::Graphics&) override;
 
     static constexpr int designW = 1120, designH = 630;
-    static constexpr int drawerH = 150;  // the analysis panel that opens under the window in Hold mode
+    static constexpr int drawerH = 166;  // the analysis panel that opens under the window in Hold mode
     void refreshNow() { timerCallback(); }  // used by the snapshot test
 
 private:
