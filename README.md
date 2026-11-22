@@ -59,11 +59,16 @@ level the engine steers and how far it is from the target, then the applied gain
 and latency (5 ms at every sample rate). Each dial is marked with the line it moves. Every on/off control fills
 with ink when on (red for Bypass), and every selection (A / B, Ride / Hold, RMS / Peak) is underlined in teal.
 The text is set in Inter with tabular figures, so live numbers don't shift. The window can be resized freely
-from 1000 x 630 up: the text and controls keep one size, and the graph and dials take the extra room. A one-time tip explains the two settings that matter most.
+from 720 x 540 up, and the text and controls always keep one size: the graph and dials take the extra
+room. Below 1000 x 630 it switches to a compact layout: the graph and dials run the full width, the output
+readouts become one line at the top of the graph, and Ride / Hold, rise, fall, trim and return to 0 dB open
+from the **Ride / Hold** button in the top bar. A one-time tip explains the two settings that matter most.
 
 ![Hold mode with the analysis panel open](docs/window-hold.png)
 
 ![A larger window: the graph grows, the text stays the same size](docs/window-1600.png)
+
+![The compact layout at 720 x 540, with the mode panel open](docs/window-720-mode.png)
 
 ## Installing
 

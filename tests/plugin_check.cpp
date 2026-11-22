@@ -122,7 +122,8 @@ static void snapshots(const File& dir) {
         std::printf("  wrote %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
     };
     // the window opens at the size it was left at, and is laid out again (not scaled) at every size
-    const std::pair<int, int> sizes[] = {{1120, 630}, {1000, 630}, {1600, 900}};
+    // (below 1000 x 630 it switches to the compact layout)
+    const std::pair<int, int> sizes[] = {{1120, 630}, {1000, 630}, {1600, 900}, {860, 600}, {720, 540}};
     for (auto [w, h] : sizes) {
         proc.editorWidth = w; proc.editorHeight = h;
         std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
@@ -143,6 +144,10 @@ static void snapshots(const File& dir) {
             MessageManager::getInstance()->runDispatchLoopUntil(100);
         }
         save(img, "window-" + String(w) + ".png");
+        if (w == 720) {  // compact: the mode panel opens over the window from the top bar
+            static_cast<CorridorEditor*>(ed.get())->openModePanel(true);
+            save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-720-mode.png");
+        }
     }
     proc.editorWidth = 1120; proc.editorHeight = 630;
     // Hold mode: the analysis panel opens under the window while a section is measured
