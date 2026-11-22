@@ -57,7 +57,7 @@ public:
     juce::AudioProcessorValueTreeState& state() { return apvts; }
 
     // UI preferences kept with the session
-    int editorWidth = 1120;
+    int editorWidth = 1120, editorHeight = 630;  // the window size, without the Hold panel
     bool tipDismissedThisRun = false;
 
     // undo / redo of every parameter change, presets, and two A / B slots

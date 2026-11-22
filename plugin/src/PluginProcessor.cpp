@@ -111,6 +111,7 @@ void CorridorAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     st.setProperty("holdValid", t.holdValid.load(), nullptr);
     st.setProperty("holdGain", t.holdGain.load(), nullptr);
     st.setProperty("editorWidth", editorWidth, nullptr);
+    st.setProperty("editorHeight", editorHeight, nullptr);
     st.setProperty("presetName", presetName, nullptr);
     st.setProperty("slot", slot, nullptr);
     for (int i = 0; i < 2; ++i) {  // the A / B slots travel with the session
@@ -136,6 +137,7 @@ void CorridorAudioProcessor::setStateInformation(const void* data, int sizeInByt
         apvts.replaceState(st);
         undo.clearUndoHistory();
         editorWidth = st.getProperty("editorWidth", 1120);
+        editorHeight = st.getProperty("editorHeight", 630);
         if (st.getProperty("holdValid", false)) dsp.setStoredHoldGain(true, float(st.getProperty("holdGain", 0.0)));
     }
 }

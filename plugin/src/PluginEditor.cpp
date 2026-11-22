@@ -1,7 +1,8 @@
 // Corridor Leveler - plugin window.
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Design size 1120 x 630, scaled as a whole. A monitoring screen in flat, opaque surfaces:
+// A monitoring screen in flat, opaque surfaces. Resizing the window never scales the text: the graph and the
+// dials take the extra room, and the Output and Mode panels keep their width.
 //
 //   top bar    wordmark (About), preset, A / B, undo, redo, the live status sentence, theme, bypass
 //   level      the input and output level over the last 10 s, with the Target, Threshold and Ceiling
@@ -28,26 +29,43 @@ using namespace juce;
 
 namespace {
 
-constexpr int W = CorridorEditor::designW, H = CorridorEditor::designH;
 constexpr float kPi = MathConstants<float>::pi;
 constexpr int kHist = 500;          // 10 s at 20 ms per entry
 constexpr int kWaveEntries = 300;   // 6 s in the analysis panel
 
 // ---------------------------------------------------------------- geometry (one 16 px gutter everywhere)
-//   columns: 16 + 760 + 16 + 312 + 16 = 1120
-//   rows:    top bar 52, then 12 + 384 + 16 + 150 + 16 = 630 on the left; 12 + 240 + 16 + 278 + 16 on the right
+// Worked out from the window's real size. At the default 1120 x 630:
+//   columns: 16 + 760 + 16 + 312 + 16 = 1120  (the left column takes any extra width)
+//   rows:    top bar 52, then 12 + 384 + 16 + 150 + 16 = 630 on the left (the level panel takes any extra
+//            height); 12 + 240 + 16 + 278 + 16 on the right (the mode panel takes it)
 constexpr float kTopBar = 52.f;
-const Rectangle<float> kLevelCard{16.f, 64.f, 760.f, 384.f};
-const Rectangle<float> kDialCard{16.f, 464.f, 760.f, 150.f};
-const Rectangle<float> kReadCard{792.f, 64.f, 312.f, 240.f};
-const Rectangle<float> kModeCard{792.f, 320.f, 312.f, 294.f};
-constexpr float PX0 = 88.f, PX1 = 700.f;   // plot, left to right (the meters sit either side)
-constexpr float GT = 124.f, GB = 356.f;    // level plot, 0 to -80 dB
-constexpr float LT = 372.f, LB = 432.f;    // gain lane
+constexpr float kRailW = 312.f, kDialH = 150.f, kReadH = 240.f;
 constexpr float kDbRange = 80.f;
-constexpr float kInBarX = 32.f, kOutBarX = 747.f, kBarW = 5.f, kBarGap = 3.f;
-float yOf(float v) { return GT + jlimit(0.f, kDbRange, -v) / kDbRange * (GB - GT); }
-float vOf(float y) { return -jlimit(0.f, kDbRange, (y - GT) / (GB - GT) * kDbRange); }
+constexpr float kBarW = 5.f, kBarGap = 3.f;
+struct Geo {
+    float w = 1120.f, h = 630.f;
+    Rectangle<float> level, dial, read, mode;
+    float px0 = 0, px1 = 0;   // plot, left to right (the meters sit either side)
+    float gt = 0, gb = 0;     // level plot, 0 to -80 dB
+    float lt = 0, lb = 0;     // gain lane
+    float inBarX = 0, outBarX = 0;
+    void layout(float width, float height) {
+        w = width; h = height;
+        const float left = w - 48.f - kRailW;
+        level = {16.f, 64.f, left, h - 64.f - 16.f - kDialH - 16.f};
+        dial = {16.f, h - 16.f - kDialH, left, kDialH};
+        read = {left + 32.f, 64.f, kRailW, kReadH};
+        mode = {left + 32.f, 64.f + kReadH + 16.f, kRailW, h - (64.f + kReadH + 16.f) - 16.f};
+        inBarX = level.getX() + 16.f;
+        outBarX = level.getRight() - 16.f - (kBarW * 2.f + kBarGap);
+        px0 = level.getX() + 72.f;
+        px1 = level.getRight() - 76.f;
+        lb = level.getBottom() - 16.f; lt = lb - 60.f;
+        gt = level.getY() + 60.f; gb = lt - 16.f;
+    }
+    float yOf(float v) const { return gt + jlimit(0.f, kDbRange, -v) / kDbRange * (gb - gt); }
+    float vOf(float y) const { return -jlimit(0.f, kDbRange, (y - gt) / (gb - gt) * kDbRange); }
+};
 
 // ---------------------------------------------------------------- palette (the window is always dark)
 struct Pal {
@@ -521,8 +539,15 @@ public:
         if (endLabels.first.isNotEmpty()) {  // which way is which: the start of the sweep is fast, the end slow
             const float dy = float(kDialTop) + float(kDial) - 6.f, half = float(kDial) * 0.5f;
             g.setFont(text(11.f)); g.setColour(c.muted);
-            g.drawText(endLabels.first, Rectangle<float>(cx - half - 48.f, dy - 8.f, 44.f, 16.f), Justification::centredRight);
-            g.drawText(endLabels.second, Rectangle<float>(cx + half + 4.f, dy - 8.f, 44.f, 16.f), Justification::centredLeft);
+            const float need = jmax(widthOf(text(11.f), endLabels.first), widthOf(text(11.f), endLabels.second)) + 6.f;
+            if (cx - half - 4.f >= need) {  // room beside the dial
+                g.drawText(endLabels.first, Rectangle<float>(cx - half - 4.f - need, dy - 8.f, need, 16.f), Justification::centredRight);
+                g.drawText(endLabels.second, Rectangle<float>(cx + half + 4.f, dy - 8.f, need, 16.f), Justification::centredLeft);
+            } else {  // a narrow column: just under the two ends of the sweep
+                const float uy = float(kDialTop) + float(kDial) - 4.f;
+                g.drawText(endLabels.first, Rectangle<float>(cx - half - 6.f, uy, need, 14.f), Justification::centredLeft);
+                g.drawText(endLabels.second, Rectangle<float>(cx + half + 6.f - need, uy, need, 14.f), Justification::centredRight);
+            }
         }
         if (!isEditing())
             drawFigure(g, slider.getTextFromValue(slider.getValue()), Rectangle<float>(0.f, float(kValueTop), w, 20.f), Justification::centred, 13.f, c.text, c.muted);
@@ -611,7 +636,7 @@ struct MeterVals { float peakL = -120.f, peakR = -120.f, hold = -120.f; };
 
 class Scene : public Component {
 public:
-    Scene(CorridorAudioProcessor& p, const Pal*& pal_) : proc(p), pal(pal_) { hist.reserve(kHist); }
+    Scene(CorridorAudioProcessor& p, const Pal*& pal_, const Geo& geo) : proc(p), pal(pal_), G(geo) { hist.reserve(kHist); }
     std::vector<corridor::Snapshot> hist;
     MeterVals in, out;
     bool analyzing = false, bypassed = false;
@@ -623,67 +648,67 @@ public:
     void paint(Graphics& g) override {
         const Pal& c = *pal;
         g.fillAll(c.ground);
-        g.setColour(c.rule); g.fillRect(0.f, kTopBar - 1.f, float(W), 1.f);
-        card(g, c, kLevelCard); card(g, c, kDialCard); card(g, c, kReadCard); card(g, c, kModeCard);
+        g.setColour(c.rule); g.fillRect(0.f, kTopBar - 1.f, float(getWidth()), 1.f);
+        card(g, c, G.level); card(g, c, G.dial); card(g, c, G.read); card(g, c, G.mode);
         // dial card: one column per dial, split by 1px dividers
-        const float colW = (kDialCard.getWidth() - 32.f) / 5.f;
+        const float colW = (G.dial.getWidth() - 32.f) / 5.f;
         g.setColour(c.rule);
-        for (int i = 1; i < 5; ++i) g.fillRect(kDialCard.getX() + 16.f + colW * float(i), kDialCard.getY() + 20.f, 1.f, kDialCard.getHeight() - 40.f);
+        for (int i = 1; i < 5; ++i) g.fillRect(G.dial.getX() + 16.f + colW * float(i), G.dial.getY() + 20.f, 1.f, G.dial.getHeight() - 40.f);
         paintLevel(g, c);
     }
 
     void paintLevel(Graphics& g, const Pal& c) {
-        const float cx0 = kLevelCard.getX() + 16.f, cx1 = kLevelCard.getRight() - 16.f;
+        const float cx0 = G.level.getX() + 16.f, cx1 = G.level.getRight() - 16.f;
         // header: the title, then the two series named by their own marks
         g.setFont(text(16.f, true)); g.setColour(c.text);
-        g.drawText("Level", Rectangle<float>(cx0, 80.f, 120.f, 20.f), Justification::centredLeft);
+        g.drawText("Level", Rectangle<float>(cx0, G.level.getY() + 16.f, 120.f, 20.f), Justification::centredLeft);
         {
             const Font lf = text(12.f);
             g.setFont(lf);
             float x = cx1;
             auto item = [&](const String& label, std::function<void(float)> mark) {
                 const float tw = widthOf(lf, label);
-                x -= tw; g.setColour(c.muted); g.drawText(label, Rectangle<float>(x, 80.f, tw + 2.f, 20.f), Justification::centredLeft);
+                x -= tw; g.setColour(c.muted); g.drawText(label, Rectangle<float>(x, G.level.getY() + 16.f, tw + 2.f, 20.f), Justification::centredLeft);
                 x -= 22.f; mark(x); x -= 20.f;
             };
             item(peakMode(proc) ? "Peak, last 10 s" : "RMS, last 10 s", [](float) {});
             x += 16.f;
-            item("Input", [&](float mx) { g.setColour(c.inLine.withAlpha(0.35f)); g.fillRect(mx, 86.f, 14.f, 8.f); g.setColour(c.inLine); g.fillRect(mx, 86.f, 14.f, 1.f); });
-            item("Output", [&](float mx) { g.setColour(c.accent); g.fillRect(mx, 89.f, 14.f, 2.f); });
+            item("Input", [&](float mx) { g.setColour(c.inLine.withAlpha(0.35f)); g.fillRect(mx, G.level.getY() + 22.f, 14.f, 8.f); g.setColour(c.inLine); g.fillRect(mx, G.level.getY() + 22.f, 14.f, 1.f); });
+            item("Output", [&](float mx) { g.setColour(c.accent); g.fillRect(mx, G.level.getY() + 25.f, 14.f, 2.f); });
         }
         // grid: a line and a figure every 10 dB, read by the plot and both meters alike
         g.setFont(num(11.f));
         for (int v = 0; v >= -80; v -= 10) {
-            const float y = std::round(yOf(float(v)));
-            g.setColour(c.grid); g.fillRect(PX0, y, PX1 - PX0, 1.f);
+            const float y = std::round(G.yOf(float(v)));
+            g.setColour(c.grid); g.fillRect(G.px0, y, G.px1 - G.px0, 1.f);
             g.setColour(c.muted);
-            g.drawText(fmtDb(float(v), 0), Rectangle<float>(kInBarX + 13.f, y - 7.f, 80.f - (kInBarX + 13.f) - 4.f, 14.f), Justification::centredRight);
-            g.drawText(fmtDb(float(v), 0), Rectangle<float>(PX1 + 8.f, y - 7.f, kOutBarX - PX1 - 12.f, 14.f), Justification::centredLeft);
+            g.drawText(fmtDb(float(v), 0), Rectangle<float>(G.inBarX + 13.f, y - 7.f, G.px0 - 8.f - (G.inBarX + 13.f) - 4.f, 14.f), Justification::centredRight);
+            g.drawText(fmtDb(float(v), 0), Rectangle<float>(G.px1 + 8.f, y - 7.f, G.outBarX - G.px1 - 12.f, 14.f), Justification::centredLeft);
         }
-        paintMeter(g, c, kInBarX, in, "In peak");
-        paintMeter(g, c, kOutBarX, out, "Out peak");
+        paintMeter(g, c, G.inBarX, in, "In peak");
+        paintMeter(g, c, G.outBarX, out, "Out peak");
 
         const int n = int(hist.size());
-        const float x0 = PX0, x1 = PX1, sx = (x1 - x0) / float(kHist - 1);
+        const float x0 = G.px0, x1 = G.px1, sx = (x1 - x0) / float(kHist - 1);
         auto X = [&](int k) { return x1 - float(n - 1 - k) * sx; };
         if (analyzing && n > 1) {  // the stretch being measured in Hold
             const int span = jmin(n - 1, int(analyzeSeconds * 50.f));
             const float ax = X(n - 1 - span);
             g.setColour(c.accent.withAlpha(c.dark ? 0.08f : 0.07f));
-            g.fillRect(Rectangle<float>(ax, GT, x1 - ax, GB - GT));
+            g.fillRect(Rectangle<float>(ax, G.gt, x1 - ax, G.gb - G.gt));
         }
         const bool peak = peakMode(proc);  // the graph draws what the target measures
         if (n > 1) {
             Path fillP, inP, outP;
-            fillP.startNewSubPath(X(0), GB);
+            fillP.startNewSubPath(X(0), G.gb);
             for (int k = 0; k < n; ++k) {
                 const auto& h = hist[size_t(k)];
-                const float yi = yOf(peak ? h.inPk : h.inRms), yo = yOf(peak ? h.outPk : h.outRms);
+                const float yi = G.yOf(peak ? h.inPk : h.inRms), yo = G.yOf(peak ? h.outPk : h.outRms);
                 fillP.lineTo(X(k), yi);
                 if (k == 0) { inP.startNewSubPath(X(k), yi); outP.startNewSubPath(X(k), yo); }
                 else { inP.lineTo(X(k), yi); outP.lineTo(X(k), yo); }
             }
-            fillP.lineTo(X(n - 1), GB); fillP.closeSubPath();
+            fillP.lineTo(X(n - 1), G.gb); fillP.closeSubPath();
             g.setColour(c.inLine.withAlpha(c.dark ? 0.16f : 0.22f)); g.fillPath(fillP);
             g.setColour(c.inLine); g.strokePath(inP, PathStrokeType(1.f));
             g.setColour(c.accent); g.strokePath(outP, PathStrokeType(2.f, PathStrokeType::mitered, PathStrokeType::butt));
@@ -694,7 +719,7 @@ public:
         const Ref refs[3] = {{ids::ceiling, "Ceiling", c.negative, true}, {ids::target, "Target", c.text, false}, {ids::threshold, "Threshold", c.warning, true}};
         float labelY[3];
         for (int i = 0; i < 3; ++i) {
-            const float y = std::round(yOf(st.getRawParameterValue(refs[i].id)->load())) + 0.5f;
+            const float y = std::round(G.yOf(st.getRawParameterValue(refs[i].id)->load())) + 0.5f;
             const bool hot = hover == refs[i].id || dragId == refs[i].id || emphasis == refs[i].id;
             lineMark(g, Line<float>(x0, y, x1, y), refs[i].col, refs[i].dashed, hot ? 2.5f : refs[i].dashed ? 1.f : 1.5f);
             labelY[i] = y - 16.f;
@@ -719,18 +744,18 @@ public:
     void paintGainLane(Graphics& g, const Pal& c, XF X, int n) {
         const float rng = proc.state().getRawParameterValue(ids::range)->load();
         const float scale = jmax(6.f, std::ceil(rng / 6.f) * 6.f);
-        const float mid = std::round((LT + LB) * 0.5f), half = (LB - LT) * 0.5f;
+        const float mid = std::round((G.lt + G.lb) * 0.5f), half = (G.lb - G.lt) * 0.5f;
         auto gy = [&](float db) { return mid - jlimit(-1.f, 1.f, db / scale) * half; };
-        g.setColour(c.grid); g.fillRect(PX0, LT, PX1 - PX0, 1.f); g.fillRect(PX0, LB, PX1 - PX0, 1.f);
-        g.setColour(c.track); g.fillRect(PX0, mid, PX1 - PX0, 1.f);
+        g.setColour(c.grid); g.fillRect(G.px0, G.lt, G.px1 - G.px0, 1.f); g.fillRect(G.px0, G.lb, G.px1 - G.px0, 1.f);
+        g.setColour(c.track); g.fillRect(G.px0, mid, G.px1 - G.px0, 1.f);
         g.setFont(num(11.f)); g.setColour(c.muted);
         const auto lbl = [&](float y, const String& s) {
-            g.drawText(s, Rectangle<float>(kLevelCard.getX() + 8.f, y - 7.f, 80.f - kLevelCard.getX() - 12.f, 14.f), Justification::centredRight);
+            g.drawText(s, Rectangle<float>(G.level.getX() + 8.f, y - 7.f, G.px0 - 8.f - G.level.getX() - 12.f, 14.f), Justification::centredRight);
         };
-        lbl(LT, "+" + String(int(scale))); lbl(mid, "0"); lbl(LB, fmtDb(-scale, 0));
+        lbl(G.lt, "+" + String(int(scale))); lbl(mid, "0"); lbl(G.lb, fmtDb(-scale, 0));
         g.setFont(text(12.f)); g.setColour(c.muted);
-        g.drawText("Gain", Rectangle<float>(PX1 + 8.f, mid - 16.f, 60.f, 16.f), Justification::centredLeft);
-        g.drawText("dB", Rectangle<float>(PX1 + 8.f, mid, 60.f, 16.f), Justification::centredLeft);
+        g.drawText("Gain", Rectangle<float>(G.px1 + 8.f, mid - 16.f, 60.f, 16.f), Justification::centredLeft);
+        g.drawText("dB", Rectangle<float>(G.px1 + 8.f, mid, 60.f, 16.f), Justification::centredLeft);
         if (n < 2) return;
         Path line, area;
         area.startNewSubPath(X(0), mid);
@@ -749,11 +774,11 @@ public:
 
     // a meter: left and right bars in fixed zones (green up to -18 dBFS, amber to -6, red above)
     void paintMeter(Graphics& g, const Pal& c, float bx, const MeterVals& m, const String& name) {
-        const float top = yOf(0.f), bot = yOf(-kDbRange);
+        const float top = G.yOf(0.f), bot = G.yOf(-kDbRange);
         const bool clip = m.hold > -0.5f;
         g.setFont(text(12.f, clip)); g.setColour(clip ? c.negative : c.muted);
-        const float lw = 64.f, lx = bx < kLevelCard.getCentreX() ? kLevelCard.getX() + 12.f : kLevelCard.getRight() - 12.f - lw;
-        g.drawText(clip ? "Clip" : name, Rectangle<float>(lx, 104.f, lw, 16.f), bx < kLevelCard.getCentreX() ? Justification::centredLeft : Justification::centredRight);
+        const float lw = 64.f, lx = bx < G.level.getCentreX() ? G.level.getX() + 12.f : G.level.getRight() - 12.f - lw;
+        g.drawText(clip ? "Clip" : name, Rectangle<float>(lx, G.gt - 20.f, lw, 16.f), bx < G.level.getCentreX() ? Justification::centredLeft : Justification::centredRight);
         const float pk[2] = {m.peakL, m.peakR};
         auto zone = [&](float v) { return v > -6.f ? c.negative : v > -18.f ? c.warning : c.positive; };
         for (int ch = 0; ch < 2; ++ch) {
@@ -761,27 +786,27 @@ public:
             g.setColour(c.track); g.fillRect(x, top, kBarW, bot - top);
             if (pk[ch] > -kDbRange) {
                 const float v = jmin(0.f, pk[ch]);
-                const float t = yOf(v), y18 = yOf(-18.f), y6 = yOf(-6.f);
+                const float t = G.yOf(v), y18 = G.yOf(-18.f), y6 = G.yOf(-6.f);
                 g.setColour(c.positive); g.fillRect(x, jmax(t, y18), kBarW, bot - jmax(t, y18));
                 if (v > -18.f) { g.setColour(c.warning); g.fillRect(x, jmax(t, y6), kBarW, y18 - jmax(t, y6)); }
                 if (v > -6.f) { g.setColour(c.negative); g.fillRect(x, t, kBarW, y6 - t); }
             }
-            if (m.hold > -kDbRange) { g.setColour(zone(m.hold)); g.fillRect(x, yOf(jmin(0.f, m.hold)) - 1.f, kBarW, 2.f); }
+            if (m.hold > -kDbRange) { g.setColour(zone(m.hold)); g.fillRect(x, G.yOf(jmin(0.f, m.hold)) - 1.f, kBarW, 2.f); }
         }
     }
 
     // drag the Target, Threshold and Ceiling lines; click a meter to clear its peak hold
     const char* hit(Point<float> p) const {
-        if (p.x < PX0 || p.x > PX1 || p.y < GT - 8.f || p.y > GB + 8.f) return nullptr;
+        if (p.x < G.px0 || p.x > G.px1 || p.y < G.gt - 8.f || p.y > G.gb + 8.f) return nullptr;
         const char* best = nullptr; float bd = 8.f;
         for (const char* id : {ids::target, ids::threshold, ids::ceiling}) {
-            const float d = std::abs(yOf(proc.state().getRawParameterValue(id)->load()) - p.y);
+            const float d = std::abs(G.yOf(proc.state().getRawParameterValue(id)->load()) - p.y);
             if (d < bd) { bd = d; best = id; }
         }
         return best;
     }
     bool onMeter(Point<float> p) const {
-        return p.y >= GT - 24.f && p.y <= GB && ((p.x >= kInBarX - 6.f && p.x <= kInBarX + 20.f) || (p.x >= kOutBarX - 6.f && p.x <= kOutBarX + 20.f));
+        return p.y >= G.gt - 24.f && p.y <= G.gb && ((p.x >= G.inBarX - 6.f && p.x <= G.inBarX + 20.f) || (p.x >= G.outBarX - 6.f && p.x <= G.outBarX + 20.f));
     }
     void mouseMove(const MouseEvent& e) override {
         hover = hit(e.position);
@@ -794,7 +819,7 @@ public:
         if (dragId) if (auto* p = proc.state().getParameter(dragId)) { proc.undo.beginNewTransaction(); p->beginChangeGesture(); mouseDrag(e); }
     }
     void mouseDrag(const MouseEvent& e) override {
-        if (dragId) if (auto* p = proc.state().getParameter(dragId)) p->setValueNotifyingHost(p->convertTo0to1(vOf(e.position.y)));
+        if (dragId) if (auto* p = proc.state().getParameter(dragId)) p->setValueNotifyingHost(p->convertTo0to1(G.vOf(e.position.y)));
     }
     void mouseUp(const MouseEvent&) override {
         if (dragId) if (auto* p = proc.state().getParameter(dragId)) p->endChangeGesture();
@@ -804,6 +829,7 @@ public:
 private:
     CorridorAudioProcessor& proc;
     const Pal*& pal;
+    const Geo& G;
 };
 
 // ---------------------------------------------------------------- readouts: the output level first, then what made it
@@ -913,6 +939,7 @@ public:
     }
     Tabs tabs;
     static constexpr int kRow0 = 80, kPitch = 34;
+    int foot() const { return jmax(212, getHeight() - 82); }  // the rule above the last row: at the panel's foot
     void resized() override {
         const int w = getWidth();
         tabs.setBounds(16, 6, 140, 37);  // its bottom edge is the rule at y 43
@@ -922,7 +949,7 @@ public:
             r.value->setBounds(w - 16 - 24 - 64, y, 64, 26);
             y += kPitch;
         }
-        ease.setBounds(w - 16 - 40, 222, 40, 26);
+        ease.setBounds(w - 16 - 40, foot() + 10, 40, 26);
     }
     void refresh() {
         for (auto& r : rows) if (!r.value->isBeingEdited()) r.value->setText(splitFigure(r.slider->getTextFromValue(r.slider->getValue())).first, dontSendNotification);
@@ -950,13 +977,14 @@ public:
         g.setFont(text(12.f)); g.setColour(c.muted);
         g.drawFittedText("Rise lifts quiet passages, fall pulls loud ones down. A slow rise and a fast fall suit voice.",
                          Rectangle<int>(int(x0), y + 2, int(x1 - x0), 32), Justification::topLeft, 2, 1.f);
-        g.setColour(c.rule); g.fillRect(x0, 212.f, x1 - x0, 1.f);
+        const float fy = float(foot());
+        g.setColour(c.rule); g.fillRect(x0, fy, x1 - x0, 1.f);
         g.setFont(text(13.f)); g.setColour(c.text);
-        g.drawText("Return to 0 dB in silence", Rectangle<float>(x0, 222.f, x1 - x0 - 48.f, 26.f), Justification::centredLeft);
+        g.drawText("Return to 0 dB in silence", Rectangle<float>(x0, fy + 10.f, x1 - x0 - 48.f, 26.f), Justification::centredLeft);
         g.setFont(text(12.f)); g.setColour(c.muted);
         g.drawFittedText(ease.getToggleState() ? "On: after 2 s of silence the gain glides back to 0 dB."
                                                : "Off: the gain freezes while it is quiet.",
-                         Rectangle<int>(int(x0), 248, int(x1 - x0 - 48.f), 32), Justification::topLeft, 2, 1.f);
+                         Rectangle<int>(int(x0), int(fy) + 36, int(x1 - x0 - 48.f), 32), Justification::topLeft, 2, 1.f);
         for (auto* v : {&riseValue, &fallValue, &trimValue}) v->setColour(Label::textColourId, c.text);
     }
 
@@ -1240,7 +1268,7 @@ void markTipSeen() { PropertiesFile f(settingsOptions()); f.setValue("tipSeen", 
 class CorridorContent : public Component, private ChangeListener {
 public:
     explicit CorridorContent(CorridorAudioProcessor& p)
-        : proc(p), pal(&kDark), scene(p, pal), readouts(pal), header(pal),
+        : proc(p), pal(&kDark), scene(p, pal, geo), readouts(pal), header(pal),
           threshold(p, ids::threshold, "Threshold", [](double v) { return fmtDb(float(v)) + " dB"; }, "thr"),
           response(p, ids::response, "Response", [](double v) { return String(roundToInt(v)) + " ms" + kDot + speedWord(v); }, "", {"Fast", "Slow"}),
           target(p, ids::target, "Target", [&p](double v) { return fmtDb(float(v)) + levelUnit(p); }, "data"),
@@ -1310,7 +1338,7 @@ public:
         addChildComponent(prompt);
         checker->addChangeListener(this);
         checker->check(false);  // silent; at most one prompt per host session
-        setSize(W, H);
+        setSize(CorridorEditor::designW, CorridorEditor::designH);
         sendLookAndFeelChange();
         addMouseListener(this, true);  // a click anywhere lets Ctrl+Z and A reach the window
     }
@@ -1320,6 +1348,7 @@ public:
     ~CorridorContent() override { checker->removeChangeListener(this); setLookAndFeel(nullptr); }
 
     std::function<void(bool)> onDrawerChange;
+    int drawerSpace = 0;  // the height the Hold panel takes at the bottom, set by the editor
 
     void changeListenerCallback(ChangeBroadcaster*) override {
         const auto r = checker->known();
@@ -1353,10 +1382,12 @@ public:
     }
 
     void resized() override {
+        const int W = getWidth(), H = getHeight() - drawerSpace;
+        geo.layout(float(W), float(H));
         scene.setBounds(0, 0, W, H);
         header.setBounds(0, 0, W, int(kTopBar));
-        readouts.setBounds(kReadCard.toNearestInt());
-        mode.setBounds(kModeCard.toNearestInt());
+        readouts.setBounds(geo.read.toNearestInt());
+        mode.setBounds(geo.mode.toNearestInt());
         // top bar, left to right: name (About), preset, A / B, undo, redo, the status sentence ... update, theme, bypass
         aboutBtn.setBounds(12, 8, 160, 36);
         presetBtn.setBounds(196, 11, 172, 30);
@@ -1366,18 +1397,18 @@ public:
         bypassBtn.setBounds(W - 16 - 100, 11, 100, 30);
         int statusRight = bypassBtn.getX() - 16;
         if (updateBtn.isVisible()) { updateBtn.setBounds(bypassBtn.getX() - 12 - 150, 11, 150, 30); statusRight = updateBtn.getX() - 16; }
-        detect.setBounds(int(kReadCard.getRight()) - 16 - 100, int(kReadCard.getY()) + 6, 100, 30);  // in the Output panel's title row
+        detect.setBounds(int(geo.read.getRight()) - 16 - 100, int(geo.read.getY()) + 6, 100, 30);  // in the Output panel's title row
         header.statusArea = Rectangle<float>(552.f, 6.f, float(statusRight - 552), kTopBar - 13.f);
         // dials: five equal columns in the dial card
-        const float colW = (kDialCard.getWidth() - 32.f) / 5.f;
+        const float colW = (geo.dial.getWidth() - 32.f) / 5.f;
         int i = 0;
         for (auto* k : {&threshold, &response, &target, &range, &ceiling}) {
-            const int x = int(std::round(kDialCard.getX() + 16.f + colW * float(i++)));
-            k->setBounds(x, int(kDialCard.getY()) + 14, int(colW), 128);
+            const int x = int(std::round(geo.dial.getX() + 16.f + colW * float(i++)));
+            k->setBounds(x, int(geo.dial.getY()) + 14, int(colW), 128);
         }
-        tip.setBounds(int(PX0) + 8, int(GT) + 26, 500, 92);
+        tip.setBounds(int(geo.px0) + 8, int(geo.gt) + 26, jmin(500, int(geo.px1 - geo.px0) - 16), 92);
         about.setBounds(8, 46, 420, 196);
-        prompt.setBounds(0, 0, W, H);
+        prompt.setBounds(getLocalBounds());
         drawer.setBounds(0, H, W, CorridorEditor::drawerH);
     }
 
@@ -1522,6 +1553,7 @@ private:
     CorridorAudioProcessor& proc;
     SharedResourcePointer<FontSet> fontHold;  // the typefaces live as long as the window
     const Pal* pal;
+    Geo geo;  // declared before everything that reads it
     Look look;
     Scene scene;
     Readouts readouts;
@@ -1543,13 +1575,13 @@ private:
 
 // ---------------------------------------------------------------- editor
 CorridorEditor::CorridorEditor(CorridorAudioProcessor& p) : AudioProcessorEditor(&p), proc(p) {
-    const int savedWidth = p.editorWidth;  // read first: setting limits triggers resized()
+    const int savedW = p.editorWidth, savedH = p.editorHeight;  // read first: setting limits triggers resized()
     content = std::make_unique<CorridorContent>(p);
     content->onDrawerChange = [this](bool open) { applyDrawer(open); };
     addAndMakeVisible(*content);
     setResizable(true, true);
     setWantsKeyboardFocus(false);
-    width0 = jlimit(minW, maxW, savedWidth);
+    size0 = {jlimit(minW, maxW, savedW), jlimit(minH, maxH, savedH)};
     drawerOpen = p.state().getRawParameterValue(ids::mode)->load() > 0.5f;
     applyDrawer(drawerOpen);
     content->tick();  // fill the window before it is first shown
@@ -1558,26 +1590,25 @@ CorridorEditor::CorridorEditor(CorridorAudioProcessor& p) : AudioProcessorEditor
 
 CorridorEditor::~CorridorEditor() { stopTimer(); }
 
-int CorridorEditor::contentHeight() const { return designH + (drawerOpen ? drawerH : 0); }
+int CorridorEditor::drawerSpace() const { return drawerOpen ? drawerH : 0; }
 
 // Hold mode opens the analysis panel under the window: the window grows by its height and keeps its width.
+// The window resizes freely; its contents are laid out again at the new size, never scaled.
 void CorridorEditor::applyDrawer(bool open) {
+    const int mainH = getHeight() > 0 ? getHeight() - drawerSpace() : size0.y;
+    const int w = getWidth() > 0 ? getWidth() : size0.x;
     drawerOpen = open;
-    const double ratio = double(designW) / double(contentHeight());
-    const int w = getWidth() > 0 ? getWidth() : width0;
-    setResizeLimits(minW, int(std::round(minW / ratio)), maxW, int(std::round(maxW / ratio)));  // the whole layout scales; at 720 px it is drawn at 64%
-    if (auto* c = getConstrainer()) c->setFixedAspectRatio(ratio);
-    setSize(w, int(std::round(w / ratio)));
+    setResizeLimits(minW, minH + drawerSpace(), maxW, maxH + drawerSpace());
+    setSize(w, mainH + drawerSpace());
     resized();
 }
 
 void CorridorEditor::paint(Graphics& g) { g.fillAll(kDark.ground); }
 
 void CorridorEditor::resized() {
-    const float s = float(getWidth()) / float(designW);
-    content->setBounds(0, 0, designW, contentHeight());
-    content->setTransform(AffineTransform::scale(s));
-    if (getWidth() > 0) proc.editorWidth = getWidth();
+    content->drawerSpace = drawerSpace();
+    content->setBounds(getLocalBounds());
+    if (getWidth() > 0) { proc.editorWidth = getWidth(); proc.editorHeight = getHeight() - drawerSpace(); }
 }
 
 void CorridorEditor::timerCallback() { content->tick(); }

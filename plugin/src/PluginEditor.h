@@ -9,9 +9,9 @@
 
 class CorridorContent;
 
-// The window is designed at 1120 x 630 and scaled as a whole, so it can be resized freely
-// (keeping its shape) and still look identical at every size. In Hold mode it grows by an
-// analysis panel of drawerH under it.
+// The window opens at 1120 x 630 and can be resized freely. It is laid out again at every size, never
+// scaled, so the text keeps one size: the graph and the dials take the extra room. In Hold mode it grows
+// by an analysis panel of drawerH under it.
 class CorridorEditor : public juce::AudioProcessorEditor, private juce::Timer {
 public:
     explicit CorridorEditor(CorridorAudioProcessor&);
@@ -22,16 +22,17 @@ public:
 
     static constexpr int designW = 1120, designH = 630;
     static constexpr int drawerH = 166;  // the analysis panel that opens under the window in Hold mode
-    static constexpr int minW = 720, maxW = 2240;  // window width limits; the layout scales, and below 720 px text gets too small to read
+    static constexpr int minW = 1000, maxW = 2560;  // the smallest size that holds every panel with the text at full size
+    static constexpr int minH = 630, maxH = 1600;
     void refreshNow() { timerCallback(); }  // used by the snapshot test
 
 private:
     void timerCallback() override;
     void applyDrawer(bool open);
-    int contentHeight() const;
+    int drawerSpace() const;
 
     bool drawerOpen = false;
-    int width0 = designW;
+    juce::Point<int> size0{designW, designH};
 
     CorridorAudioProcessor& proc;
     std::unique_ptr<CorridorContent> content;

@@ -121,13 +121,17 @@ static void snapshots(const File& dir) {
         PNGImageFormat().writeImageToStream(img, os);
         std::printf("  wrote %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
     };
-    for (int w : {1120, 960, 720}) {
-        proc.editorWidth = w;
+    // the window opens at the size it was left at, and is laid out again (not scaled) at every size
+    const std::pair<int, int> sizes[] = {{1120, 630}, {1000, 630}, {1600, 900}};
+    for (auto [w, h] : sizes) {
+        proc.editorWidth = w; proc.editorHeight = h;
         std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
         static_cast<CorridorEditor*>(ed.get())->refreshNow();
-        CHECK(ed->getWidth() == w, "editor width %d", ed->getWidth());
-        CHECK(std::abs(ed->getHeight() - int(std::round(w * 630.0 / 1120.0))) <= 1, "editor height %d", ed->getHeight());
+        CHECK(ed->getWidth() == w, "editor width %d, expected %d", ed->getWidth(), w);
+        CHECK(ed->getHeight() == h, "editor height %d, expected %d", ed->getHeight(), h);
         CHECK(ed->isResizable(), "editor not resizable");
+        if (auto* content = ed->getChildComponent(0))
+            CHECK(content->getTransform().isIdentity(), "the window contents are scaled at %dx%d", w, h);
         const Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f);
         if (w == 1120) {  // the update prompt, as a person would see it
             SharedResourcePointer<updates::Checker> chk;
@@ -140,6 +144,7 @@ static void snapshots(const File& dir) {
         }
         save(img, "window-" + String(w) + ".png");
     }
+    proc.editorWidth = 1120; proc.editorHeight = 630;
     // Hold mode: the analysis panel opens under the window while a section is measured
     {
         proc.editorWidth = 1120;
@@ -150,7 +155,7 @@ static void snapshots(const File& dir) {
         runSine(proc, 48000, -70.f, 0.6, ph);
         runSine(proc, 48000, -22.f, 1.4, ph);
         static_cast<CorridorEditor*>(ed.get())->refreshNow();
-        const int h = int(std::round(1120.0 * (630 + CorridorEditor::drawerH) / 1120.0));
+        const int h = 630 + CorridorEditor::drawerH;
         CHECK(std::abs(ed->getHeight() - h) <= 1, "hold-mode editor height %d, expected %d", ed->getHeight(), h);
         save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-hold.png");
         if (auto* m = proc.state().getParameter(ids::mode)) m->setValueNotifyingHost(0.f);
