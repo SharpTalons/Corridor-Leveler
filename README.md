@@ -17,14 +17,14 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
 
 ## Controls
 
-- **Ride / Hold**: Ride adjusts the gain continuously. Hold slides an analysis sheet out under the window:
+- **Ride / Hold**: Ride adjusts the gain continuously. Hold opens an analysis panel under the window:
   press **Analyze** (or the **A** key), play a typical section while the live input waveform lights up, then
   press **Lock** (or it locks after 20 s). One fixed correction is then held. Analyze / Lock is also a host
   parameter, so a hotkey, Stream Deck or MIDI button can press it: each press analyzes, the next locks.
 - **Threshold** (dB RMS, −70 to 0): below this it stops adjusting, so silence, breaths and noise never trigger a boost.
 - **Target**: the level you want, −40 to −3 dB. The default is −18. The level settles on the target itself,
   then holds still inside a small dead band so it never fidgets.
-- **RMS / Peak** (the switch right of Ride / Hold): what the target measures. **RMS** puts the average loudness
+- **RMS / Peak** (the switch in the Output panel's title row): what the target measures. **RMS** puts the average loudness
   on the target (dB RMS, the usual choice for voice). **Peak** puts the highest peaks on the target (dBFS peak),
   and the graph then draws peaks to match.
 - **Response** (ms): how long Corridor listens before it judges the level. 10 ms is the fastest and follows
@@ -35,30 +35,33 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
 - **Ceiling** (dBFS, −60 to 0): the highest peak allowed, enforced by a 5 ms look-ahead brick-wall limiter.
   To reach the target, boosts may push short peaks (consonants, plosives) up to 6 dB into that limiter; a boost
   that would need more is held back. Half the dial covers −12 to 0, where it is usually set.
-- **Rise, fall, trim** (the button next to Ride / Hold opens them):
+- **Rise, fall, trim** (under Ride / Hold, always in view):
   - **Rise** (ms): how fast quiet passages are lifted.
   - **Fall** (ms): how fast loud passages are pulled down. A slow rise and a fast fall suit voice.
   - **Output trim** (dB): a final +/-12 dB after the leveler, still under the ceiling.
 - **Return to 0 dB in silence** (on by default): after 2 s of silence the gain glides back to 0 dB. Off, the
   gain freezes below the threshold instead.
-- **Bypass**: click-free, and keeps the same latency so nothing jumps. While bypassed the button turns red
-  and reads **Bypassed**.
+- **Bypass** (top right): click-free, and keeps the same latency so nothing jumps. While bypassed the button
+  turns red and reads **Bypassed**.
 
-Also in the header: **presets** (Stream voice, Podcast, Music bed, Drums, Quiet room), **A / B** (two complete
+Also in the top bar: **presets** (Stream voice, Podcast, Music bed, Drums, Quiet room), **A / B** (two complete
 settings to compare; B starts as a copy of A, and both are saved with the session), and **undo / redo**
 (Ctrl+Z, Ctrl+Shift+Z) for every change. Double-click a dial, or press Enter on it, to type a value;
 Alt-click resets it.
 
-The window is a full-bleed level graph with the header, meters and readouts floating over it as glass, and
-the controls sitting in the graph where it frosts over. The graph is marked every 10 dB on both edges, at the
-same heights as the meters' scales. The colours are tuned for contrast on bright or glare-prone screens, and the
-text is set in Inter. The window can be resized from 720 to 2240 px wide and keeps its shape. Every
-on/off button shows its state the same way: off is plain glass with a grey dot, on is filled solid (red for
-Bypass) and the dot lights. The meters show left and right with a balance dot and the peak level on top, in
-green, amber and red zones. The legend bar above the graph shows how far the output is from the target and the
-applied gain; the latency is under the graph (5 ms at every sample rate). A one-time tip explains the two settings that matter most.
+The window is a flat, dark monitoring screen. The top bar holds presets, A / B, undo and redo, the live status
+as one plain sentence, and Bypass. The **Level** panel draws the input and output over the last 10 s (RMS or
+peak, following the target) with the Target, Threshold and Ceiling lines (drag them to set them), marked every
+10 dB on both edges. The left and right peak meters sit either side on the same scale, in green, amber and red
+zones; click one to clear its peak hold. Under the graph, the **gain lane** shows how much Corridor boosted or
+cut, moment by moment, with the limiter's catches marked in red. The **Output** panel leads with the output
+level the engine steers and how far it is from the target, then the applied gain, input, peaks, stereo balance
+and latency (5 ms at every sample rate). Each dial is marked with the line it moves. Every on/off control fills
+with ink when on (red for Bypass), and every selection (A / B, Ride / Hold, RMS / Peak) is underlined in teal.
+The text is set in Inter with tabular figures, so live numbers don't shift. The window can be resized from
+720 to 2240 px wide and keeps its shape. A one-time tip explains the two settings that matter most.
 
-![Hold mode with the analysis sheet open](docs/window-hold.png)
+![Hold mode with the analysis panel open](docs/window-hold.png)
 
 ## Installing
 
@@ -74,7 +77,7 @@ version exists, it asks once per session, with **Update** and **Ignore**:
 - **Update** downloads the installer with a progress bar and opens it. Close OBS or your DAW when the
   installer asks; settings and sessions are kept.
 - **Ignore** stops the automatic prompt for that version. The next version asks again.
-- The version button in the header opens a panel with the installed version, the last result and
+- Clicking the name in the top bar opens a panel with the installed version, the last result and
   **Check for updates**, which always asks, even about an ignored version.
 - Offline, it uses the last answer it saved.
 

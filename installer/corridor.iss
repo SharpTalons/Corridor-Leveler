@@ -43,6 +43,7 @@ Type: files; Name: "{app}\Corridor Leveler.exe"
 Source: "{#SrcDir}\vst2\Corridor Leveler.dll"; DestDir: "{commonpf64}\VSTPlugins"; Components: vst2; Flags: ignoreversion
 Source: "{#SrcDir}\vst3\Corridor Leveler.vst3\*"; DestDir: "{commoncf64}\VST3\Corridor Leveler.vst3"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SrcDir}\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SrcDir}\OFL-Inter.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcDir}\README.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
 [Icons]

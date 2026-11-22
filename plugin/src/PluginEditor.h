@@ -21,7 +21,7 @@ public:
     void paint(juce::Graphics&) override;
 
     static constexpr int designW = 1120, designH = 630;
-    static constexpr int drawerH = 150;  // the analysis panel that opens under the window in Hold mode
+    static constexpr int drawerH = 166;  // the analysis panel that opens under the window in Hold mode
     static constexpr int minW = 720, maxW = 2240;  // window width limits; the layout scales, and below 720 px text gets too small to read
     void refreshNow() { timerCallback(); }  // used by the snapshot test
 
