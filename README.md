@@ -47,7 +47,8 @@ The window is flat and quiet, in an analyzer style: the full-bleed level graph i
 grid, the input as a thin grey trace and the output as a gold curve. The Target, Threshold and Ceiling lines
 (gold, green and red) each have a round handle. The header, meters, readouts and dials sit straight on the graph
 as solid panels with a thin edge, with no gradients or glow. Dials are matte discs with the value as a gold arc
-around them; anything switched on turns gold. It is dark charcoal by default, with a light version on the
+just inside the rim and a gold dot for a pointer; Threshold and Target add a thin outer arc showing the live
+input and output level. Anything switched on turns gold. It is dark charcoal by default, with a light version on the
 sun / moon switch, and a plain edge keeps the window distinct on black, dark or white backgrounds. It can be
 resized freely (it keeps its shape). The meters show left and right with a balance dot, in green, amber and red
 zones, marked at the graph's heights. The bottom corners show how far the output is from the target and the

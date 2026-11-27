@@ -202,40 +202,45 @@ public:
              : role == "resp" ? (c.dark ? c.resp : c.resp.darker(0.3f)) : role == "range" ? (c.dark ? c.range : c.range.darker(0.2f)) : c.ink;
     }
 
-    // A dial: a dark matte disc in a thin light ring, the value as an arc just outside it, a dot for a pointer.
+    // A dial in the analyzer style: a dark matte disc edged by a thin light ring and a dark outline. The
+    // value is a gold arc running just inside the rim (no track behind it), and a gold dot near the edge is
+    // the pointer. Threshold and Target add a thin outer arc showing the live level: green for the input on
+    // Threshold, grey for the output on Target.
     void drawRotarySlider(Graphics& g, int x, int y, int w, int h, float pos, float a0, float a1, Slider& s) override {
         const Pal& c = p();
         const float cx = float(x) + float(w) * 0.5f, cy = float(y) + float(h) * 0.5f;
-        const float ringR = float(jmin(w, h)) * 0.5f - 7.f, r = ringR - 7.f;
+        const float r = float(jmin(w, h)) * 0.5f - 13.f;  // the disc
         const float ang = a0 + pos * (a1 - a0);
         const String role = s.getProperties().getWithDefault("role", "");
-        const Colour col = roleColour(role);
-        Path track; track.addCentredArc(cx, cy, ringR, ringR, 0.f, a0, a1, true);
-        g.setColour(c.meterOff);
-        g.strokePath(track, PathStrokeType(3.f, PathStrokeType::curved, PathStrokeType::butt));
-        if (pos > 0.003f) {
-            Path val; val.addCentredArc(cx, cy, ringR, ringR, 0.f, a0, ang, true);
-            g.setColour(col); g.strokePath(val, PathStrokeType(3.f, PathStrokeType::curved, PathStrokeType::butt));
-        }
-        // live level on the ring: Target shows the output level, Threshold the input level
+        const bool hot = s.isMouseOverOrDragging();
+        auto arc = [&](float rad, float from, float to, float thick, Colour col) {
+            Path a; a.addCentredArc(cx, cy, rad, rad, 0.f, from, to, true);
+            g.setColour(col); g.strokePath(a, PathStrokeType(thick, PathStrokeType::curved, PathStrokeType::butt));
+        };
+        // live level: a thin arc outside the disc, from the start of the sweep to the level
         const var live = s.getProperties()["live"];
         if (!live.isVoid()) {
             const double lv = double(live);
-            if (lv >= s.getMinimum() && lv <= s.getMaximum()) {
-                const float la = a0 + float(s.valueToProportionOfLength(lv)) * (a1 - a0);
-                g.setColour(c.ink);
-                g.fillEllipse(cx + ringR * std::sin(la) - 2.f, cy - ringR * std::cos(la) - 2.f, 4.f, 4.f);
+            if (lv > s.getMinimum()) {
+                const float la = a0 + float(s.valueToProportionOfLength(jmin(lv, s.getMaximum()))) * (a1 - a0);
+                arc(r + 6.f, a0, la, 2.5f, role == "thr" ? c.thr : c.label);
             }
         }
-        const bool hot = s.isMouseOverOrDragging();
+        // the disc: a dark outline, the matte face and a thin light ring
+        g.setColour(c.dark ? Colours::black.withAlpha(0.45f) : Colours::black.withAlpha(0.14f));
+        g.fillEllipse(cx - r - 2.f, cy - r - 2.f, (r + 2.f) * 2.f, (r + 2.f) * 2.f);
         g.setColour(hot ? c.glassStrong : c.glass);
         g.fillEllipse(cx - r, cy - r, r * 2.f, r * 2.f);
         g.setColour(hot ? c.label : c.knobRim);
-        g.drawEllipse(cx - r, cy - r, r * 2.f, r * 2.f, 1.5f);
-        const float pr = r * 0.78f, d = jmax(4.5f, r * 0.13f);
-        g.setColour(col);
+        g.drawEllipse(cx - r + 0.75f, cy - r + 0.75f, (r - 0.75f) * 2.f, (r - 0.75f) * 2.f, 1.5f);
+        // the value, just inside the rim
+        const Colour accent = c.data;
+        if (pos > 0.003f) arc(r - 4.f, a0, ang, 3.5f, accent);
+        // the pointer: a dot near the edge
+        const float pr = r - 11.f, d = jmax(5.f, r * 0.15f);
+        g.setColour(accent);
         g.fillEllipse(cx + std::sin(ang) * pr - d * 0.5f, cy - std::cos(ang) * pr - d * 0.5f, d, d);
-        if (s.hasKeyboardFocus(false)) { g.setColour(c.ink); g.drawEllipse(cx - ringR - 6.f, cy - ringR - 6.f, (ringR + 6.f) * 2.f, (ringR + 6.f) * 2.f, 1.5f); }
+        if (s.hasKeyboardFocus(false)) { g.setColour(c.ink); g.drawEllipse(cx - r - 10.f, cy - r - 10.f, (r + 10.f) * 2.f, (r + 10.f) * 2.f, 1.5f); }
     }
 
     // The thin sliders in the Rise / Fall / Trim panel.
