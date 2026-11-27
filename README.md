@@ -50,8 +50,9 @@ as solid panels with a thin edge, with no gradients or glow. Dials are matte dis
 just inside the rim and a gold dot for a pointer; Threshold and Target add a thin outer arc showing the live
 input and output level. Anything switched on turns gold. It is dark charcoal by default, with a light version on the
 sun / moon switch, and a plain edge keeps the window distinct on black, dark or white backgrounds. It can be
-resized freely (it keeps its shape). The meters show left and right with a balance dot, in green, amber and red
-zones, marked at the graph's heights. The bottom corners show how far the output is from the target and the
+resized freely (it keeps its shape). The meters are slim left and right bars in a plain darker column, filled in
+solid olive, yellow and red zones with a gold peak-hold tick and red caps when they clip, marked at the graph's
+heights, with a balance dot underneath. The bottom corners show how far the output is from the target and the
 applied gain; the latency is in the status strip along the bottom (5 ms at every sample rate). A one-time tip explains the two settings that matter most.
 
 ![Hold mode with the analysis sheet open](docs/window-hold.png)

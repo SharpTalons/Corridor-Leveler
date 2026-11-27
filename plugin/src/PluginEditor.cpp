@@ -628,33 +628,35 @@ public:
         const float w = float(getWidth()), cx = w * 0.5f;
         auto ly = [](float v) { return yOf(v) - kMeterY; };  // the graph's scale, in this component's coordinates
         const float top = ly(0.f), bot = ly(-kDbRange);
-        drawGlass(g, gc, *this, capsule(getLocalBounds().toFloat(), 24.f), {Colour(), 1.05f, true, 18.f, 7.f, 1.4f});
-        auto zone = [&](float v) { return v > -6.f ? c.mHot : v > -18.f ? c.mWarn : c.mSafe; };
-        // clip light, peak readout in its zone colour, name
-        g.setColour(hold > -0.5f ? c.mHot : c.meterOff); g.fillRoundedRectangle(cx - 12.f, 8.f, 24.f, 5.f, 2.5f);
-        g.setFont(sans(11.5f, true)); g.setColour(hold > -kDbRange ? zone(hold) : c.muted);
-        g.drawText(hold > -kDbRange ? fmtDb(hold) : String(CharPointer_UTF8("\xe2\x88\x92\xe2\x88\x9e")), Rectangle<float>(0.f, 17.f, w, 16.f), Justification::centred);
-        g.setFont(sans(11.f)); g.setColour(c.muted);
-        g.drawText(input ? "In" : "Out", Rectangle<float>(0.f, 33.f, w, 16.f), Justification::centred);
-        // left and right bars in fixed zones: green up to -18 dBFS, amber to -6, red above
-        const float bw = 5.f, gap = 3.f, bx = input ? 12.f : w - 12.f - bw * 2.f - gap;
+        // a plain column a shade darker than the window, square, with a 1 px edge
+        const Colour column = c.dark ? Colour(0xff18181b) : Colour(0xffd8d8de), track = c.dark ? Colour(0xff0f0f11) : Colour(0xffc2c2ca);
+        g.setColour(column); g.fillRect(getLocalBounds());
+        g.setColour(c.rimSoft); g.drawRect(getLocalBounds(), 1);
+        // peak readout in small grey figures (red once it clips), then the name
+        g.setFont(sans(10.5f)); g.setColour(hold > -0.5f ? c.mHot : c.label);
+        g.drawText(hold > -kDbRange ? fmtDb(hold) : String(CharPointer_UTF8("\xe2\x88\x92\xe2\x88\x9e")), Rectangle<float>(0.f, 14.f, w, 14.f), Justification::centred);
+        g.setFont(sans(10.5f)); g.setColour(c.muted);
+        g.drawText(input ? "IN" : "OUT", Rectangle<float>(0.f, 30.f, w, 14.f), Justification::centred);
+        // slim left and right bars on a dark track, square ends, in solid zones:
+        // olive up to -18 dBFS, yellow to -6, red above; a gold tick for the peak hold, red caps when it clips
+        const float bw = 7.f, gap = 2.f, bx = input ? 10.f : w - 10.f - bw * 2.f - gap;
         const float y18 = ly(-18.f), y6 = ly(-6.f);
         const float pk[2] = {peakL, peakR};
         for (int ch = 0; ch < 2; ++ch) {
             const float x = bx + float(ch) * (bw + gap);
-            g.setColour(c.meterOff); g.fillRoundedRectangle(x, top, bw, bot - top, 2.5f);
+            g.setColour(track); g.fillRect(x, top, bw, bot - top);
             if (pk[ch] > -kDbRange) {
                 const float t = ly(jmin(0.f, pk[ch]));
-                // three solid zones, each filled only as far as the level reaches
                 g.setColour(c.mSafe); g.fillRect(x, jmax(t, y18), bw, bot - jmax(t, y18));
                 if (t < y18) { g.setColour(c.mWarn); g.fillRect(x, jmax(t, y6), bw, y18 - jmax(t, y6)); }
                 if (t < y6) { g.setColour(c.mHot); g.fillRect(x, t, bw, y6 - t); }
             }
-            if (hold > -kDbRange) { g.setColour(zone(hold)); g.fillRect(x - 1.f, ly(jmin(0.f, hold)) - 1.f, bw + 2.f, 2.f); }
+            if (hold > -kDbRange) { g.setColour(c.data); g.fillRect(x, std::round(ly(jmin(0.f, hold))) - 1.f, bw, 2.f); }
+            g.setColour(hold > -0.5f ? c.mHot : track); g.fillRect(x, top - 6.f, bw, 3.f);
         }
         // the graph's marks: a tick every 5 dB, a number every 10, at the same heights
         const float tickX = input ? bx + bw * 2.f + gap + 3.f : bx - 7.f;
-        g.setFont(sans(11.f));
+        g.setFont(sans(10.5f));
         for (int v = 0; v >= -80; v -= 5) {
             const float y = std::round(ly(float(v))) + 0.5f;
             const bool major = v % 10 == 0;
@@ -667,12 +669,12 @@ public:
         }
         // stereo balance: L and R at the ends of a short track, the dot leans to the louder side
         const float by = bot + 11.f, half = 15.f, lean = jlimit(-1.f, 1.f, balance / 4.f);
-        g.setColour(c.muted); g.setFont(sans(11.f, true));
+        g.setColour(c.muted); g.setFont(sans(10.5f));
         g.drawText("L", Rectangle<float>(cx - half - 13.f, by - 7.f, 12.f, 14.f), Justification::centred);
         g.drawText("R", Rectangle<float>(cx + half + 1.f, by - 7.f, 12.f, 14.f), Justification::centred);
-        g.setColour(c.meterOff); g.fillRoundedRectangle(cx - half, by - 1.5f, half * 2.f, 3.f, 1.5f);
+        g.setColour(track); g.fillRect(cx - half, by - 1.f, half * 2.f, 2.f);
         g.setColour(c.muted); g.fillRect(cx - 0.5f, by - 4.f, 1.f, 8.f);
-        g.setColour(c.ink); g.fillEllipse(cx - lean * half - 3.5f, by - 3.5f, 7.f, 7.f);
+        g.setColour(c.data); g.fillEllipse(cx - lean * half - 3.f, by - 3.f, 6.f, 6.f);
     }
     void mouseDown(const MouseEvent&) override { dsp.resetPeakHolds(); }
 
