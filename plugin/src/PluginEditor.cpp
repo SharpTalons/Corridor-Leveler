@@ -639,7 +639,7 @@ public:
         g.drawText(input ? "IN" : "OUT", Rectangle<float>(0.f, 30.f, w, 14.f), Justification::centred);
         // slim left and right bars on a dark track, square ends, in solid zones:
         // olive up to -18 dBFS, yellow to -6, red above; a gold tick for the peak hold, red caps when it clips
-        const float bw = 7.f, gap = 2.f, bx = input ? 10.f : w - 10.f - bw * 2.f - gap;
+        const float bw = 7.f, gap = 2.f, bx = input ? cx - bw - gap * 0.5f : w - 10.f - bw * 2.f - gap;
         const float y18 = ly(-18.f), y6 = ly(-6.f);
         const float pk[2] = {peakL, peakR};
         for (int ch = 0; ch < 2; ++ch) {
@@ -654,18 +654,17 @@ public:
             if (hold > -kDbRange) { g.setColour(c.data); g.fillRect(x, std::round(ly(jmin(0.f, hold))) - 1.f, bw, 2.f); }
             g.setColour(hold > -0.5f ? c.mHot : track); g.fillRect(x, top - 6.f, bw, 3.f);
         }
-        // the graph's marks: a tick every 5 dB, a number every 10, at the same heights
-        const float tickX = input ? bx + bw * 2.f + gap + 3.f : bx - 7.f;
-        g.setFont(sans(10.5f));
-        for (int v = 0; v >= -80; v -= 5) {
-            const float y = std::round(ly(float(v))) + 0.5f;
-            const bool major = v % 10 == 0;
-            g.setColour(c.muted.withMultipliedAlpha(major ? 0.9f : 0.5f));
-            g.fillRect(tickX, y, major ? 4.f : 3.f, 1.f);
-            if (!major) continue;
-            g.setColour(c.muted);
-            if (input) g.drawText(fmtDb(float(v), 0), Rectangle<float>(tickX + 7.f, y - 7.f, 30.f, 14.f), Justification::centredLeft);
-            else g.drawText(fmtDb(float(v), 0), Rectangle<float>(tickX - 33.f, y - 7.f, 30.f, 14.f), Justification::centredRight);
+        // one dB scale for the whole window: beside the output meter, facing the graph, a number every 10 dB
+        // (the graph's grid carries the lines across; the input meter needs no copy of it)
+        if (!input) {
+            const float tickX = bx - 6.f;
+            g.setFont(sans(10.5f));
+            for (int v = 0; v >= -80; v -= 10) {
+                const float y = std::round(ly(float(v))) + 0.5f;
+                g.setColour(c.muted.withMultipliedAlpha(0.8f)); g.fillRect(tickX, y, 3.f, 1.f);
+                g.setColour(c.muted);
+                g.drawText(fmtDb(float(v), 0), Rectangle<float>(tickX - 33.f, y - 7.f, 30.f, 14.f), Justification::centredRight);
+            }
         }
         // stereo balance: L and R at the ends of a short track, the dot leans to the louder side
         const float by = bot + 11.f, half = 15.f, lean = jlimit(-1.f, 1.f, balance / 4.f);
@@ -1097,7 +1096,7 @@ public:
         : proc(p), scene(p, gc), meterIn(true, gc, p.core()), meterOut(false, gc, p.core()), readouts(gc), tags(p, gc), header(gc),
           threshold(p, ids::threshold, "Threshold", [](double v) { return fmtDb(float(v)) + " dB"; }, 30.f, "thr"),
           response(p, ids::response, "Response", [](double v) { return String(roundToInt(v)) + " ms" + kDot + speedWord(v); }, 30.f, "resp", {"Fast", "Slow"}),
-          target(p, ids::target, "Target", [](double v) { return fmtDb(float(v)) + " dB RMS"; }, 44.f, "data"),
+          target(p, ids::target, "Target", [](double v) { return fmtDb(float(v)) + " dB"; }, 44.f, "data"),
           range(p, ids::range, "Range", [](double v) { return kPlusMinus + fmtDb(float(v)) + " dB"; }, 30.f, "range"),
           ceiling(p, ids::ceiling, "Ceiling", [](double v) { return fmtDb(float(v)) + " dBFS"; }, 30.f, "ceil"),
           rideHold(gc, {"Ride", "Hold"}), ab(gc, {"A", "B"}), more(p, gc), tip(gc), drawer(p, gc), about(*checker, gc), prompt(*checker, gc) {
