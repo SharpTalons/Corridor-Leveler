@@ -44,7 +44,7 @@ constexpr float kTopBar = 52.f;
 constexpr float kRailW = 312.f, kDialH = 150.f, kReadH = 240.f;
 constexpr int kFullW = 1000, kFullH = 630;  // the full layout from here up; compact below
 constexpr float kDbRange = 80.f;
-constexpr float kBarW = 5.f, kBarGap = 3.f;
+constexpr float kBarW = 6.f, kBarGap = 2.f;
 struct Geo {
     float w = 1120.f, h = 630.f;
     bool compact = false;
@@ -86,12 +86,15 @@ struct Pal {
     Colour accent, positive, negative, warning;
     Colour inLine, grid, track, shade;
 };
-// dark: cards are darker than the ground; text greys pass 4.5:1 on the cards
+// Analyzer style: a flat charcoal ground, cards a shade darker, grey text and one gold accent (the output,
+// the Target, every value arc and anything switched on). Olive is the threshold and the safe meter zone,
+// yellow the meter's middle zone, red the ceiling and clipping. Text greys pass 4.5:1 on the cards.
 const Pal kDark{true,
-                Colour(0xff171719), Colour(0xff121115), Colour(0xff222125), Colour(0xff2a292e), Colour(0xff222125), Colour(0xff3a3a3e),
-                Colour(0xffffffff), Colour(0xffbdbdc0), Colour(0xff8a8c92),
-                Colour(0xff4fd1bf), Colour(0xff5fc39c), Colour(0xffe5566f), Colour(0xffd9a441),
-                Colour(0xff6e7076), Colour(0xff25242a), Colour(0xff2f2e33), Colour(0x66000000)};
+                Colour(0xff1e1e22), Colour(0xff19191c), Colour(0xff2a2a2f), Colour(0xff34343a), Colour(0xff2c2c31), Colour(0xff45454c),
+                Colour(0xffe8e8ec), Colour(0xffb8b8c0), Colour(0xff8e8e98),
+                Colour(0xffffc21a), Colour(0xff9cc23a), Colour(0xffff4d4d), Colour(0xffe6c229),
+                Colour(0xff7c7c84), Colour(0xff27272c), Colour(0xff0f0f11), Colour(0x00000000)};
+const Colour kKnobRim(0xff5a5a62), kFrame(0xff4a4a52);
 
 // ---------------------------------------------------------------- type: Inter Tabular, Regular and SemiBold
 // Mostly regular weight; SemiBold for names, titles, the chosen option and the answer figure.
@@ -151,10 +154,9 @@ void card(Graphics& g, const Pal& c, Rectangle<float> r) {
     g.setColour(c.surface); g.fillRoundedRectangle(r, 6.f);
     if (!c.dark) { g.setColour(c.rule); g.drawRoundedRectangle(r.reduced(0.5f), 6.f, 1.f); }
 }
-// a floating panel (menu, popover, dialog): the one place a shadow is drawn
+// a floating panel (menu, popover, dialog): flat, with a 1 px edge
 void floating(Graphics& g, const Pal& c, Rectangle<float> r) {
     Path p; p.addRoundedRectangle(r, 6.f);
-    DropShadow(c.shade, 24, {0, 8}).drawForPath(g, p);
     g.setColour(c.dark ? c.raised : c.surface); g.fillPath(p);
     g.setColour(c.dark ? c.control.withAlpha(0.6f) : c.rule); g.strokePath(p, PathStrokeType(1.f));
 }
@@ -271,40 +273,43 @@ public:
     // the colour and the dash of the line a dial moves
     Colour roleColour(const String& role) const {
         const Pal& c = p();
-        return role == "data" ? c.text : role == "thr" ? c.warning : role == "ceil" ? c.negative : c.muted;
+        return role == "data" ? c.accent : role == "thr" ? c.positive : role == "ceil" ? c.negative : c.muted;
     }
 
-    // A flat dial: a thin track, the value arc in ink, a raised disc with a pointer. The live level
-    // (Target: the output, Threshold: the input) is a dot on the track.
+    // A dial in the analyzer style: a dark matte disc edged by a thin light ring and a dark outline. The
+    // value is a gold arc just inside the rim (no track behind it) and a gold dot near the edge is the
+    // pointer. Threshold and Target add a thin outer arc for the live level: olive for the input on
+    // Threshold, grey for the output on Target.
     void drawRotarySlider(Graphics& g, int x, int y, int w, int h, float pos, float a0, float a1, Slider& s) override {
         const Pal& c = p();
         const float cx = float(x) + float(w) * 0.5f, cy = float(y) + float(h) * 0.5f;
-        const float ringR = float(jmin(w, h)) * 0.5f - 4.f, r = ringR - 8.f;
+        const float r = float(jmin(w, h)) * 0.5f - 9.f;  // the disc
         const float ang = a0 + pos * (a1 - a0);
-        const PathStrokeType ring(3.f, PathStrokeType::curved, PathStrokeType::butt);
-        Path track; track.addCentredArc(cx, cy, ringR, ringR, 0.f, a0, a1, true);
-        g.setColour(c.track); g.strokePath(track, ring);
-        if (pos > 0.003f) {
-            Path val; val.addCentredArc(cx, cy, ringR, ringR, 0.f, a0, ang, true);
-            g.setColour(c.text); g.strokePath(val, ring);
-        }
+        const String role = s.getProperties().getWithDefault("role", "");
         const bool hot = s.isMouseOverOrDragging();
-        g.setColour(hot ? c.hover : c.raised);
-        g.fillEllipse(cx - r, cy - r, r * 2.f, r * 2.f);
-        const float p0 = r * 0.35f, p1 = r * 0.92f;
-        g.setColour(c.text);
-        g.drawLine(cx + std::sin(ang) * p0, cy - std::cos(ang) * p0, cx + std::sin(ang) * p1, cy - std::cos(ang) * p1, 2.f);
+        auto arc = [&](float rad, float from, float to, float thick, Colour col) {
+            Path a; a.addCentredArc(cx, cy, rad, rad, 0.f, from, to, true);
+            g.setColour(col); g.strokePath(a, PathStrokeType(thick, PathStrokeType::curved, PathStrokeType::butt));
+        };
         const var live = s.getProperties()["live"];
         if (!live.isVoid()) {
             const double lv = double(live);
-            if (lv >= s.getMinimum() && lv <= s.getMaximum()) {
-                const float la = a0 + float(s.valueToProportionOfLength(lv)) * (a1 - a0);
-                const bool isOut = s.getProperties()["role"].toString() == "data";
-                g.setColour(isOut ? c.accent : c.secondary);
-                g.fillEllipse(cx + ringR * std::sin(la) - 3.f, cy - ringR * std::cos(la) - 3.f, 6.f, 6.f);
+            if (lv > s.getMinimum()) {
+                const float la = a0 + float(s.valueToProportionOfLength(jmin(lv, s.getMaximum()))) * (a1 - a0);
+                arc(r + 5.5f, a0, la, 2.f, role == "thr" ? c.positive : c.secondary);
             }
         }
-        if (s.hasKeyboardFocus(false)) { g.setColour(c.accent); g.drawEllipse(cx - ringR - 5.f, cy - ringR - 5.f, (ringR + 5.f) * 2.f, (ringR + 5.f) * 2.f, 1.5f); }
+        g.setColour(Colours::black.withAlpha(0.45f));
+        g.fillEllipse(cx - r - 2.f, cy - r - 2.f, (r + 2.f) * 2.f, (r + 2.f) * 2.f);
+        g.setColour(hot ? c.hover : c.raised);
+        g.fillEllipse(cx - r, cy - r, r * 2.f, r * 2.f);
+        g.setColour(hot ? c.secondary : kKnobRim);
+        g.drawEllipse(cx - r + 0.75f, cy - r + 0.75f, (r - 0.75f) * 2.f, (r - 0.75f) * 2.f, 1.5f);
+        if (pos > 0.003f) arc(r - 4.f, a0, ang, 3.f, c.accent);
+        const float pr = r - 10.f, d = jmax(5.f, r * 0.15f);
+        g.setColour(c.accent);
+        g.fillEllipse(cx + std::sin(ang) * pr - d * 0.5f, cy - std::cos(ang) * pr - d * 0.5f, d, d);
+        if (s.hasKeyboardFocus(false)) { g.setColour(c.accent); g.drawEllipse(cx - r - 8.f, cy - r - 8.f, (r + 8.f) * 2.f, (r + 8.f) * 2.f, 1.5f); }
     }
 
     // the thin sliders for rise, fall and trim
@@ -313,9 +318,10 @@ public:
         const float cy = std::round(float(y) + float(h) * 0.5f), x0 = float(x) + 6.f, x1 = float(x + w) - 6.f;
         const float px = jlimit(x0, x1, pos);
         g.setColour(c.track); g.fillRect(x0, cy - 1.f, x1 - x0, 2.f);
-        g.setColour(c.text); g.fillRect(x0, cy - 1.f, px - x0, 2.f);
+        g.setColour(c.accent); g.fillRect(x0, cy - 1.f, px - x0, 2.f);
         const float tr = s.isMouseOverOrDragging() ? 7.f : 6.f;
-        g.setColour(c.text); g.fillEllipse(px - tr, cy - tr, tr * 2.f, tr * 2.f);
+        g.setColour(c.raised); g.fillEllipse(px - tr, cy - tr, tr * 2.f, tr * 2.f);
+        g.setColour(s.isMouseOverOrDragging() ? c.secondary : kKnobRim); g.drawEllipse(px - tr + 0.75f, cy - tr + 0.75f, (tr - 0.75f) * 2.f, (tr - 0.75f) * 2.f, 1.5f);
         if (s.hasKeyboardFocus(false)) { g.setColour(c.accent); g.drawEllipse(px - 10.f, cy - 10.f, 20.f, 20.f, 1.5f); }
     }
 
@@ -332,7 +338,7 @@ public:
         const bool on = b.getToggleState();
         if (kind == "switch") {
             const auto t = Rectangle<float>(r.getRight() - 32.f, r.getCentreY() - 9.f, 32.f, 18.f);
-            g.setColour(on ? c.text : c.track); g.fillRoundedRectangle(t, 9.f);
+            g.setColour(on ? c.accent : c.track); g.fillRoundedRectangle(t, 9.f);
             const float kx = on ? t.getRight() - 16.f : t.getX() + 2.f;
             g.setColour(on ? c.surface : c.secondary);
             g.fillEllipse(kx, t.getY() + 2.f, 14.f, 14.f);
@@ -348,15 +354,15 @@ public:
             if (b.hasKeyboardFocus(false)) { g.setColour(c.accent); g.drawEllipse(disc.expanded(1.f), 1.5f); }
             return;
         }
-        const float rad = r.getHeight() * 0.5f;
+        const float rad = 4.f;
         if (kind == "primary") {
-            g.setColour(!b.isEnabled() ? c.track : over || down ? c.text.withAlpha(0.86f) : c.text);
+            g.setColour(!b.isEnabled() ? c.track : over || down ? c.accent.brighter(0.15f) : c.accent);
             g.fillRoundedRectangle(r, rad);
         } else if (kind == "control") {
             const bool danger = b.getProperties().getWithDefault("danger", false);
-            if (on && b.getClickingTogglesState()) { g.setColour(danger ? c.negative : c.text); g.fillRoundedRectangle(r, rad); }
+            if (on && b.getClickingTogglesState() && danger) { g.setColour(c.negative); g.fillRoundedRectangle(r, rad); }
             else {
-                if (over || down) { g.setColour(c.hover); g.fillRoundedRectangle(r, rad); }
+                g.setColour(over || down ? c.hover : c.raised); g.fillRoundedRectangle(r, rad);
                 g.setColour(c.control); g.drawRoundedRectangle(r, rad, 1.f);
             }
         } else if (over) {
@@ -374,7 +380,7 @@ public:
         const bool filledToggle = kind == "control" && on && b.getClickingTogglesState();
         const Colour col = !b.isEnabled() ? c.muted.withAlpha(0.6f)
                          : kind == "primary" ? c.surface
-                         : filledToggle ? (alarm ? Colours::white : c.surface)
+                         : filledToggle ? (alarm ? Colours::white : c.accent)
                          : alarm ? c.negative
                          : kind == "icon" ? (over ? c.text : c.secondary)
                          : on || over ? c.text : c.secondary;
@@ -540,13 +546,14 @@ public:
         const float w = float(getWidth()), cx = w * 0.5f;
         const String role = slider.getProperties()["role"].toString();
         // name, led by the mark of the line it moves
-        const Font tf = text(13.f, true);
+        const Font tf = text(11.5f).withExtraKerningFactor(0.06f);
+        const String name = title.toUpperCase();
         const bool hasMark = role.isNotEmpty();
-        const float tw = widthOf(tf, title) + (hasMark ? 20.f : 0.f);
+        const float tw = widthOf(tf, name) + (hasMark ? 20.f : 0.f);
         float tx = cx - tw * 0.5f;
         if (hasMark) { lineMark(g, Line<float>(tx, 9.5f, tx + 13.f, 9.5f), look->roleColour(role), role != "data", role == "data" ? 2.f : 1.5f); tx += 20.f; }
-        g.setFont(tf); g.setColour(c.text);
-        g.drawText(title, Rectangle<float>(tx, 0.f, tw, 19.f), Justification::centredLeft);
+        g.setFont(tf); g.setColour(slider.isMouseOverOrDragging() ? c.text : c.secondary);
+        g.drawText(name, Rectangle<float>(tx, 0.f, tw, 19.f), Justification::centredLeft);
         if (endLabels.first.isNotEmpty()) {  // which way is which: the start of the sweep is fast, the end slow
             const float dy = float(kDialTop) + float(kDial) - 6.f, half = float(kDial) * 0.5f;
             g.setFont(text(11.f)); g.setColour(c.muted);
@@ -613,7 +620,7 @@ public:
         for (int i = 0; i < labels.size(); ++i) {
             const auto r = slot(i);
             const bool sel = i == selected;
-            g.setColour(sel ? c.text : hoverIndex == i ? c.secondary : c.muted);
+            g.setColour(sel ? c.accent : hoverIndex == i ? c.text : c.muted);
             const float tw = widthOf(f, labels[i]);
             const float tx = r.getX();
             g.drawText(labels[i], Rectangle<float>(tx, 0.f, tw + 2.f, float(getHeight()) - 1.f), Justification::centredLeft);
@@ -692,14 +699,22 @@ public:
             item("Output", [&](float mx) { g.setColour(c.accent); g.fillRect(mx, G.level.getY() + 25.f, 14.f, 2.f); });
         }
         }
-        // grid: a line and a figure every 10 dB, read by the plot and both meters alike
+        // grid: a line every 10 dB (fainter every 5) and every second; one dB scale, beside the output meter,
+        // read by the plot and both meters alike
         g.setFont(num(11.f));
-        for (int v = 0; v >= -80; v -= 10) {
+        for (int v = 0; v >= -80; v -= 5) {
             const float y = std::round(G.yOf(float(v)));
-            g.setColour(c.grid); g.fillRect(G.px0, y, G.px1 - G.px0, 1.f);
+            g.setColour(v % 10 == 0 ? c.grid : c.grid.interpolatedWith(c.surface, 0.5f)); g.fillRect(G.px0, y, G.px1 - G.px0, 1.f);
+            if (v % 10 != 0) continue;
             g.setColour(c.muted);
-            g.drawText(fmtDb(float(v), 0), Rectangle<float>(G.inBarX + 13.f, y - 7.f, G.px0 - 8.f - (G.inBarX + 13.f) - 4.f, 14.f), Justification::centredRight);
             g.drawText(fmtDb(float(v), 0), Rectangle<float>(G.px1 + 8.f, y - 7.f, G.outBarX - G.px1 - 12.f, 14.f), Justification::centredLeft);
+        }
+        {
+            const float sxg = (G.px1 - G.px0) / float(kHist - 1);
+            for (int sec = 0; sec <= 10; ++sec) {
+                g.setColour(sec % 5 == 0 ? c.grid : c.grid.interpolatedWith(c.surface, 0.5f));
+                g.fillRect(std::round(G.px1 - float(sec * 50) * sxg), G.gt, 1.f, G.gb - G.gt);
+            }
         }
         paintMeter(g, c, G.inBarX, in, "In peak");
         paintMeter(g, c, G.outBarX, out, "Out peak");
@@ -732,12 +747,16 @@ public:
         // the three reference lines, labelled at their left end
         auto& st = proc.state();
         struct Ref { const char* id; const char* name; Colour col; bool dashed; };
-        const Ref refs[3] = {{ids::ceiling, "Ceiling", c.negative, true}, {ids::target, "Target", c.text, false}, {ids::threshold, "Threshold", c.warning, true}};
+        const Ref refs[3] = {{ids::ceiling, "Ceiling", c.negative, true}, {ids::target, "Target", c.accent, false}, {ids::threshold, "Threshold", c.positive, true}};
         float labelY[3];
         for (int i = 0; i < 3; ++i) {
             const float y = std::round(G.yOf(st.getRawParameterValue(refs[i].id)->load())) + 0.5f;
             const bool hot = hover == refs[i].id || dragId == refs[i].id || emphasis == refs[i].id;
-            lineMark(g, Line<float>(x0, y, x1, y), refs[i].col, refs[i].dashed, hot ? 2.5f : refs[i].dashed ? 1.f : 1.5f);
+            lineMark(g, Line<float>(x0, y, x1, y), refs[i].col, refs[i].dashed, hot ? 2.f : 1.f);
+            // the handle: a round node at the right end, edged in the card colour so it sits on top
+            const float hr = hot ? 6.f : 5.f;
+            g.setColour(c.surface); g.fillEllipse(x1 - 10.f - hr - 1.5f, y - hr - 1.5f, (hr + 1.5f) * 2.f, (hr + 1.5f) * 2.f);
+            g.setColour(refs[i].col); g.fillEllipse(x1 - 10.f - hr, y - hr, hr * 2.f, hr * 2.f);
             labelY[i] = y - 16.f;
         }
         for (int i = 1; i < 3; ++i) labelY[i] = jmax(labelY[i], labelY[i - 1] + 15.f);  // never on top of each other
@@ -748,7 +767,7 @@ public:
             const String s = String(refs[i].name) + "  " + fmtDb(v);
             const auto r = Rectangle<float>(x0 + 6.f, labelY[i], widthOf(lf, s) + 8.f, 14.f);
             g.setColour(c.surface); g.fillRect(r);
-            g.setColour(refs[i].col == c.text ? c.text : refs[i].col);
+            g.setColour(refs[i].col);
             g.drawText(s, r.withTrimmedLeft(4.f), Justification::centredLeft);
         }
         paintGainLane(g, c, X, n);
@@ -796,7 +815,6 @@ public:
         const float lw = 64.f, lx = bx < G.level.getCentreX() ? G.level.getX() + 12.f : G.level.getRight() - 12.f - lw;
         g.drawText(clip ? "Clip" : name, Rectangle<float>(lx, G.gt - 20.f, lw, 16.f), bx < G.level.getCentreX() ? Justification::centredLeft : Justification::centredRight);
         const float pk[2] = {m.peakL, m.peakR};
-        auto zone = [&](float v) { return v > -6.f ? c.negative : v > -18.f ? c.warning : c.positive; };
         for (int ch = 0; ch < 2; ++ch) {
             const float x = bx + float(ch) * (kBarW + kBarGap);
             g.setColour(c.track); g.fillRect(x, top, kBarW, bot - top);
@@ -807,7 +825,8 @@ public:
                 if (v > -18.f) { g.setColour(c.warning); g.fillRect(x, jmax(t, y6), kBarW, y18 - jmax(t, y6)); }
                 if (v > -6.f) { g.setColour(c.negative); g.fillRect(x, t, kBarW, y6 - t); }
             }
-            if (m.hold > -kDbRange) { g.setColour(zone(m.hold)); g.fillRect(x, G.yOf(jmin(0.f, m.hold)) - 1.f, kBarW, 2.f); }
+            if (m.hold > -kDbRange) { g.setColour(c.accent); g.fillRect(x, std::round(G.yOf(jmin(0.f, m.hold))) - 1.f, kBarW, 2.f); }
+            g.setColour(clip ? c.negative : c.track); g.fillRect(x, top - 6.f, kBarW, 3.f);
         }
     }
 
@@ -1444,6 +1463,9 @@ public:
         if (!mods.isAnyModifierKeyDown() && (code == 'A' || code == 'a') && drawer.isVisible()) { drawer.analyze.triggerClick(); return true; }
         return false;
     }
+
+    // a plain edge round the window, lighter than the ground, so it stands apart from a black host
+    void paintOverChildren(Graphics& g) override { g.setColour(kFrame); g.drawRect(getLocalBounds().toFloat(), 1.5f); }
 
     void resized() override {
         const int W = getWidth(), H = getHeight() - drawerSpace;

@@ -49,15 +49,20 @@ settings to compare; B starts as a copy of A, and both are saved with the sessio
 (Ctrl+Z, Ctrl+Shift+Z) for every change. Double-click a dial, or press Enter on it, to type a value;
 Alt-click resets it.
 
-The window is a flat, dark monitoring screen. The top bar holds presets, A / B, undo and redo, the live status
+The window is a flat, dark monitoring screen in an analyzer style: a charcoal ground, grey text and one gold
+accent, with no gradients or glow, and a plain edge so it stands out against a black host. The top bar holds presets, A / B, undo and redo, the live status
 as one plain sentence, and Bypass. The **Level** panel draws the input and output over the last 10 s (RMS or
-peak, following the target) with the Target, Threshold and Ceiling lines (drag them to set them), marked every
-10 dB on both edges. The left and right peak meters sit either side on the same scale, in green, amber and red
-zones; click one to clear its peak hold. Under the graph, the **gain lane** shows how much Corridor boosted or
+peak, following the target) over a faint grid (every 10 dB and every second), the output as a gold
+curve and the input as a thin grey line, with the Target, Threshold and Ceiling lines (gold, olive and red) and a
+round handle on each (drag them to set them). One dB scale, beside the output meter, serves the plot and both
+meters. The slim left and right peak meters sit either side, in olive, yellow and red zones with a gold
+peak-hold tick and a red cap when they clip; click one to clear its peak hold. Under the graph, the **gain lane** shows how much Corridor boosted or
 cut, moment by moment, with the limiter's catches marked in red. The **Output** panel leads with the output
 level the engine steers and how far it is from the target, then the applied gain, input, peaks, stereo balance
-and latency (5 ms at every sample rate). Each dial is marked with the line it moves. Every on/off control fills
-with ink when on (red for Bypass), and every selection (A / B, Ride / Hold, RMS / Peak) is underlined in teal.
+and latency (5 ms at every sample rate). Each dial is a matte disc with its value as a gold arc just inside the rim
+and a gold dot for a pointer; Threshold and Target add a thin outer arc for the live input and output level, and
+each dial's name is marked with the line it moves. Switches turn gold when on (Bypass red), and every selection
+(A / B, Ride / Hold, RMS / Peak) is gold and underlined in gold.
 The text is set in Inter with tabular figures, so live numbers don't shift. The window can be resized freely
 from 720 x 540 up, and the text and controls always keep one size: the graph and dials take the extra
 room. Below 1000 x 630 it switches to a compact layout: the graph and dials run the full width, the output
