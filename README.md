@@ -17,47 +17,58 @@ Both run the same engine (`core/`). Mono and stereo, at whatever sample rate the
 
 ## Controls
 
-- **Ride / Hold**: Ride adjusts the gain continuously. Hold slides an analysis sheet out under the window:
+- **Ride / Hold**: Ride adjusts the gain continuously. Hold opens an analysis panel under the window:
   press **Analyze** (or the **A** key), play a typical section while the live input waveform lights up, then
   press **Lock** (or it locks after 20 s). One fixed correction is then held. Analyze / Lock is also a host
   parameter, so a hotkey, Stream Deck or MIDI button can press it: each press analyzes, the next locks.
-- **Threshold** (dB RMS): below this it stops adjusting, so silence, breaths and noise never trigger a boost.
-- **Target** (dB RMS): the level you want.
+- **Threshold** (dB RMS, −70 to 0): below this it stops adjusting, so silence, breaths and noise never trigger a boost.
+- **Target**: the level you want, −40 to −3 dB. The default is −18. The level settles on the target itself,
+  then holds still inside a small dead band so it never fidgets.
+- **RMS / Peak** (the switch in the Output panel's title row): what the target measures. **RMS** puts the average loudness
+  on the target (dB RMS, the usual choice for voice). **Peak** puts the highest peaks on the target (dBFS peak),
+  and the graph then draws peaks to match.
 - **Response** (ms): how long Corridor listens before it judges the level. 10 ms is the fastest and follows
   almost every word; 3000 ms is the slowest and rides whole phrases. The dial is marked Fast and Slow and
   runs on a log scale. Drums are detected and stretch it up to 3x (at most 0.8 s), so the gain follows the
   groove, not each hit. Below about 50 ms the leveler starts to shape the sound itself, like a compressor.
 - **Range** (dB): the most it may boost or cut.
-- **Ceiling** (dBFS): the highest peak allowed. Boosts stop short of it and a 5 ms look-ahead
-  brick-wall limiter catches the rest.
-- **Rise, fall, trim** (the button next to Ride / Hold opens them):
+- **Ceiling** (dBFS, −60 to 0): the highest peak allowed, enforced by a 5 ms look-ahead brick-wall limiter.
+  To reach the target, boosts may push short peaks (consonants, plosives) up to 6 dB into that limiter; a boost
+  that would need more is held back. Half the dial covers −12 to 0, where it is usually set.
+- **Rise, fall, trim** (under Ride / Hold, always in view):
   - **Rise** (ms): how fast quiet passages are lifted.
   - **Fall** (ms): how fast loud passages are pulled down. A slow rise and a fast fall suit voice.
   - **Output trim** (dB): a final +/-12 dB after the leveler, still under the ceiling.
-- **Return to 0 dB in silence**: off, the gain freezes below the threshold; on, after 2 s of silence it
-  glides back to 0 dB.
-- **Bypass**: click-free, and keeps the same latency so nothing jumps.
+- **Return to 0 dB in silence** (on by default): after 2 s of silence the gain glides back to 0 dB. Off, the
+  gain freezes below the threshold instead.
+- **Bypass** (top right): click-free, and keeps the same latency so nothing jumps. While bypassed the button
+  turns red and reads **Bypassed**.
 
-Also in the header: **presets** (Stream voice, Podcast, Music bed, Drums, Quiet room), **A / B** (two complete
+Also in the top bar: **presets** (Stream voice, Podcast, Music bed, Drums, Quiet room), **A / B** (two complete
 settings to compare; B starts as a copy of A, and both are saved with the session), and **undo / redo**
 (Ctrl+Z, Ctrl+Shift+Z) for every change. Double-click a dial, or press Enter on it, to type a value;
 Alt-click resets it.
 
-The window is flat and quiet, in an analyzer style: the full-bleed level graph is the interface, with a faint
-grid, the input as a thin grey trace and the output as a gold curve. The Target, Threshold and Ceiling lines
-(gold, green and red) each have a round handle. The header, meters, readouts and dials sit straight on the graph
-as solid panels with a thin edge, with no gradients or glow. Dials are matte discs with the value as a gold arc
-just inside the rim and a gold dot for a pointer; Threshold and Target add a thin outer arc showing the live
-input and output level. Anything switched on turns gold. It is dark charcoal by default, with a light version on the
-sun / moon switch, and a plain edge keeps the window distinct on black, dark or white backgrounds. It can be
-resized freely (it keeps its shape). The meters are slim left and right bars in a plain darker column, filled in
-solid olive, yellow and red zones with a gold peak-hold tick and red caps when they clip, and a balance dot underneath.
-The dB scale is shown once, beside the output meter, at the graph's heights. The bottom corners show how far the output is from the target and the
-applied gain; the latency is in the status strip along the bottom (5 ms at every sample rate). A one-time tip explains the two settings that matter most.
+The window is a flat, dark monitoring screen. The top bar holds presets, A / B, undo and redo, the live status
+as one plain sentence, and Bypass. The **Level** panel draws the input and output over the last 10 s (RMS or
+peak, following the target) with the Target, Threshold and Ceiling lines (drag them to set them), marked every
+10 dB on both edges. The left and right peak meters sit either side on the same scale, in green, amber and red
+zones; click one to clear its peak hold. Under the graph, the **gain lane** shows how much Corridor boosted or
+cut, moment by moment, with the limiter's catches marked in red. The **Output** panel leads with the output
+level the engine steers and how far it is from the target, then the applied gain, input, peaks, stereo balance
+and latency (5 ms at every sample rate). Each dial is marked with the line it moves. Every on/off control fills
+with ink when on (red for Bypass), and every selection (A / B, Ride / Hold, RMS / Peak) is underlined in teal.
+The text is set in Inter with tabular figures, so live numbers don't shift. The window can be resized freely
+from 720 x 540 up, and the text and controls always keep one size: the graph and dials take the extra
+room. Below 1000 x 630 it switches to a compact layout: the graph and dials run the full width, the output
+readouts become one line at the top of the graph, and Ride / Hold, rise, fall, trim and return to 0 dB open
+from the **Ride / Hold** button in the top bar. A one-time tip explains the two settings that matter most.
 
-![Hold mode with the analysis sheet open](docs/window-hold.png)
+![Hold mode with the analysis panel open](docs/window-hold.png)
 
-![Light theme](docs/window-light.png)
+![A larger window: the graph grows, the text stays the same size](docs/window-1600.png)
+
+![The compact layout at 720 x 540, with the mode panel open](docs/window-720-mode.png)
 
 ## Installing
 
@@ -73,11 +84,9 @@ version exists, it asks once per session, with **Update** and **Ignore**:
 - **Update** downloads the installer with a progress bar and opens it. Close OBS or your DAW when the
   installer asks; settings and sessions are kept.
 - **Ignore** stops the automatic prompt for that version. The next version asks again.
-- The version button in the header opens a panel with the installed version, the last result and
+- Clicking the name in the top bar opens a panel with the installed version, the last result and
   **Check for updates**, which always asks, even about an ignored version.
 - Offline, it uses the last answer it saved.
-
-This follows the `update-check` spec from fubulatu-lang/Design-Constants.
 
 ## Versions and releases
 
@@ -100,7 +109,7 @@ cmake --build build --config Release --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-JUCE and FST are downloaded at configure time. Corridor Leveler ships for Windows only;
+JUCE is downloaded at configure time; FST's one header is kept in `third_party/fst`. Corridor Leveler ships for Windows only;
 the CI also builds on Linux purely to run the tests and render the window screenshots (that needs ALSA, X11,
 FreeType and Fontconfig development libraries). Options: `CORRIDOR_BUILD_PLUGIN`,
 `CORRIDOR_BUILD_VST2`, `CORRIDOR_BUILD_TESTS`.
@@ -112,14 +121,15 @@ Tests:
 - `tests/plugin_check.cpp`: loads the built VST3 and 2.x binaries like a host, checks level, latency and
   bypass, and renders the window to PNG.
 
-The `prototype/` folder holds the original browser prototype.
-
 ## Licences
 
 Corridor Leveler is licensed under the **GNU AGPL v3 or later** (see `LICENSE`).
 
 - [JUCE](https://juce.com) is used under its AGPLv3 open-source licence.
-- The 2.x plugin is built with [FST](https://git.iem.at/zmoelnig/FST) (GPLv3 or later), an independent
+- [Inter](https://rsms.me/inter/) is embedded under the SIL Open Font License 1.1 (see `plugin/fonts/OFL.txt`),
+  with its tabular figures made the default and the family renamed "Inter Tabular".
+- The 2.x plugin is built with [FST](https://git.iem.at/zmoelnig/FST) (GPLv3 or later; its header is in
+  `third_party/fst` with its licence), an independent
   reimplementation of the 2.x plugin headers, because Steinberg no longer distributes that SDK.
   "VST" is a Steinberg trademark. FST's authors ask that plugins built with FST not be called "VST"
   or "VST compatible", so this project refers to that build as the 2.x plugin.

@@ -78,6 +78,7 @@ jobs:
           cp -r "$A/VST3/Corridor Leveler.vst3" stage/vst3/
           cp "$A/VST/Corridor Leveler.dll" stage/vst2/
           cp LICENSE stage/LICENSE.txt
+          cp plugin/fonts/OFL.txt stage/OFL-Inter.txt
           cp installer/README.txt stage/README.txt
       - name: Build installer
         shell: pwsh

@@ -84,6 +84,9 @@ static void checkBinary(AudioPluginFormatManager& fm, const String& path, const 
 static void checkUpdates() {
     std::printf("update check: version comparison and release parsing\n");
     using updates::isNewer;
+    // the check asks this project's own repository, never an old or other name
+    CHECK(String(updates::kLatestUrl) == "https://api.github.com/repos/SharpTalons/Corridor-Leveler/releases/latest", "update URL %s", updates::kLatestUrl);
+    CHECK(String(updates::kReleasesPage) == "https://github.com/SharpTalons/Corridor-Leveler/releases", "releases page %s", updates::kReleasesPage);
     CHECK(isNewer("0.10.0", "0.9.9"), "0.10.0 > 0.9.9");
     CHECK(!isNewer("1.0.0", "1.0.0"), "equal is not newer");
     CHECK(isNewer("v0.1.23", "0.1.22"), "leading v");
@@ -121,13 +124,18 @@ static void snapshots(const File& dir) {
         PNGImageFormat().writeImageToStream(img, os);
         std::printf("  wrote %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
     };
-    for (int w : {1120, 960}) {
-        proc.editorWidth = w;
+    // the window opens at the size it was left at, and is laid out again (not scaled) at every size
+    // (below 1000 x 630 it switches to the compact layout)
+    const std::pair<int, int> sizes[] = {{1120, 630}, {1000, 630}, {1600, 900}, {860, 600}, {720, 540}};
+    for (auto [w, h] : sizes) {
+        proc.editorWidth = w; proc.editorHeight = h;
         std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
         static_cast<CorridorEditor*>(ed.get())->refreshNow();
-        CHECK(ed->getWidth() == w, "editor width %d", ed->getWidth());
-        CHECK(std::abs(ed->getHeight() - int(std::round(w * 630.0 / 1120.0))) <= 1, "editor height %d", ed->getHeight());
+        CHECK(ed->getWidth() == w, "editor width %d, expected %d", ed->getWidth(), w);
+        CHECK(ed->getHeight() == h, "editor height %d, expected %d", ed->getHeight(), h);
         CHECK(ed->isResizable(), "editor not resizable");
+        if (auto* content = ed->getChildComponent(0))
+            CHECK(content->getTransform().isIdentity(), "the window contents are scaled at %dx%d", w, h);
         const Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f);
         if (w == 1120) {  // the update prompt, as a person would see it
             SharedResourcePointer<updates::Checker> chk;
@@ -139,14 +147,12 @@ static void snapshots(const File& dir) {
             MessageManager::getInstance()->runDispatchLoopUntil(100);
         }
         save(img, "window-" + String(w) + ".png");
+        if (w == 720) {  // compact: the mode panel opens over the window from the top bar
+            static_cast<CorridorEditor*>(ed.get())->openModePanel(true);
+            save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-720-mode.png");
+        }
     }
-    {  // the light theme
-        proc.editorWidth = 1120; proc.darkTheme = false;
-        std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
-        static_cast<CorridorEditor*>(ed.get())->refreshNow();
-        save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-light.png");
-        proc.darkTheme = true;
-    }
+    proc.editorWidth = 1120; proc.editorHeight = 630;
     // Hold mode: the analysis panel opens under the window while a section is measured
     {
         proc.editorWidth = 1120;
@@ -157,10 +163,23 @@ static void snapshots(const File& dir) {
         runSine(proc, 48000, -70.f, 0.6, ph);
         runSine(proc, 48000, -22.f, 1.4, ph);
         static_cast<CorridorEditor*>(ed.get())->refreshNow();
-        const int h = int(std::round(1120.0 * (630 + CorridorEditor::drawerH) / 1120.0));
+        const int h = 630 + CorridorEditor::drawerH;
         CHECK(std::abs(ed->getHeight() - h) <= 1, "hold-mode editor height %d, expected %d", ed->getHeight(), h);
         save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-hold.png");
         if (auto* m = proc.state().getParameter(ids::mode)) m->setValueNotifyingHost(0.f);
+    }
+    // Peak detection: the target is a peak level, and the graph draws peaks to match
+    {
+        proc.editorWidth = 1120;
+        auto set = [&](const char* id, float v) { if (auto* p = proc.state().getParameter(id)) p->setValueNotifyingHost(p->convertTo0to1(v)); };
+        set(ids::detect, 1.f); set(ids::target, -9.f);
+        std::unique_ptr<AudioProcessorEditor> ed(proc.createEditor());
+        runSine(proc, 48000, -22.f, 8.0, ph);  // peaks at -19 dBFS: needs +10, inside the 12 dB range
+        const float pk = proc.core().telemetry().outPk.load();
+        CHECK(std::abs(pk + 9.f) < 0.5f, "peak mode: output peaks at %.2f dBFS, target -9", pk);
+        static_cast<CorridorEditor*>(ed.get())->refreshNow();
+        save(ed->createComponentSnapshot(ed->getLocalBounds(), true, 1.0f), "window-peak.png");
+        set(ids::detect, 0.f); set(ids::target, -18.f);
     }
 }
 

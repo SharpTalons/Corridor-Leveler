@@ -20,8 +20,10 @@
 
 namespace updates {
 
-inline constexpr const char* kLatestUrl = "https://api.github.com/repos/fubulatu-lang/Corridor-Leveler/releases/latest";
-inline constexpr const char* kReleasesPage = "https://github.com/fubulatu-lang/Corridor-Leveler/releases";
+// The project's own repository. (It used to live at fubulatu-lang/Corridor-Leveler; asking that old name
+// relied on GitHub's redirect, which would stop, or point at someone else's releases, if the name were reused.)
+inline constexpr const char* kLatestUrl = "https://api.github.com/repos/SharpTalons/Corridor-Leveler/releases/latest";
+inline constexpr const char* kReleasesPage = "https://github.com/SharpTalons/Corridor-Leveler/releases";
 inline constexpr juce::int64 kMaxBytes = 200LL * 1024 * 1024;
 
 struct Release {
