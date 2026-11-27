@@ -43,12 +43,15 @@ settings to compare; B starts as a copy of A, and both are saved with the sessio
 (Ctrl+Z, Ctrl+Shift+Z) for every change. Double-click a dial, or press Enter on it, to type a value;
 Alt-click resets it.
 
-The window is drawn in a Liquid Glass style: a full-bleed level graph with the header, meters and readouts
-floating over it as glass, and the controls sitting in the graph where it frosts over. It is dark by default,
-with a light version on the sun / moon switch, and can be resized freely (it keeps its shape). The meters show
-left and right with a balance dot, in green, amber and red zones, marked at the graph's heights. The bottom
-corners show how far the output is from the target and the applied gain; the latency is under them
-(5 ms at every sample rate). A one-time tip explains the two settings that matter most.
+The window is flat and quiet, in an analyzer style: the full-bleed level graph is the interface, with a faint
+grid, the input as a thin grey trace and the output as a gold curve. The Target, Threshold and Ceiling lines
+(gold, green and red) each have a round handle. The header, meters, readouts and dials sit straight on the graph
+as solid panels with a thin edge, with no gradients or glow. Dials are matte discs with the value as a gold arc
+around them; anything switched on turns gold. It is dark charcoal by default, with a light version on the
+sun / moon switch, and a plain edge keeps the window distinct on black, dark or white backgrounds. It can be
+resized freely (it keeps its shape). The meters show left and right with a balance dot, in green, amber and red
+zones, marked at the graph's heights. The bottom corners show how far the output is from the target and the
+applied gain; the latency is in the status strip along the bottom (5 ms at every sample rate). A one-time tip explains the two settings that matter most.
 
 ![Hold mode with the analysis sheet open](docs/window-hold.png)
 
